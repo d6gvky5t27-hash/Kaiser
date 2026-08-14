@@ -207,6 +207,23 @@
   }
   .titleMenuBtn:hover { background: #c9bb92; }
   .titleMenuBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Intro-Sequenz (§90): kurzer Text-Vorspann vor dem Titelbildschirm */
+  #introScreen {
+    width: 960px; background: #0a0c11; border: 6px solid #0a0c11;
+    box-shadow: 0 0 0 2px #4a5570 inset, 0 0 40px rgba(0,0,0,0.6);
+    padding: calc(var(--sp-5) * 3) var(--sp-5); text-align: center; color: #d8cba8;
+    min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  #introScreen p {
+    font-size: var(--fs-md); letter-spacing: 1px; margin: var(--sp-3) 0; opacity: 0;
+    animation: introFadeIn 2s ease forwards;
+  }
+  #introScreen .introSkip {
+    margin-top: var(--sp-5); font-size: var(--fs-body); color: #8a8264; letter-spacing: 1px;
+  }
+  @keyframes introFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
   #charCreation { text-align: left; }
   #charCreation h2 { text-align:center; color: var(--gold); letter-spacing:2px; margin-bottom: var(--sp-5); font-weight: normal; }
   .formRow { display:flex; align-items:center; gap: var(--sp-4); margin-bottom: var(--sp-4); font-size: var(--fs-md); }
@@ -292,10 +309,18 @@
 </head>
 <body>
 
-<div id="titleScreen">
+<div id="introScreen" onclick="skipIntro()">
+  <p style="animation-delay:0.2s;">Anno 1500.</p>
+  <p style="animation-delay:1.6s;">Eine junge Dynastie erhebt sich in einem unruhigen Reich —</p>
+  <p style="animation-delay:3.0s;">zwischen Kornkammern, Kanzleien und Kriegsherren.</p>
+  <p style="animation-delay:4.4s;" id="introFinalLine"><b style="color:var(--gold); letter-spacing:2px;">KAISERREICH</b></p>
+  <div class="introSkip">(klicken zum Überspringen)</div>
+</div>
+
+<div id="titleScreen" style="display:none;">
   <h1>KAISERREICH</h1>
   <h2>AUFSTIEG EINER DYNASTIE</h2>
-  <div class="cityArt">
+  <div class="cityArt" onclick="crownClicked()" title="">
     <svg viewBox="0 0 40 30" width="140" height="105">
       <polygon points="4,28 4,14 10,20 20,8 30,20 36,14 36,28" fill="#b8963e"/>
       <polygon points="4,28 4,14 10,20 20,8 30,20 36,14 36,28" fill="none" stroke="#5c3a1a" stroke-width="1"/>
@@ -937,6 +962,8 @@ const GOODS = {
   buecher:   { name: "Bücher",    base: 35, category: "luxus" }, // zweistufige Kette: Holz -> Papier -> Bücher
   schmuck:   { name: "Schmuck",   base: 85, category: "luxus" },
   glaswaren: { name: "Glaswaren", base: 32, category: "luxus" },
+  mehl:      { name: "Mehl",      base: 13, category: "verarbeitet" }, // zweistufige Kette: Getreide -> Mehl -> Brot
+  brot:      { name: "Brot",      base: 18, category: "verarbeitet" },
 };
 
 // Produktionsketten: Input-Ware -> Output-Ware, Verhältnis, benötigtes Gebäude,
@@ -963,6 +990,12 @@ const PRODUCTION_CHAINS = [
   { input: "papier",   output: "buecher",  ratioPerWorker: 0.15, building: "buchbinderei", workerGroup: "geistliche" },
   { input: "eisen",    output: "schmuck",  ratioPerWorker: 0.1,  building: "goldschmiede", workerGroup: "handwerker" },
   { input: "stein",    output: "glaswaren", ratioPerWorker: 0.2,  building: "glasblaeserei", workerGroup: "handwerker" },
+  // Zweite echte zweistufige Kette (§17, siehe DEVELOPMENT.md-Vorschlag "Mehl->Brot als
+  // weitere zweistufige Kette"): eigene Gebäude statt der bestehenden Mühle (die bleibt
+  // unverändert ein reiner Getreide-Ertragsbooster), damit bestehende Spielstände ohne
+  // die neuen Gebäude von der neuen Kette unberührt bleiben.
+  { input: "getreide", output: "mehl",     ratioPerWorker: 0.5, building: "kornmuehle",   workerGroup: "handwerker" },
+  { input: "mehl",     output: "brot",     ratioPerWorker: 0.35, building: "baeckerei",    workerGroup: "handwerker" },
 ];
 
 // materialCost (§26: Bauwerke aus echten mittelalterlichen Rohstoffen — Holz, Stein,
@@ -998,6 +1031,8 @@ const BUILDINGS = {
   buchbinderei:  { name: "Buchbinderei",     icon: "BB",  cost: 320,  effect: "enables",        value: "buecher",   materialCost: { holz: 15, stein: 5 } },
   goldschmiede:  { name: "Goldschmiede",     icon: "GS",  cost: 400,  effect: "enables",        value: "schmuck",   materialCost: { stein: 15, holz: 10 } },
   glasblaeserei: { name: "Glasbläserei",     icon: "GB",  cost: 350,  effect: "enables",        value: "glaswaren", materialCost: { stein: 20, holz: 15 } },
+  kornmuehle:    { name: "Kornmühle",        icon: "KM",  cost: 240,  effect: "enables",        value: "mehl",      materialCost: { holz: 15, stein: 5 } },
+  baeckerei:     { name: "Bäckerei",         icon: "BK",  cost: 260,  effect: "enables",        value: "brot",      materialCost: { holz: 20, stein: 10 } },
 };
 
 // Bedarf pro Kopf und Gruppe (relative Gewichtung für Preisbildung); §13: mindestens
@@ -1005,12 +1040,12 @@ const BUILDINGS = {
 const POP_GROUPS = {
   bauern:       { name: "Bauern",       needs: { getreide: 1.0 }, weight: 1.0, share: 0.40 },
   landarbeiter: { name: "Landarbeiter", needs: { getreide: 1.0, gemuese: 0.3 }, weight: 1.0, share: 0.08 },
-  handwerker:   { name: "Handwerker",   needs: { getreide: 1.0, bier: 0.3, leder: 0.05, kleidung: 0.1 }, weight: 1.1, share: 0.12 },
-  buerger:      { name: "Bürger",       needs: { getreide: 1.0, bier: 0.3, fleisch: 0.2, kleidung: 0.15, salz: 0.1, buecher: 0.02, glaswaren: 0.03 }, weight: 1.4, share: 0.08 },
-  haendler:     { name: "Händler",      needs: { getreide: 1.0, bier: 0.4, werkzeuge: 0.1, leder: 0.05, wein: 0.1, papier: 0.05, glaswaren: 0.02 }, weight: 1.3, share: 0.07 },
-  adel:         { name: "Adel",         needs: { getreide: 1.2, bier: 0.5, werkzeuge: 0.2, leder: 0.15, wein: 0.3, gewuerze: 0.05, kleidung: 0.2, waffen: 0.02, schmuck: 0.03, seide: 0.03, buecher: 0.02 }, weight: 2.0, share: 0.04 },
-  geistliche:   { name: "Geistliche",   needs: { getreide: 0.9, wein: 0.1, buecher: 0.05, papier: 0.05 }, weight: 1.2, share: 0.03 },
-  soldaten:     { name: "Soldaten",     needs: { getreide: 1.1, fleisch: 0.2, waffen: 0.05 }, weight: 1.2, share: 0.03 },
+  handwerker:   { name: "Handwerker",   needs: { getreide: 1.0, bier: 0.3, leder: 0.05, kleidung: 0.1, brot: 0.1 }, weight: 1.1, share: 0.12 },
+  buerger:      { name: "Bürger",       needs: { getreide: 1.0, bier: 0.3, fleisch: 0.2, kleidung: 0.15, salz: 0.1, buecher: 0.02, glaswaren: 0.03, brot: 0.15 }, weight: 1.4, share: 0.08 },
+  haendler:     { name: "Händler",      needs: { getreide: 1.0, bier: 0.4, werkzeuge: 0.1, leder: 0.05, wein: 0.1, papier: 0.05, glaswaren: 0.02, brot: 0.1 }, weight: 1.3, share: 0.07 },
+  adel:         { name: "Adel",         needs: { getreide: 1.2, bier: 0.5, werkzeuge: 0.2, leder: 0.15, wein: 0.3, gewuerze: 0.05, kleidung: 0.2, waffen: 0.02, schmuck: 0.03, seide: 0.03, buecher: 0.02, brot: 0.1 }, weight: 2.0, share: 0.04 },
+  geistliche:   { name: "Geistliche",   needs: { getreide: 0.9, wein: 0.1, buecher: 0.05, papier: 0.05, brot: 0.1 }, weight: 1.2, share: 0.03 },
+  soldaten:     { name: "Soldaten",     needs: { getreide: 1.1, fleisch: 0.2, waffen: 0.05, brot: 0.1 }, weight: 1.2, share: 0.03 },
   tageloehner:  { name: "Tagelöhner",   needs: { getreide: 0.85 }, weight: 0.6, share: 0.08 },
   arme:         { name: "Arme",         needs: { getreide: 0.8 }, weight: 0.5, share: 0.07 },
 };
@@ -1023,7 +1058,9 @@ const TROOP_TYPES = {
   miliz:             { name: "Bauernmiliz",       cost: 50,  upkeep: 2,  strength: 1,   source: "vasall" },
   bogenschuetzen:    { name: "Bogenschützen",     cost: 90,  upkeep: 3,  strength: 2,   source: "vasall" },
   armbrustschuetzen: { name: "Armbrustschützen",  cost: 130, upkeep: 4,  strength: 2.5, source: "vasall" },
+  pikeniere:         { name: "Pikeniere",         cost: 110, upkeep: 4,  strength: 3,   source: "vasall" },
   ritter:            { name: "Ritter",            cost: 400, upkeep: 12, strength: 8,   source: "vasall", minAdelSatisfaction: 45 },
+  schwere_kavallerie:{ name: "Schwere Kavallerie",cost: 650, upkeep: 18, strength: 12,  source: "vasall", minAdelSatisfaction: 55 },
   soeldner:          { name: "Söldner",           cost: 200, upkeep: 15, strength: 4,   source: "soeldner" },
 };
 
@@ -1032,6 +1069,7 @@ const TROOP_TYPES = {
 const FORMATIONS = {
   ritter_zentrum:    { name: "Ritter im Zentrum, Fußvolk an den Flanken", requiresTroop: "ritter", bonus: 0.15 },
   schuetzen_vorhut:  { name: "Bogen-/Armbrustschützen als Vorhut",        requiresTroop: ["bogenschuetzen","armbrustschuetzen"], bonus: 0.12 },
+  pikenwall:         { name: "Pikenwall gegen Kavallerie",                requiresTroop: "pikeniere", bonus: 0.13 },
   gleichmaessig:     { name: "Gleichmäßig verteilt (keine Schwerpunktbildung)", requiresTroop: null, bonus: 0 },
 };
 
@@ -1405,6 +1443,22 @@ const EVENTS = [
       { label: "Durchreise zügig abwickeln", apply: (r, s) => { s.treasury += 60; } },
     ],
   },
+  // §88 Easter Egg: eine einmalige, augenzwinkernde Anspielung auf die
+  // Design-Philosophie "1986 außen – 2026 innen" (GAME_DESIGN.md), ausgelöst
+  // sobald die Chronik zufällig das Jahr 1986 erreicht. Kein Gameplay-Effekt
+  // von Belang, nur eine kleine Prestige-Anekdote — die _sawEasterEgg1986-
+  // Flagge verhindert ein erneutes Auslösen, falls per Debug im Jahr
+  // hin- und hergesprungen wird.
+  {
+    id: "seltsames_kribbeln",
+    title: "Ein seltsames Kribbeln in der Luft",
+    text: "Für einen Wimpernschlag scheint die Welt zu flackern — als bestünde sie aus lauter kleinen, viereckigen Farbklecksen. Ein fahrender Gaukler murmelt etwas von \"Pixeln\" und \"1986\", bevor alles wieder normal wirkt. Deine Hofastrologen sind ratlos, aber beeindruckt.",
+    condition: (r, s) => s.year === 1986 && !s._sawEasterEgg1986,
+    options: [
+      { label: "Als gutes Omen feiern lassen (+Prestige)", apply: (r, s) => { s._sawEasterEgg1986 = true; s.prestige += 19; addChronicle(s, "Die Gelehrten datieren das Ereignis auf ein fernes Jahr: 1986."); } },
+      { label: "Schnell vergessen", apply: (r, s) => { s._sawEasterEgg1986 = true; } },
+    ],
+  },
 ];
 
 // ============================================================
@@ -1517,6 +1571,26 @@ function upgradeBuildingAt(state, region, plotIndex) {
   return { ok: true };
 }
 
+// ---------- Individuelle KI-Kommandanten (Content-Vertiefung): jede
+// KI-Region bekommt einen benannten Hauptmann mit eigenen Werten, der über
+// mehrere Schlachten hinweg bestehen bleibt (Erfahrung wächst, Tod führt zu
+// einem Nachfolger) statt bei jeder Kriegserklärung neu ausgewürfelt zu werden. ----------
+function generateCommander(regionName) {
+  const gender = rnd() < 0.5 ? "m" : "f";
+  const pool = gender === "m" ? MALE_NAMES : FEMALE_NAMES;
+  const name = pool[Math.floor(rnd() * pool.length)];
+  return {
+    name: `Hauptmann ${name} von ${regionName}`,
+    leadership: 30 + Math.round(rnd() * 50),
+    courage: 30 + Math.round(rnd() * 50),
+    tactics: 30 + Math.round(rnd() * 50),
+    experience: 20 + Math.round(rnd() * 40),
+    battlesFought: 0,
+    battlesWon: 0,
+    alive: true,
+  };
+}
+
 function makeRegion(name, isPlayer, fertility, startPop) {
   const population = {};
   for (const gid in POP_GROUPS) {
@@ -1553,6 +1627,7 @@ function makeRegion(name, isPlayer, fertility, startPop) {
     extraGrainRate: 0,      // §Original: freiwillige Kornverteilung über den Bedarf hinaus
     governanceStyle: 15,    // §Original: Regierungsstil 0=sehr fair .. 100=gierig (moderater Startwert)
     priceNoise,             // Marktspekulation: jährliche Preisschwankung unabhängig von Angebot/Nachfrage
+    commander: isPlayer ? null : generateCommander(name), // individueller KI-Hauptmann, überlebt mehrere Schlachten
   };
 }
 
@@ -1589,7 +1664,7 @@ function newGame(options) {
       ai2: { relation: CONFIG.diplomacy.startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
       ai3: { relation: CONFIG.diplomacy.startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
     },
-    army: { miliz: 0, bogenschuetzen: 0, armbrustschuetzen: 0, ritter: 0, soeldner: 0 },
+    army: { miliz: 0, bogenschuetzen: 0, armbrustschuetzen: 0, pikeniere: 0, ritter: 0, schwere_kavallerie: 0, soeldner: 0 },
     advisors: { schatzmeister: null, marschall: null, diplomat: null, spionagemeister: null, geistlicher: null, handelsberater: null },
     religiousInfluence: CONFIG.religion.startInfluence,
     intel: {
@@ -3215,15 +3290,27 @@ const UNIT_TYPES = {
     name: "Miliz", attack: 3, defense: 3, rangedAttack: 0, armor: 1,
     speed: 3, moraleBase: 40, disciplineBase: 30, costPerSoldier: 0.4,
   },
+  pikeniere: {
+    name: "Pikeniere", attack: 4, defense: 8, rangedAttack: 0, armor: 3,
+    speed: 2, moraleBase: 55, disciplineBase: 55, costPerSoldier: 1.2,
+  },
+  schwere_kavallerie: {
+    name: "Schwere Kavallerie", attack: 11, defense: 6, rangedAttack: 0, armor: 8,
+    speed: 6, moraleBase: 75, disciplineBase: 65, costPerSoldier: 6.0,
+  },
 };
 
 // ---------- §6 Schere-Stein-Papier-Konter (additive Modifikatoren) ----------
 // counterModifier(A, B) = wie stark A im Kampf gegen B verstärkt/geschwächt wird
 const UNIT_COUNTERS = {
-  kavallerie: { bogenschuetzen: 0.40, infanterie: -0.25 },
+  // Pikeniere sind der historische Hartkonter gegen (schwere) Kavallerie —
+  // ergänzt den bereits bestehenden Kavallerie-vs-Bogenschützen/Infanterie-Konter.
+  kavallerie: { bogenschuetzen: 0.40, infanterie: -0.25, pikeniere: -0.35 },
+  schwere_kavallerie: { bogenschuetzen: 0.45, infanterie: -0.10, pikeniere: -0.20 }, // schwerere Rüstung dämpft den Pikenmalus etwas
   bogenschuetzen: { infanterie: 0.20 }, // gilt nur in der Fernkampfphase, siehe meleeMalus unten
   artillerie: { grossFormationBonus: 0.30, kavallerieErreichtMalus: -0.50 },
   miliz: { heimatBonus: 0.25 },
+  pikeniere: { kavallerie: 0.50, schwere_kavallerie: 0.35 },
 };
 // Bogenschützen im direkten Nahkampf (Hauptkampfphase) sind stark benachteiligt
 const ARCHER_MELEE_MALUS = -0.40;
@@ -3233,15 +3320,15 @@ const LARGE_FORMATION_SOLDIER_THRESHOLD = 400;
 // ---------- §12 Gelände ----------
 const TERRAIN_TYPES = {
   ebene:  { name: "Ebene",  desc: "Offenes Feld — ideal für Reiterei.",
-    unitMods: { kavallerie: { attack: 0.20 } }, defenderBonus: 0 },
+    unitMods: { kavallerie: { attack: 0.20 }, schwere_kavallerie: { attack: 0.15 } }, defenderBonus: 0 },
   wald:   { name: "Wald",   desc: "Dichter Wald — hemmt Kavallerie, begünstigt Schützen.",
-    unitMods: { kavallerie: { attack: -0.30 }, bogenschuetzen: { rangedAttack: 0.10 } }, defenderBonus: 0.05 },
+    unitMods: { kavallerie: { attack: -0.30 }, schwere_kavallerie: { attack: -0.35 }, bogenschuetzen: { rangedAttack: 0.10 } }, defenderBonus: 0.05 },
   huegel: { name: "Hügel",  desc: "Erhöhte Stellung — Verteidiger und Artillerie im Vorteil.",
     unitMods: { artillerie: { rangedAttack: 0.10 } }, defenderBonus: 0.20 },
   sumpf:  { name: "Sumpf",  desc: "Morastiger Boden — alle Einheiten stark verlangsamt.",
-    unitMods: {}, defenderBonus: 0.10, speedMalus: 0.5 },
+    unitMods: { schwere_kavallerie: { attack: -0.15 } }, defenderBonus: 0.10, speedMalus: 0.5 },
   stadt:  { name: "Stadt",  desc: "Enge Gassen — Infanterie im Vorteil, Kavallerie stark behindert.",
-    unitMods: { infanterie: { defense: 0.15 }, kavallerie: { attack: -0.40 } }, defenderBonus: 0.15 },
+    unitMods: { infanterie: { defense: 0.15 }, kavallerie: { attack: -0.40 }, schwere_kavallerie: { attack: -0.45 }, pikeniere: { defense: 0.10 } }, defenderBonus: 0.15 },
   burg:   { name: "Burg",   desc: "Befestigte Stellung — der Verteidiger ist massiv im Vorteil.",
     unitMods: {}, defenderBonus: 0.50 },
 };
@@ -3503,8 +3590,8 @@ function computeCounterBonus(stack, opponentArmy, context) {
   }
   const totalOpp = Object.values(opponentSoldiersByType).reduce((a, b) => a + b, 0) || 1;
 
-  if (stack.unitType === "kavallerie") {
-    const c = UNIT_COUNTERS.kavallerie;
+  if (stack.unitType === "kavallerie" || stack.unitType === "schwere_kavallerie" || stack.unitType === "pikeniere") {
+    const c = UNIT_COUNTERS[stack.unitType];
     for (const type in c) {
       const share = (opponentSoldiersByType[type] || 0) / totalOpp;
       bonus += c[type] * share;
@@ -3620,7 +3707,7 @@ function chooseAiFormationAndTactic(army, knownEnemyEstimate, terrain) {
   const commander = army.commander;
   const aggressive = commander.courage > 60;
   const cavalryShare = totalSoldiers(army) > 0
-    ? army.stacks.filter(u => u.unitType === "kavallerie").reduce((s, u) => s + u.soldiers, 0) / totalSoldiers(army)
+    ? army.stacks.filter(u => u.unitType === "kavallerie" || u.unitType === "schwere_kavallerie").reduce((s, u) => s + u.soldiers, 0) / totalSoldiers(army)
     : 0;
 
   let formation = "ausgewogen";
@@ -3985,7 +4072,9 @@ function buildPlayerBattleArmy(state) {
 
   push("miliz", state.army.miliz);
   push("bogenschuetzen", state.army.bogenschuetzen + state.army.armbrustschuetzen);
+  push("pikeniere", state.army.pikeniere);
   push("kavallerie", state.army.ritter);
+  push("schwere_kavallerie", state.army.schwere_kavallerie);
   push("infanterie", state.army.soeldner);
 
   // Kaserne/Markt/Mühle-Bonus (bisher ein abstrakter Stärkewert) wird als
@@ -4023,10 +4112,16 @@ function buildAiBattleArmy(state, aiId, weakenFactor) {
   const mobilizationRate = 0.02 + kaserneLevel * 0.003;
   const totalSoldierCount = Math.max(80, Math.round(totalPop * mobilizationRate));
 
+  // Pikeniere treten erst mit einer gewissen militärischen Grundausbildung
+  // (Kaserne) als eigener Anteil in Erscheinung — vorher stellt die KI-Region
+  // nur die drei ursprünglichen Grundtypen.
   const hasArtillery = kaserneLevel >= 2;
+  const hasPikes = kaserneLevel >= 1;
   const shares = hasArtillery
-    ? { infanterie: 0.50, bogenschuetzen: 0.22, kavallerie: 0.20, artillerie: 0.08 }
-    : { infanterie: 0.55, bogenschuetzen: 0.25, kavallerie: 0.20 };
+    ? { infanterie: 0.42, bogenschuetzen: 0.20, kavallerie: 0.18, artillerie: 0.08, pikeniere: 0.12 }
+    : hasPikes
+      ? { infanterie: 0.45, bogenschuetzen: 0.22, kavallerie: 0.18, pikeniere: 0.15 }
+      : { infanterie: 0.55, bogenschuetzen: 0.25, kavallerie: 0.20 };
 
   const factor = weakenFactor !== undefined ? weakenFactor : 1.0;
   const stacks = [];
@@ -4036,13 +4131,33 @@ function buildAiBattleArmy(state, aiId, weakenFactor) {
   }
   if (stacks.length === 0) stacks.push(createUnitStack("miliz", Math.max(10, Math.round(50 * factor))));
 
-  const commander = createCommander(
-    `Hauptmann von ${region.name}`,
-    30 + Math.round(rnd() * 50), 30 + Math.round(rnd() * 50),
-    30 + Math.round(rnd() * 50), 20 + Math.round(rnd() * 40)
-  );
+  // Individueller, über mehrere Schlachten persistenter Hauptmann (statt bei
+  // jeder Kriegserklärung neu ausgewürfelt) — siehe generateCommander() in core.js.
+  if (!region.commander) region.commander = generateCommander(region.name); // defensiv für ältere Spielstände
+  const persisted = region.commander;
+  const commander = createCommander(persisted.name, persisted.tactics, persisted.leadership, persisted.courage, persisted.experience);
 
   return createArmy(region.name, commander, stacks, { isAttacker: false, isHomeTerritory: true });
+}
+
+// Aktualisiert den persistenten KI-Kommandanten nach einer ausgetragenen
+// Schlacht: Erfahrung/Führung wachsen mit jedem Gefecht leicht, ein
+// gefallener Kommandant wird durch einen neu benannten Nachfolger ersetzt.
+function updateAiCommanderAfterBattle(state, aiId, battleResult) {
+  const region = state.regions[aiId];
+  if (!region.commander) return;
+  const foughtCommander = battleResult.armyB.commander;
+  const won = battleResult.result.winner === "B";
+  region.commander.battlesFought += 1;
+  if (won) region.commander.battlesWon += 1;
+  if (!foughtCommander.alive) {
+    const oldName = region.commander.name;
+    region.commander = generateCommander(region.name);
+    addChronicle(state, `${oldName} ist in der Schlacht gefallen. ${region.commander.name} übernimmt fortan das Kommando über die Truppen von ${region.name}.`);
+  } else {
+    region.commander.experience = clamp(region.commander.experience + 3, 20, 95);
+    region.commander.leadership = clamp(region.commander.leadership + 1, 10, 99);
+  }
 }
 
 // Ermittelt das Gelände aus dem Befestigungsgrad der Zielregion (§12/§36
@@ -4130,8 +4245,12 @@ function applyBattleResultToGame(state, aiId, battleResult) {
   const rangedRatio = applyRatio("bogenschuetzen", 0.9);
   state.army.bogenschuetzen = Math.round(state.army.bogenschuetzen * rangedRatio);
   state.army.armbrustschuetzen = Math.round(state.army.armbrustschuetzen * rangedRatio);
+  state.army.pikeniere = Math.round(state.army.pikeniere * applyRatio("pikeniere", 0.9));
   state.army.ritter = Math.round(state.army.ritter * applyRatio("kavallerie", 0.9));
+  state.army.schwere_kavallerie = Math.round(state.army.schwere_kavallerie * applyRatio("schwere_kavallerie", 0.9));
   state.army.soeldner = Math.round(state.army.soeldner * applyRatio("infanterie", 0.9));
+
+  updateAiCommanderAfterBattle(state, aiId, battleResult);
 
   // Diplomatische/wirtschaftliche Konsequenzen wie zuvor
   const hadPact = dip.treaties.nichtangriff || dip.treaties.allianz;
@@ -4169,9 +4288,39 @@ let selectedTraits = [];
 
 // ---------- Start-/Charaktererstellungsbildschirm (§8/§89) ----------
 function showTitleScreen() {
+  const introEl = document.getElementById('introScreen');
+  if (introEl) introEl.style.display = 'none';
   document.getElementById('titleScreen').style.display = 'block';
   document.getElementById('charCreation').style.display = 'none';
   document.getElementById('frame').style.display = 'none';
+}
+
+// ---------- Intro-Sequenz (§90): kurzer Text-Vorspann vor dem Titelbildschirm ----------
+let __introTimer = null;
+function showIntroScreen() {
+  document.getElementById('introScreen').style.display = 'flex';
+  document.getElementById('titleScreen').style.display = 'none';
+  __introTimer = setTimeout(skipIntro, 6200);
+}
+function skipIntro() {
+  if (__introTimer) { clearTimeout(__introTimer); __introTimer = null; }
+  showTitleScreen();
+}
+
+// ---------- Easter Egg (§88): die Krone auf dem Titelbildschirm mehrfach
+// anklicken enthüllt eine kleine Anekdote und einen bescheidenen Startbonus
+// für die nächste Partie — kein Pflicht-Feature, reine Spielerei. ----------
+let __crownClickCount = 0;
+let __crownClickTimer = null;
+function crownClicked() {
+  __crownClickCount++;
+  if (__crownClickTimer) clearTimeout(__crownClickTimer);
+  __crownClickTimer = setTimeout(() => { __crownClickCount = 0; }, 2500);
+  if (__crownClickCount >= 7 && !window.__crownEasterEggUnlocked) {
+    window.__crownEasterEggUnlocked = true;
+    __crownClickCount = 0;
+    alert('Die Krone glänzt plötzlich heller als sonst...\n\nEin Hofnarr flüstert: "Sieben ist eine gute Zahl, Herrscher!"\n\nDeine nächste Dynastie beginnt mit einer vollen Schatulle (+500 Taler).');
+  }
 }
 
 function showCharCreation() {
@@ -4209,6 +4358,11 @@ function syncSliders() {
 
 function launchGame(options) {
   state = newGame(options);
+  if (window.__crownEasterEggUnlocked) {
+    state.treasury += 500;
+    addChronicle(state, "Ein Hofnarr murmelt etwas von einer glänzenden Krone — die Staatskasse begann mit ungewöhnlichem Glück.");
+    window.__crownEasterEggUnlocked = false;
+  }
   document.getElementById('titleScreen').style.display = 'none';
   document.getElementById('charCreation').style.display = 'none';
   document.getElementById('frame').style.display = 'block';
@@ -4643,6 +4797,7 @@ function renderMilitary() {
     const region = state.regions[aiId];
     const intel = state.intel[aiId];
     warHtml += `<div class="diploBlock"><b>${region.name}</b> — geschätzte gegnerische Stärke: zwischen ${intel.rangeLow ?? '?'} und ${intel.rangeHigh ?? '?'} (Aufklärung: ${Math.round(intel.accuracy*100)}%)<br>
+      ${region.commander ? `<i>Kommandant: ${region.commander.name} — ${region.commander.battlesFought} Schlacht(en), ${region.commander.battlesWon} Sieg(e)</i><br>` : ''}
       ${dip.treaties.nichtangriff ? '<i>Nichtangriffspakt aktiv — Kriegserklärung bricht ihn.</i><br>' : ''}
       ${buildingLevelSum(region, 'stadtmauer') > 0 ? '<i>Befestigt (Stadtmauer) — löst eine mehrjährige Belagerung aus, bevor es zur Schlacht kommt.</i><br>' : ''}
       <button class="dipbtn" onclick="doDeclareWar('${aiId}')" ${state.pendingSiege ? 'disabled' : ''}>Krieg erklären</button>
@@ -4769,7 +4924,7 @@ function btStartBattle() {
 }
 
 function btUnitBlockHtml(stack) {
-  const abbr = { infanterie:'INF', bogenschuetzen:'BOG', kavallerie:'KAV', artillerie:'ART', miliz:'MIL' }[stack.unitType];
+  const abbr = { infanterie:'INF', bogenschuetzen:'BOG', kavallerie:'KAV', artillerie:'ART', miliz:'MIL', pikeniere:'PIK', schwere_kavallerie:'SKV' }[stack.unitType];
   const dead = stack.soldiers <= 0 || stack.routed;
   return `<div class="btUnitBlock" style="${dead ? 'opacity:0.3;' : ''}">
     [${abbr}]<br><span class="cnt">${Math.max(0, Math.round(stack.soldiers))}</span>
@@ -4946,6 +5101,8 @@ const BUILDING_ICONS = {
   buchbinderei: `<rect x="3" y="8" width="14" height="9" fill="${P.holz}"/><polygon points="2,8 10,3 18,8" fill="${P.dach}"/><rect x="6" y="11" width="3" height="5" fill="${P.rot}"/><rect x="9.5" y="11" width="3" height="5" fill="${P.blau}"/><rect x="13" y="11" width="2.5" height="5" fill="${P.gruenDunkel}"/>`,
   goldschmiede: `<rect x="3" y="9" width="14" height="8" fill="${P.steinDunkel}"/><polygon points="2,9 10,4 18,9" fill="${P.gold}"/><circle cx="10" cy="13" r="2.4" fill="none" stroke="${P.gold}" stroke-width="1.4"/>`,
   glasblaeserei: `<rect x="3" y="9" width="14" height="8" fill="${P.stein}"/><polygon points="2,9 10,4 18,9" fill="${P.steinDunkel}"/><path d="M8 12 L12 12 L11 17 L9 17 Z" fill="${P.wasserHell}" opacity="0.8"/>`,
+  kornmuehle: `<rect x="5" y="7" width="10" height="10" fill="${P.stein}"/><polygon points="5,7 15,7 10,2" fill="${P.steinDunkel}"/><circle cx="17" cy="12" r="4" fill="none" stroke="${P.wasserHell}" stroke-width="1.4"/><line x1="17" y1="8" x2="17" y2="16" stroke="${P.wasserHell}" stroke-width="1"/><line x1="13" y1="12" x2="21" y2="12" stroke="${P.wasserHell}" stroke-width="1"/>`,
+  baeckerei: `<rect x="3" y="9" width="14" height="8" fill="${P.steinDunkel}"/><polygon points="2,9 10,4 18,9" fill="${P.dach}"/><ellipse cx="7" cy="14" rx="2.4" ry="1.5" fill="${P.stroh}"/><ellipse cx="12" cy="14" rx="2.4" ry="1.5" fill="${P.dach}"/>`,
 };
 
 function renderBuildingIcon(type) {
@@ -4978,6 +5135,8 @@ const GOOD_ICONS = {
   buecher: `<rect x="3" y="12" width="14" height="3" fill="${P.rot}"/><rect x="3" y="9" width="14" height="3" fill="${P.gruenDunkel}"/><rect x="3" y="6" width="14" height="3" fill="${P.blau}"/><rect x="9" y="6" width="1.5" height="9" fill="${P.gold}"/>`,
   schmuck: `<circle cx="10" cy="9" r="5" fill="none" stroke="${P.gold}" stroke-width="1.6"/><polygon points="10,3 12,7 8,7" fill="${P.wasserHell}"/><circle cx="10" cy="14.5" r="1.3" fill="${P.gold}"/>`,
   glaswaren: `<path d="M7 2 L13 2 L12 8 L13 17 L7 17 L8 8 Z" fill="${P.wasserHell}" opacity="0.75"/><path d="M7 2 L13 2 L12 8 L13 17 L7 17 L8 8 Z" fill="none" stroke="${P.wasser}" stroke-width="0.8"/><rect x="6" y="1" width="8" height="1.5" fill="${P.grau}"/>`,
+  mehl: `<path d="M4 6 L16 6 L15 17 L5 17 Z" fill="${P.creme}"/><path d="M4 6 L16 6 L15 17 L5 17 Z" fill="none" stroke="${P.holzDunkel}" stroke-width="0.8"/><line x1="6" y1="4" x2="7" y2="6" stroke="${P.creme}" stroke-width="1"/><line x1="10" y1="3" x2="10" y2="6" stroke="${P.creme}" stroke-width="1"/><line x1="14" y1="4" x2="13" y2="6" stroke="${P.creme}" stroke-width="1"/>`,
+  brot: `<path d="M3 13 Q3 8 10 8 Q17 8 17 13 Q17 17 10 17 Q3 17 3 13 Z" fill="${P.stroh}"/><path d="M6 9 Q10 12 14 9" fill="none" stroke="${P.holzDunkel}" stroke-width="0.8"/><path d="M5 12 Q10 15 15 12" fill="none" stroke="${P.holzDunkel}" stroke-width="0.8"/>`,
 };
 
 function renderGoodIcon(gid, size) {
@@ -5300,7 +5459,7 @@ document.getElementById('loadFile').addEventListener('change', (e) => {
   reader.readAsText(file);
 });
 
-showTitleScreen();
+showIntroScreen();
 </script>
 </body>
 </html>

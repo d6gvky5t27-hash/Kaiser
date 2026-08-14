@@ -162,6 +162,7 @@ function buildDemoArmies() {
     createUnitStack('infanterie', 1200),
     createUnitStack('bogenschuetzen', 400),
     createUnitStack('kavallerie', 180),
+    createUnitStack('schwere_kavallerie', 60),
     createUnitStack('artillerie', 12),
   ], { isAttacker: true });
 
@@ -169,6 +170,7 @@ function buildDemoArmies() {
   const armyB = createArmy('Pfalz', commanderB, [
     createUnitStack('infanterie', 950),
     createUnitStack('bogenschuetzen', 320),
+    createUnitStack('pikeniere', 260),
     createUnitStack('kavallerie', 110),
   ], { isHomeTerritory: true });
 
@@ -192,7 +194,7 @@ function startBattleScreen() {
 }
 
 function unitBlockHtml(stack) {
-  const abbr = { infanterie:'INF', bogenschuetzen:'BOG', kavallerie:'KAV', artillerie:'ART', miliz:'MIL' }[stack.unitType];
+  const abbr = { infanterie:'INF', bogenschuetzen:'BOG', kavallerie:'KAV', artillerie:'ART', miliz:'MIL', pikeniere:'PIK', schwere_kavallerie:'SKV' }[stack.unitType];
   const dead = stack.soldiers <= 0 || stack.routed;
   return `<div class="unitBlock" style="${dead ? 'opacity:0.3;' : ''}">
     [${abbr}]<br><span class="cnt">${Math.max(0, Math.round(stack.soldiers))}</span>

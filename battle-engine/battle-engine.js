@@ -184,8 +184,8 @@ function computeCounterBonus(stack, opponentArmy, context) {
   }
   const totalOpp = Object.values(opponentSoldiersByType).reduce((a, b) => a + b, 0) || 1;
 
-  if (stack.unitType === "kavallerie") {
-    const c = UNIT_COUNTERS.kavallerie;
+  if (stack.unitType === "kavallerie" || stack.unitType === "schwere_kavallerie" || stack.unitType === "pikeniere") {
+    const c = UNIT_COUNTERS[stack.unitType];
     for (const type in c) {
       const share = (opponentSoldiersByType[type] || 0) / totalOpp;
       bonus += c[type] * share;
@@ -301,7 +301,7 @@ function chooseAiFormationAndTactic(army, knownEnemyEstimate, terrain) {
   const commander = army.commander;
   const aggressive = commander.courage > 60;
   const cavalryShare = totalSoldiers(army) > 0
-    ? army.stacks.filter(u => u.unitType === "kavallerie").reduce((s, u) => s + u.soldiers, 0) / totalSoldiers(army)
+    ? army.stacks.filter(u => u.unitType === "kavallerie" || u.unitType === "schwere_kavallerie").reduce((s, u) => s + u.soldiers, 0) / totalSoldiers(army)
     : 0;
 
   let formation = "ausgewogen";

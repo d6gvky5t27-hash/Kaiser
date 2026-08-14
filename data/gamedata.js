@@ -339,6 +339,8 @@ const GOODS = {
   buecher:   { name: "Bücher",    base: 35, category: "luxus" }, // zweistufige Kette: Holz -> Papier -> Bücher
   schmuck:   { name: "Schmuck",   base: 85, category: "luxus" },
   glaswaren: { name: "Glaswaren", base: 32, category: "luxus" },
+  mehl:      { name: "Mehl",      base: 13, category: "verarbeitet" }, // zweistufige Kette: Getreide -> Mehl -> Brot
+  brot:      { name: "Brot",      base: 18, category: "verarbeitet" },
 };
 
 // Produktionsketten: Input-Ware -> Output-Ware, Verhältnis, benötigtes Gebäude,
@@ -365,6 +367,12 @@ const PRODUCTION_CHAINS = [
   { input: "papier",   output: "buecher",  ratioPerWorker: 0.15, building: "buchbinderei", workerGroup: "geistliche" },
   { input: "eisen",    output: "schmuck",  ratioPerWorker: 0.1,  building: "goldschmiede", workerGroup: "handwerker" },
   { input: "stein",    output: "glaswaren", ratioPerWorker: 0.2,  building: "glasblaeserei", workerGroup: "handwerker" },
+  // Zweite echte zweistufige Kette (§17, siehe DEVELOPMENT.md-Vorschlag "Mehl->Brot als
+  // weitere zweistufige Kette"): eigene Gebäude statt der bestehenden Mühle (die bleibt
+  // unverändert ein reiner Getreide-Ertragsbooster), damit bestehende Spielstände ohne
+  // die neuen Gebäude von der neuen Kette unberührt bleiben.
+  { input: "getreide", output: "mehl",     ratioPerWorker: 0.5, building: "kornmuehle",   workerGroup: "handwerker" },
+  { input: "mehl",     output: "brot",     ratioPerWorker: 0.35, building: "baeckerei",    workerGroup: "handwerker" },
 ];
 
 // materialCost (§26: Bauwerke aus echten mittelalterlichen Rohstoffen — Holz, Stein,
@@ -400,6 +408,8 @@ const BUILDINGS = {
   buchbinderei:  { name: "Buchbinderei",     icon: "BB",  cost: 320,  effect: "enables",        value: "buecher",   materialCost: { holz: 15, stein: 5 } },
   goldschmiede:  { name: "Goldschmiede",     icon: "GS",  cost: 400,  effect: "enables",        value: "schmuck",   materialCost: { stein: 15, holz: 10 } },
   glasblaeserei: { name: "Glasbläserei",     icon: "GB",  cost: 350,  effect: "enables",        value: "glaswaren", materialCost: { stein: 20, holz: 15 } },
+  kornmuehle:    { name: "Kornmühle",        icon: "KM",  cost: 240,  effect: "enables",        value: "mehl",      materialCost: { holz: 15, stein: 5 } },
+  baeckerei:     { name: "Bäckerei",         icon: "BK",  cost: 260,  effect: "enables",        value: "brot",      materialCost: { holz: 20, stein: 10 } },
 };
 
 // Bedarf pro Kopf und Gruppe (relative Gewichtung für Preisbildung); §13: mindestens
@@ -407,12 +417,12 @@ const BUILDINGS = {
 const POP_GROUPS = {
   bauern:       { name: "Bauern",       needs: { getreide: 1.0 }, weight: 1.0, share: 0.40 },
   landarbeiter: { name: "Landarbeiter", needs: { getreide: 1.0, gemuese: 0.3 }, weight: 1.0, share: 0.08 },
-  handwerker:   { name: "Handwerker",   needs: { getreide: 1.0, bier: 0.3, leder: 0.05, kleidung: 0.1 }, weight: 1.1, share: 0.12 },
-  buerger:      { name: "Bürger",       needs: { getreide: 1.0, bier: 0.3, fleisch: 0.2, kleidung: 0.15, salz: 0.1, buecher: 0.02, glaswaren: 0.03 }, weight: 1.4, share: 0.08 },
-  haendler:     { name: "Händler",      needs: { getreide: 1.0, bier: 0.4, werkzeuge: 0.1, leder: 0.05, wein: 0.1, papier: 0.05, glaswaren: 0.02 }, weight: 1.3, share: 0.07 },
-  adel:         { name: "Adel",         needs: { getreide: 1.2, bier: 0.5, werkzeuge: 0.2, leder: 0.15, wein: 0.3, gewuerze: 0.05, kleidung: 0.2, waffen: 0.02, schmuck: 0.03, seide: 0.03, buecher: 0.02 }, weight: 2.0, share: 0.04 },
-  geistliche:   { name: "Geistliche",   needs: { getreide: 0.9, wein: 0.1, buecher: 0.05, papier: 0.05 }, weight: 1.2, share: 0.03 },
-  soldaten:     { name: "Soldaten",     needs: { getreide: 1.1, fleisch: 0.2, waffen: 0.05 }, weight: 1.2, share: 0.03 },
+  handwerker:   { name: "Handwerker",   needs: { getreide: 1.0, bier: 0.3, leder: 0.05, kleidung: 0.1, brot: 0.1 }, weight: 1.1, share: 0.12 },
+  buerger:      { name: "Bürger",       needs: { getreide: 1.0, bier: 0.3, fleisch: 0.2, kleidung: 0.15, salz: 0.1, buecher: 0.02, glaswaren: 0.03, brot: 0.15 }, weight: 1.4, share: 0.08 },
+  haendler:     { name: "Händler",      needs: { getreide: 1.0, bier: 0.4, werkzeuge: 0.1, leder: 0.05, wein: 0.1, papier: 0.05, glaswaren: 0.02, brot: 0.1 }, weight: 1.3, share: 0.07 },
+  adel:         { name: "Adel",         needs: { getreide: 1.2, bier: 0.5, werkzeuge: 0.2, leder: 0.15, wein: 0.3, gewuerze: 0.05, kleidung: 0.2, waffen: 0.02, schmuck: 0.03, seide: 0.03, buecher: 0.02, brot: 0.1 }, weight: 2.0, share: 0.04 },
+  geistliche:   { name: "Geistliche",   needs: { getreide: 0.9, wein: 0.1, buecher: 0.05, papier: 0.05, brot: 0.1 }, weight: 1.2, share: 0.03 },
+  soldaten:     { name: "Soldaten",     needs: { getreide: 1.1, fleisch: 0.2, waffen: 0.05, brot: 0.1 }, weight: 1.2, share: 0.03 },
   tageloehner:  { name: "Tagelöhner",   needs: { getreide: 0.85 }, weight: 0.6, share: 0.08 },
   arme:         { name: "Arme",         needs: { getreide: 0.8 }, weight: 0.5, share: 0.07 },
 };
@@ -425,7 +435,9 @@ const TROOP_TYPES = {
   miliz:             { name: "Bauernmiliz",       cost: 50,  upkeep: 2,  strength: 1,   source: "vasall" },
   bogenschuetzen:    { name: "Bogenschützen",     cost: 90,  upkeep: 3,  strength: 2,   source: "vasall" },
   armbrustschuetzen: { name: "Armbrustschützen",  cost: 130, upkeep: 4,  strength: 2.5, source: "vasall" },
+  pikeniere:         { name: "Pikeniere",         cost: 110, upkeep: 4,  strength: 3,   source: "vasall" },
   ritter:            { name: "Ritter",            cost: 400, upkeep: 12, strength: 8,   source: "vasall", minAdelSatisfaction: 45 },
+  schwere_kavallerie:{ name: "Schwere Kavallerie",cost: 650, upkeep: 18, strength: 12,  source: "vasall", minAdelSatisfaction: 55 },
   soeldner:          { name: "Söldner",           cost: 200, upkeep: 15, strength: 4,   source: "soeldner" },
 };
 
@@ -434,6 +446,7 @@ const TROOP_TYPES = {
 const FORMATIONS = {
   ritter_zentrum:    { name: "Ritter im Zentrum, Fußvolk an den Flanken", requiresTroop: "ritter", bonus: 0.15 },
   schuetzen_vorhut:  { name: "Bogen-/Armbrustschützen als Vorhut",        requiresTroop: ["bogenschuetzen","armbrustschuetzen"], bonus: 0.12 },
+  pikenwall:         { name: "Pikenwall gegen Kavallerie",                requiresTroop: "pikeniere", bonus: 0.13 },
   gleichmaessig:     { name: "Gleichmäßig verteilt (keine Schwerpunktbildung)", requiresTroop: null, bonus: 0 },
 };
 
@@ -805,6 +818,22 @@ const EVENTS = [
     options: [
       { label: "Gastfreundschaft gewähren (-100 Taler, +kirchlicher Einfluss)", apply: (r, s) => { s.treasury -= 100; s.religiousInfluence = clamp((s.religiousInfluence||55) + 8, 0, 100); } },
       { label: "Durchreise zügig abwickeln", apply: (r, s) => { s.treasury += 60; } },
+    ],
+  },
+  // §88 Easter Egg: eine einmalige, augenzwinkernde Anspielung auf die
+  // Design-Philosophie "1986 außen – 2026 innen" (GAME_DESIGN.md), ausgelöst
+  // sobald die Chronik zufällig das Jahr 1986 erreicht. Kein Gameplay-Effekt
+  // von Belang, nur eine kleine Prestige-Anekdote — die _sawEasterEgg1986-
+  // Flagge verhindert ein erneutes Auslösen, falls per Debug im Jahr
+  // hin- und hergesprungen wird.
+  {
+    id: "seltsames_kribbeln",
+    title: "Ein seltsames Kribbeln in der Luft",
+    text: "Für einen Wimpernschlag scheint die Welt zu flackern — als bestünde sie aus lauter kleinen, viereckigen Farbklecksen. Ein fahrender Gaukler murmelt etwas von \"Pixeln\" und \"1986\", bevor alles wieder normal wirkt. Deine Hofastrologen sind ratlos, aber beeindruckt.",
+    condition: (r, s) => s.year === 1986 && !s._sawEasterEgg1986,
+    options: [
+      { label: "Als gutes Omen feiern lassen (+Prestige)", apply: (r, s) => { s._sawEasterEgg1986 = true; s.prestige += 19; addChronicle(s, "Die Gelehrten datieren das Ereignis auf ein fernes Jahr: 1986."); } },
+      { label: "Schnell vergessen", apply: (r, s) => { s._sawEasterEgg1986 = true; } },
     ],
   },
 ];

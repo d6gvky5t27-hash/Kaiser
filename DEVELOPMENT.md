@@ -1101,3 +1101,111 @@ stabil ohne kritische Befunde.
 (Content-Lücken → Diplomatie-Aktionen → Belagerungen) vollständig
 abgearbeitet.**
 
+## 2026-08-14 – Schritt 30: Content-Tiefe (Runde 3) + erster Aufschlag Intro/Easter Eggs
+
+Nach der Übernahme des Projekts in ein eigenständiges Git-Repository (siehe
+vorherige Session: `data/`, `js/`, `battle-engine/`, `tests/`-Struktur
+rekonstruiert, `index.html` als Build aus den Modulen verifiziert) wurde
+Punkt 7 der zuletzt offenen Prioritätenliste aus STATUS_ANALYSE.md
+vollständig abgearbeitet, dazu ein erster echter Aufschlag bei Punkt 3
+(Intro-Sequenz & Easter Eggs, zuvor komplett ❌):
+
+**Zwei neue Truppentypen — Pikeniere & Schwere Kavallerie (§33):**
+- Hauptspiel (`TROOP_TYPES`): Pikeniere (110 Taler, aus der Bauernschaft
+  wie Miliz/Bogenschützen) und Schwere Kavallerie (650 Taler, erfordert wie
+  Ritter Lehenstreue des Adels, aber mit höherer Schwelle ≥55 statt ≥45 —
+  eine noch elitärere Rittertruppe)
+- Kampf-Engine (`UNIT_TYPES`/`UNIT_COUNTERS`): Pikeniere sind der
+  historische Hartkonter gegen (schwere) Kavallerie (+50 %/+35 % Bonus je
+  nach Kavallerietyp), umgekehrt erleiden beide Kavallerietypen einen
+  spürbaren Malus gegen Pikeniere — schwere Kavallerie dank dickerer Rüstung
+  etwas weniger stark als leichte. Schwere Kavallerie selbst ist der stärkste
+  Nahkämpfer im Spiel (Angriff 11, Rüstung 8), dafür langsamer als leichte
+  Kavallerie und in Wald/Stadt noch stärker behindert
+- Neue Hauptspiel-Formation `pikenwall` (Bonus nur mit ausgehobenen
+  Pikenieren), analog zu den bestehenden formationsabhängigen Boni
+- `js/battle-bridge.js`: beide Typen fließen in `buildPlayerBattleArmy()`
+  ein; KI-Regionen erhalten ab einer gewissen Kasernen-Ausbaustufe ebenfalls
+  einen Pikeniere-Anteil in `buildAiBattleArmy()`, statt nur die
+  ursprünglichen drei Grundtypen zu würfeln
+
+**Zweite echte zweistufige Produktionskette — Getreide → Mehl → Brot (§17):**
+- Bewusst über zwei **neue** Gebäude (Kornmühle, Bäckerei) statt der
+  bestehenden Mühle umgesetzt, die weiterhin ausschließlich ein reiner
+  Getreide-Ertragsbooster bleibt — dadurch bleiben alle bestehenden
+  Spielstände und der automatisierte Wirtschaftstest unberührt, die neue
+  Kette wirkt sich nur aus, wenn die neuen Gebäude aktiv gebaut werden
+  (gleiches Muster wie bereits bei Holz→Papier→Bücher in Schritt 27)
+- Brot als neuer, bewusst kleiner Nebenbedarf bei Handwerkern/Bürgern/
+  Händlern/Adel/Geistlichen/Soldaten (0,1–0,15, analog zu den bestehenden
+  Luxus-Nebenbedarfen) — **nicht** als Ersatz für den bestehenden
+  Getreide-Grundbedarf, um den in Schritt 13 behobenen
+  Bevölkerungskollaps-Bug nicht erneut zu riskieren
+- Verifiziert: 20×100-Jahre-Wirtschaftstest weiterhin stabil (17/20 bzw.
+  16-19/20 je nach Seed-Lauf vollständig ohne Abbruch, im bisherigen Rahmen),
+  Vergleichslauf mit/ohne die neuen Gebäude zeigt nur Rauschen-Niveau-
+  Unterschied bei Zufriedenheit/Getreidebestand — keine Regression
+
+**Individuelle KI-Kommandanten mit Namen/Persönlichkeit (§31, Vertiefung):**
+- Jede KI-Region erhält bei Erzeugung (`makeRegion()` in `core.js`) einen
+  persistenten, benannten Hauptmann (`region.commander`: Name, Führung,
+  Mut, Taktik, Erfahrung, Schlachten/Siege-Zähler) statt bislang bei jeder
+  Kriegserklärung einen komplett neu ausgewürfelten
+- `buildAiBattleArmy()` nutzt jetzt diesen persistenten Kommandanten für die
+  Schlacht (mit defensivem Fallback für ältere Spielstände ohne das Feld);
+  `updateAiCommanderAfterBattle()` lässt Erfahrung/Führung nach jeder
+  Schlacht leicht wachsen (Veteranenstatus) und ersetzt einen in der
+  Schlacht gefallenen Kommandanten durch einen neu benannten Nachfolger samt
+  Chronik-Eintrag — der Diplomatie/Militär-Reiter zeigt Name und
+  Schlachtbilanz jeder KI-Region an
+- Verifiziert: End-to-End-Testschlacht zeigt Erfahrungszuwachs (33→36) und
+  Führungszuwachs (79→80) beim überlebenden Kommandanten nach einem Gefecht,
+  Name und Zähler bleiben zwischen Schlachten konsistent
+
+**Intro-Sequenz & Easter Eggs (§88/§90, erster Aufschlag):**
+- Kurzer, überspringbarer Text-Vorspann vor dem Titelbildschirm (vier
+  einblendende Zeilen, endet automatisch nach ~6 Sekunden oder per Klick) —
+  kein animiertes Sprite-Intro, aber eine echte, funktionierende Sequenz statt
+  der bisherigen kompletten Leerstelle
+- Easter Egg 1: eine augenzwinkernde, einmalige Chronik-Anekdote im Jahr 1986
+  ("Ein seltsames Kribbeln in der Luft") als Anspielung auf die
+  Design-Philosophie "1986 außen – 2026 innen" aus GAME_DESIGN.md
+- Easter Egg 2: die Krone auf dem Titelbildschirm 7× anklicken enthüllt eine
+  versteckte Nachricht und gewährt einen bescheidenen Startbonus (+500 Taler)
+  für die nächste Partie
+
+**Technische Umsetzung/Konsistenz:** Alle Änderungen wurden zuerst in den
+Modul-Quelldateien (`data/gamedata.js`, `js/*.js`, `battle-engine/*.js`)
+vorgenommen und automatisiert gegen alle drei Testsuiten geprüft, danach wurde
+der erste `<script>`-Block von `index.html` (der spielbare Build) durch
+erneutes Zusammenfügen exakt derselben 13 Dateien neu erzeugt — dadurch bleibt
+die Übereinstimmung zwischen Modulen und Build byteweise nachweisbar statt
+manuell dupliziert. UI-Änderungen (neue Truppen-Icons/Kürzel, Gebäude-/
+Waren-Icons für Kornmühle/Bäckerei/Mehl/Brot, Intro/Easter-Egg-Markup) wurden
+direkt im UI-Teil von `index.html` ergänzt, da dieser (bewusst, siehe
+GAME_DESIGN.md) nicht modularisiert ist. `battle.html` (eigenständige
+Kampf-Engine-Demo) wurde um dieselben zwei Einheitentypen in Kürzel und
+Beispielarmeen ergänzt; `battle_standalone.html` (die zweite, komplett
+inline gebündelte Demo-Variante) wurde bewusst **nicht** synchronisiert, um
+den Umfang zu begrenzen — sie bleibt für die beiden neuen Einheitentypen ein
+funktionierender, aber nicht nachgeführter Snapshot.
+
+**Getestet:** `node tests/battle_test.js`, `node tests/economy_test.js` und
+`node tests/ai_vs_ai_test.js` laufen weiterhin ohne kritische Befunde;
+zusätzlich ein Browser-Smoke-Test (Playwright, Chromium headless) gegen das
+tatsächliche `index.html`: Intro-Sequenz erscheint und lässt sich
+überspringen, Kronen-Easter-Egg löst nach 7 Klicks aus und der Bonus
+erscheint korrekt in der Startkasse, der Militär-Reiter zeigt die neuen
+Rekrutierungs-Buttons, Rekrutierung beider neuer Truppentypen funktioniert,
+mehrere Jahreswechsel laufen ohne Fehler, eine vollständige Kriegserklärung
+inklusive Kampf-Engine-Schlacht und Rückübertragung der Verluste läuft
+fehlerfrei durch, keine JavaScript-Fehler in der Konsole. Ebenso
+`battle.html` im Browser verifiziert (neue Einheitenkürzel PIK/SKV korrekt
+im Schlachtfeld sichtbar).
+
+**Nächste Punkte** (siehe STATUS_ANALYSE.md für die vollständige,
+priorisierte Liste): der verbleibende Rest ist bewusst niedrigste Priorität
+laut Spec selbst (§101) — echtes Sprite-/Canvas-Rendering, Chiptune-Musik,
+vollständige Sprachumschaltung, externe JSON-Datendateien,
+Multiplayer/Steam/Szenarioeditor (Post-Launch).
+

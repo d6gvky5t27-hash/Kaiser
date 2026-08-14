@@ -16,7 +16,9 @@ function buildPlayerBattleArmy(state) {
 
   push("miliz", state.army.miliz);
   push("bogenschuetzen", state.army.bogenschuetzen + state.army.armbrustschuetzen);
+  push("pikeniere", state.army.pikeniere);
   push("kavallerie", state.army.ritter);
+  push("schwere_kavallerie", state.army.schwere_kavallerie);
   push("infanterie", state.army.soeldner);
 
   // Kaserne/Markt/Mühle-Bonus (bisher ein abstrakter Stärkewert) wird als
@@ -54,10 +56,16 @@ function buildAiBattleArmy(state, aiId, weakenFactor) {
   const mobilizationRate = 0.02 + kaserneLevel * 0.003;
   const totalSoldierCount = Math.max(80, Math.round(totalPop * mobilizationRate));
 
+  // Pikeniere treten erst mit einer gewissen militärischen Grundausbildung
+  // (Kaserne) als eigener Anteil in Erscheinung — vorher stellt die KI-Region
+  // nur die drei ursprünglichen Grundtypen.
   const hasArtillery = kaserneLevel >= 2;
+  const hasPikes = kaserneLevel >= 1;
   const shares = hasArtillery
-    ? { infanterie: 0.50, bogenschuetzen: 0.22, kavallerie: 0.20, artillerie: 0.08 }
-    : { infanterie: 0.55, bogenschuetzen: 0.25, kavallerie: 0.20 };
+    ? { infanterie: 0.42, bogenschuetzen: 0.20, kavallerie: 0.18, artillerie: 0.08, pikeniere: 0.12 }
+    : hasPikes
+      ? { infanterie: 0.45, bogenschuetzen: 0.22, kavallerie: 0.18, pikeniere: 0.15 }
+      : { infanterie: 0.55, bogenschuetzen: 0.25, kavallerie: 0.20 };
 
   const factor = weakenFactor !== undefined ? weakenFactor : 1.0;
   const stacks = [];
@@ -67,13 +75,33 @@ function buildAiBattleArmy(state, aiId, weakenFactor) {
   }
   if (stacks.length === 0) stacks.push(createUnitStack("miliz", Math.max(10, Math.round(50 * factor))));
 
-  const commander = createCommander(
-    `Hauptmann von ${region.name}`,
-    30 + Math.round(rnd() * 50), 30 + Math.round(rnd() * 50),
-    30 + Math.round(rnd() * 50), 20 + Math.round(rnd() * 40)
-  );
+  // Individueller, über mehrere Schlachten persistenter Hauptmann (statt bei
+  // jeder Kriegserklärung neu ausgewürfelt) — siehe generateCommander() in core.js.
+  if (!region.commander) region.commander = generateCommander(region.name); // defensiv für ältere Spielstände
+  const persisted = region.commander;
+  const commander = createCommander(persisted.name, persisted.tactics, persisted.leadership, persisted.courage, persisted.experience);
 
   return createArmy(region.name, commander, stacks, { isAttacker: false, isHomeTerritory: true });
+}
+
+// Aktualisiert den persistenten KI-Kommandanten nach einer ausgetragenen
+// Schlacht: Erfahrung/Führung wachsen mit jedem Gefecht leicht, ein
+// gefallener Kommandant wird durch einen neu benannten Nachfolger ersetzt.
+function updateAiCommanderAfterBattle(state, aiId, battleResult) {
+  const region = state.regions[aiId];
+  if (!region.commander) return;
+  const foughtCommander = battleResult.armyB.commander;
+  const won = battleResult.result.winner === "B";
+  region.commander.battlesFought += 1;
+  if (won) region.commander.battlesWon += 1;
+  if (!foughtCommander.alive) {
+    const oldName = region.commander.name;
+    region.commander = generateCommander(region.name);
+    addChronicle(state, `${oldName} ist in der Schlacht gefallen. ${region.commander.name} übernimmt fortan das Kommando über die Truppen von ${region.name}.`);
+  } else {
+    region.commander.experience = clamp(region.commander.experience + 3, 20, 95);
+    region.commander.leadership = clamp(region.commander.leadership + 1, 10, 99);
+  }
 }
 
 // Ermittelt das Gelände aus dem Befestigungsgrad der Zielregion (§12/§36
@@ -161,8 +189,12 @@ function applyBattleResultToGame(state, aiId, battleResult) {
   const rangedRatio = applyRatio("bogenschuetzen", 0.9);
   state.army.bogenschuetzen = Math.round(state.army.bogenschuetzen * rangedRatio);
   state.army.armbrustschuetzen = Math.round(state.army.armbrustschuetzen * rangedRatio);
+  state.army.pikeniere = Math.round(state.army.pikeniere * applyRatio("pikeniere", 0.9));
   state.army.ritter = Math.round(state.army.ritter * applyRatio("kavallerie", 0.9));
+  state.army.schwere_kavallerie = Math.round(state.army.schwere_kavallerie * applyRatio("schwere_kavallerie", 0.9));
   state.army.soeldner = Math.round(state.army.soeldner * applyRatio("infanterie", 0.9));
+
+  updateAiCommanderAfterBattle(state, aiId, battleResult);
 
   // Diplomatische/wirtschaftliche Konsequenzen wie zuvor
   const hadPact = dip.treaties.nichtangriff || dip.treaties.allianz;

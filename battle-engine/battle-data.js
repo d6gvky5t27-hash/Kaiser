@@ -25,15 +25,27 @@ const UNIT_TYPES = {
     name: "Miliz", attack: 3, defense: 3, rangedAttack: 0, armor: 1,
     speed: 3, moraleBase: 40, disciplineBase: 30, costPerSoldier: 0.4,
   },
+  pikeniere: {
+    name: "Pikeniere", attack: 4, defense: 8, rangedAttack: 0, armor: 3,
+    speed: 2, moraleBase: 55, disciplineBase: 55, costPerSoldier: 1.2,
+  },
+  schwere_kavallerie: {
+    name: "Schwere Kavallerie", attack: 11, defense: 6, rangedAttack: 0, armor: 8,
+    speed: 6, moraleBase: 75, disciplineBase: 65, costPerSoldier: 6.0,
+  },
 };
 
 // ---------- §6 Schere-Stein-Papier-Konter (additive Modifikatoren) ----------
 // counterModifier(A, B) = wie stark A im Kampf gegen B verstärkt/geschwächt wird
 const UNIT_COUNTERS = {
-  kavallerie: { bogenschuetzen: 0.40, infanterie: -0.25 },
+  // Pikeniere sind der historische Hartkonter gegen (schwere) Kavallerie —
+  // ergänzt den bereits bestehenden Kavallerie-vs-Bogenschützen/Infanterie-Konter.
+  kavallerie: { bogenschuetzen: 0.40, infanterie: -0.25, pikeniere: -0.35 },
+  schwere_kavallerie: { bogenschuetzen: 0.45, infanterie: -0.10, pikeniere: -0.20 }, // schwerere Rüstung dämpft den Pikenmalus etwas
   bogenschuetzen: { infanterie: 0.20 }, // gilt nur in der Fernkampfphase, siehe meleeMalus unten
   artillerie: { grossFormationBonus: 0.30, kavallerieErreichtMalus: -0.50 },
   miliz: { heimatBonus: 0.25 },
+  pikeniere: { kavallerie: 0.50, schwere_kavallerie: 0.35 },
 };
 // Bogenschützen im direkten Nahkampf (Hauptkampfphase) sind stark benachteiligt
 const ARCHER_MELEE_MALUS = -0.40;
@@ -43,15 +55,15 @@ const LARGE_FORMATION_SOLDIER_THRESHOLD = 400;
 // ---------- §12 Gelände ----------
 const TERRAIN_TYPES = {
   ebene:  { name: "Ebene",  desc: "Offenes Feld — ideal für Reiterei.",
-    unitMods: { kavallerie: { attack: 0.20 } }, defenderBonus: 0 },
+    unitMods: { kavallerie: { attack: 0.20 }, schwere_kavallerie: { attack: 0.15 } }, defenderBonus: 0 },
   wald:   { name: "Wald",   desc: "Dichter Wald — hemmt Kavallerie, begünstigt Schützen.",
-    unitMods: { kavallerie: { attack: -0.30 }, bogenschuetzen: { rangedAttack: 0.10 } }, defenderBonus: 0.05 },
+    unitMods: { kavallerie: { attack: -0.30 }, schwere_kavallerie: { attack: -0.35 }, bogenschuetzen: { rangedAttack: 0.10 } }, defenderBonus: 0.05 },
   huegel: { name: "Hügel",  desc: "Erhöhte Stellung — Verteidiger und Artillerie im Vorteil.",
     unitMods: { artillerie: { rangedAttack: 0.10 } }, defenderBonus: 0.20 },
   sumpf:  { name: "Sumpf",  desc: "Morastiger Boden — alle Einheiten stark verlangsamt.",
-    unitMods: {}, defenderBonus: 0.10, speedMalus: 0.5 },
+    unitMods: { schwere_kavallerie: { attack: -0.15 } }, defenderBonus: 0.10, speedMalus: 0.5 },
   stadt:  { name: "Stadt",  desc: "Enge Gassen — Infanterie im Vorteil, Kavallerie stark behindert.",
-    unitMods: { infanterie: { defense: 0.15 }, kavallerie: { attack: -0.40 } }, defenderBonus: 0.15 },
+    unitMods: { infanterie: { defense: 0.15 }, kavallerie: { attack: -0.40 }, schwere_kavallerie: { attack: -0.45 }, pikeniere: { defense: 0.10 } }, defenderBonus: 0.15 },
   burg:   { name: "Burg",   desc: "Befestigte Stellung — der Verteidiger ist massiv im Vorteil.",
     unitMods: {}, defenderBonus: 0.50 },
 };

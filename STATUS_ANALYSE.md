@@ -60,7 +60,7 @@ Stand: nach Abschluss von MVP + Alpha + Beta (siehe ROADMAP.md).
 | 14 | Bevölkerungsentwicklung | 🟡 | Geburten/Tode/Hunger/Seuche vorhanden; keine Migration zwischen Regionen |
 | 15 | Wirtschaft (Angebot/Nachfrage) | ✅ | Vollständig implementiert und getestet |
 | 16 | Waren | ✅ | 23 Waren umgesetzt, inkl. Papier/Bücher/Schmuck/Seide/Glaswaren |
-| 17 | Produktionsketten | ✅ | 21 Ketten; erste echte zweistufige Kette umgesetzt (Holz→Papier→Bücher); Mehl→Brot als weitere zweistufige Kette bleibt als mögliche Vertiefung |
+| 17 | Produktionsketten | ✅ | 23 Ketten; zwei echte zweistufige Ketten (Holz→Papier→Bücher, Getreide→Mehl→Brot über eigene neue Gebäude Kornmühle/Bäckerei) |
 | 18 | Landwirtschaft | 🟡 | Fruchtbarkeit × Wetter wirkt; Technologie/Werkzeuge/Kriegsschäden/Krankheit als Einflussfaktoren fehlen |
 | 19 | Wetter | ✅ | Regional simuliert, keine globale Zufallszahl |
 | 20 | Handel (Straßen/Flüsse/Seewege) | 🟡 | Lokaler Marktplatz + gezielter Regionalhandel (Arbitrage zwischen zwei Regionen) mit Transportkosten und Räuberrisiko vorhanden; nur konkrete Straßen/Flüsse/Seewege als geografisches Wegenetz fehlen noch |
@@ -81,9 +81,9 @@ Stand: nach Abschluss von MVP + Alpha + Beta (siehe ROADMAP.md).
 |---|---|---|---|
 | 29 | Diplomatische Aktionen | ✅ | 12 von 12 Aktionen umgesetzt (zuletzt: Durchmarschrecht mit echter Handelsanbindung, Garantie, Friedensvertrag, Gebietsforderung) |
 | 30 | Beziehungssystem | ✅ | -100..+100, viele Einflussfaktoren, "Erinnerung" durch persistenten Wert |
-| 31 | KI-Herrscher | 🟡 | Einfache Heuristiken (Bauverhalten, Diplomatie-Initiative), aber keine echte Persönlichkeit/Risikoprofil/Chancen-Risiko-Abwägung vor Kriegserklärungen (KI erklärt selbst nie Krieg) |
+| 31 | KI-Herrscher | 🟡 | Einfache Heuristiken (Bauverhalten, Diplomatie-Initiative); jede KI-Region hat jetzt einen individuellen, benannten Hauptmann mit eigenen Werten, der über mehrere Schlachten hinweg besteht (Erfahrung wächst, Tod führt zu einem Nachfolger) — aber weiterhin keine echte Herrscher-Persönlichkeit/Risikoprofil/Chancen-Risiko-Abwägung vor Kriegserklärungen (KI erklärt selbst nie Krieg) |
 | 32 | Intrigen | 🟡 | Nur Sabotage vorhanden; Gerüchte, Erpressung, Verschwörung, Dokumentenfälschung, Rebellenunterstützung, politische Manipulation fehlen |
-| 33 | Militär (Truppentypen) | 🟡 | Rekrutierung: 5 Hauptspiel-Typen (Vasall-vs-Söldner-Unterscheidung); Kampfebene: eigene Kampf-Engine mit 5 Einheitentypen (Infanterie/Bogen/Kavallerie/Artillerie/Miliz), jetzt mit echter individueller Moral/Erfahrung/Disziplin pro Einheit; Pikeniere/schwere Kavallerie fehlen weiterhin |
+| 33 | Militär (Truppentypen) | 🟡 | Rekrutierung: 7 Hauptspiel-Typen (Vasall-vs-Söldner-Unterscheidung, jetzt inkl. Pikeniere und Schwerer Kavallerie); Kampfebene: eigene Kampf-Engine mit 7 Einheitentypen (Infanterie/Bogen/Kavallerie/Artillerie/Miliz/Pikeniere/Schwere Kavallerie), mit echter individueller Moral/Erfahrung/Disziplin pro Einheit; Pikeniere kontern (schwere) Kavallerie als historischer Hartkonter |
 | 34 | Armeeversorgung | 🟡 | Unterhaltskosten (Geld) + Söldner-Fahnenflucht bei ausbleibendem Sold/niedriger Legitimität; in der Kampf-Engine zusätzlich Fatigue-Feld vorbereitet (noch ungenutzt); keine Nahrungsversorgung/Krankheit/Plünderung |
 | 35 | Schlachtsystem | ✅ | Eigenständige Kampf-Engine vollständig integriert: 6 Kampfphasen, 5 Formationen + 7 Taktiken, Schere-Stein-Papier-Konter, 6 Geländearten, 5 Wettertypen, Moralsystem mit Fluchtmechanik, Kommandanten-Ereignisse, Entscheidungspunkte während der Schlacht, deterministischer Seed, Debug-Modus, 6 automatisierte Tests — kein reiner Stärkevergleich mehr |
 | 36 | Belagerungen | ✅ | Mehrjährige Belagerung UND Kampf-Engine kombiniert: Sturmangriff eröffnet die volle interaktive Schlacht, Aushungern schwächt die spätere Kampf-Engine-Armee real (Soldaten + Moral), Bestechung weiterhin möglich |
@@ -149,9 +149,9 @@ Stand: nach Abschluss von MVP + Alpha + Beta (siehe ROADMAP.md).
 | 60 | Moderne Bedienung | 🟡 | Maus/Touch funktioniert; keine Tastaturkürzel, kein Controller-Support |
 | 86 | Welt spielt ohne Spieler | ✅ | KI-Regionen bauen, entwickeln sich, handeln diplomatisch — unabhängig vom Spieler |
 | 87 | Spielende-Auswertung | ✅ | Vollständige Chronik-Zusammenfassung (Regierungsjahre, Generationen, höchster Titel, Höchstwerte, Kriegsbilanz, Katastrophen, Stadtstufe) |
-| 88 | Easter Eggs | ❌ | Nicht implementiert |
+| 88 | Easter Eggs | 🟡 | Zwei versteckte Anspielungen: eine Chronik-Anekdote im Jahr 1986 (Anspielung auf "1986 außen – 2026 innen"), ein Klick-Geheimnis auf dem Titelbildschirm (Krone 7× anklicken → Startbonus für die nächste Partie) |
 | 89 | Startbildschirm | ✅ | Titelbildschirm mit Neues Spiel/Laden/Optionen; Mehrspieler/Chronik bewusst deaktiviert (noch nicht existent) |
-| 90 | Intro-Sequenz | ❌ | Nicht implementiert |
+| 90 | Intro-Sequenz | 🟡 | Kurzer Text-Vorspann vor dem Titelbildschirm (überspringbar per Klick/Auto-Weiterschaltung); kein animiertes Sprite-Intro |
 | 91 | Kein visueller Modernismus | ✅ | Eingehalten (keine Neumorphism, keine Gradients, harte Kanten) |
 | 92 | Moderne UX-Komfortfunktionen | 🟡 | Speichern/Laden vorhanden; Undo, Tastenkürzel, Suche, Filter, Pause/Geschwindigkeit, Autosave, UI-Scaling, Barrierefreiheit fehlen |
 
@@ -186,6 +186,12 @@ Modularisierung, 5 neue Waren mit erster zweistufiger Produktionskette,
 alle 12 Diplomatie-Aktionen, und die Wiederverzahnung mehrjähriger
 Belagerungen mit der Kampf-Engine.
 
+**Runde 3 umgesetzt** (siehe DEVELOPMENT.md Schritt 30): die komplette
+Content-Tiefe aus Punkt 7 der vorherigen Liste (Pikeniere/schwere Kavallerie,
+Mehl→Brot-Kette, individuelle KI-Kommandanten) sowie ein erster Aufschlag bei
+Punkt 3 (Intro-Sequenz & Easter Eggs — bewusst als schlanke, aber echte
+Umsetzung statt der zuvor komplett fehlenden Funktion).
+
 Verbleibende bewusst offene Punkte, allesamt laut Spec selbst niedrigste
 Priorität (§101 — Grafik/Sound/Content-Menge stehen hinter Spielspaß/
 Simulation/KI/Wirtschaft):
@@ -193,16 +199,16 @@ Simulation/KI/Wirtschaft):
 1. **Echtes Sprite-/Canvas-Rendering statt CSS-Retro-Optik (§49–52)**
 2. **Chiptune-Soundtrack statt reiner Sound-Effekte (§58)** — keine
    Audio-Assets erzeugbar, nur mit externen Tools möglich
-3. **Intro-Sequenz & Easter Eggs (§88/§90)**
-4. **Vollständige Sprachumschaltung (§80)** — Grundstruktur (`STRINGS`/`t()`)
+3. **Vollständige Sprachumschaltung (§80)** — Grundstruktur (`STRINGS`/`t()`)
    existiert, aber nicht die gesamte UI ist darüber geführt
-5. **Multiplayer, Steam, Achievements, Szenarioeditor (§103, Post-Launch)**
-6. **Externe JSON-Datendateien statt JS-Objekte (§65/§79)** — Daten sind
+4. **Multiplayer, Steam, Achievements, Szenarioeditor (§103, Post-Launch)**
+5. **Externe JSON-Datendateien statt JS-Objekte (§65/§79)** — Daten sind
    bereits von der Logik getrennt, aber noch nicht als eigenständige Dateien
-7. **Weitere Content-Tiefe** (optional, kein blinder Fleck mehr): Pikeniere/
-   schwere Kavallerie als Truppentypen, Mehl→Brot als weitere zweistufige
-   Kette, individuelle KI-Kommandanten mit Namen/Persönlichkeit über
-   mehrere Partien hinweg
+6. **Weitere Content-Tiefe** (optional, kein blinder Fleck mehr): eine echte
+   Herrscher-KI-Persönlichkeit mit Risikoprofil vor Kriegserklärungen (§31,
+   die KI erklärt weiterhin selbst nie Krieg), Migration zwischen Regionen
+   (§14 nur Zu-/Abwanderung zur Außenwelt, nicht zwischen den 8 Regionen),
+   weitere Intrigen-Arten neben Sabotage (§32)
 
 Sag mir, mit welchem Punkt ich weitermachen soll — oder ich schlage eine
 Reihenfolge vor und arbeite sie eigenständig ab.

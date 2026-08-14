@@ -108,6 +108,26 @@ function upgradeBuildingAt(state, region, plotIndex) {
   return { ok: true };
 }
 
+// ---------- Individuelle KI-Kommandanten (Content-Vertiefung): jede
+// KI-Region bekommt einen benannten Hauptmann mit eigenen Werten, der über
+// mehrere Schlachten hinweg bestehen bleibt (Erfahrung wächst, Tod führt zu
+// einem Nachfolger) statt bei jeder Kriegserklärung neu ausgewürfelt zu werden. ----------
+function generateCommander(regionName) {
+  const gender = rnd() < 0.5 ? "m" : "f";
+  const pool = gender === "m" ? MALE_NAMES : FEMALE_NAMES;
+  const name = pool[Math.floor(rnd() * pool.length)];
+  return {
+    name: `Hauptmann ${name} von ${regionName}`,
+    leadership: 30 + Math.round(rnd() * 50),
+    courage: 30 + Math.round(rnd() * 50),
+    tactics: 30 + Math.round(rnd() * 50),
+    experience: 20 + Math.round(rnd() * 40),
+    battlesFought: 0,
+    battlesWon: 0,
+    alive: true,
+  };
+}
+
 function makeRegion(name, isPlayer, fertility, startPop) {
   const population = {};
   for (const gid in POP_GROUPS) {
@@ -144,6 +164,7 @@ function makeRegion(name, isPlayer, fertility, startPop) {
     extraGrainRate: 0,      // §Original: freiwillige Kornverteilung über den Bedarf hinaus
     governanceStyle: 15,    // §Original: Regierungsstil 0=sehr fair .. 100=gierig (moderater Startwert)
     priceNoise,             // Marktspekulation: jährliche Preisschwankung unabhängig von Angebot/Nachfrage
+    commander: isPlayer ? null : generateCommander(name), // individueller KI-Hauptmann, überlebt mehrere Schlachten
   };
 }
 
@@ -180,7 +201,7 @@ function newGame(options) {
       ai2: { relation: CONFIG.diplomacy.startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
       ai3: { relation: CONFIG.diplomacy.startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
     },
-    army: { miliz: 0, bogenschuetzen: 0, armbrustschuetzen: 0, ritter: 0, soeldner: 0 },
+    army: { miliz: 0, bogenschuetzen: 0, armbrustschuetzen: 0, pikeniere: 0, ritter: 0, schwere_kavallerie: 0, soeldner: 0 },
     advisors: { schatzmeister: null, marschall: null, diplomat: null, spionagemeister: null, geistlicher: null, handelsberater: null },
     religiousInfluence: CONFIG.religion.startInfluence,
     intel: {
