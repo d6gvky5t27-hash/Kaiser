@@ -1,0 +1,1103 @@
+# DEVELOPMENT LOG
+
+## Überblick: Was ist bereits implementiert (Stand: nach Schritt 11)
+
+Diese Liste fasst alle bisherigen Entwicklungsschritte thematisch zusammen.
+Das vollständige chronologische Protokoll mit allen Testergebnissen steht
+weiter unten unter "Detailliertes Änderungsprotokoll". Für den Abgleich
+gegen jeden einzelnen Abschnitt des Master-Prompts siehe STATUS_ANALYSE.md.
+
+**Wirtschaft & Ressourcen**
+- Angebot/Nachfrage-Preisbildung pro Region, mit vollständiger Ursachen-
+  Aufschlüsselung als Tooltip (Basispreis/Nachfrage/Angebot/Multiplikator)
+- 9 Waren: Getreide, Holz, Stein, Ton, Eisen, Wolle, Leder, Bier, Werkzeuge
+- Produktionsketten inkl. mittelalterlicher Rohstoffe (Steinbruch, Tongrube,
+  Gerberei zusätzlich zu Sägewerk/Schmiede/Brauerei)
+- Bauwerke kosten echte Baustoffe (materialCost), nicht nur Taler
+- Landwirtschaft: Fruchtbarkeit × regionales, probabilistisches Wetter
+- Einfache Handels-KI zwischen allen Regionen (baut Preisgefälle ab,
+  verstärkt durch Handelsverträge)
+- Steuersystem mit spürbarer Wirkung auf Zufriedenheit/Wirtschaft/Rebellion
+- Staatskasse getrennt simuliert, Bankrott-Schwelle als Niederlagebedingung
+
+**Bevölkerung**
+- 5 Gruppen (Bauern, Handwerker, Händler, Adel, Arme) mit Zufriedenheit,
+  Geburten/Alterstod/Hungertoten/Seuchentoten — vollständige Ursachen-
+  Aufschlüsselung pro Jahr als Tooltip
+
+**Gebäude & Karte**
+- 13 Gebäudetypen, als Parzellen-Instanzen mehrfach baubar und pro Instanz
+  bis Stufe 4 ausbaubar (exponentiell steigende Ausbaukosten)
+- Eigene Kartenseite: Landschaftsansicht mit organisch verstreuten Symbolen
+  (angelehnt ans Original), Zeichenerklärung, Fluss/Hauptstadt-Dekoration
+
+**Charaktere & Dynastie**
+- Herrscher mit 6 Werten, 10 wählbaren/zufälligen Persönlichkeits-Traits mit
+  echten Gameplay-Effekten
+- Heirat, Kindergeburt, Alterung, Tod, automatische Erbfolge
+- Erbfolgestreitigkeiten bei mehreren, altersnahen Erben (Kosten für
+  Zufriedenheit/Taler/Prestige/Legitimität)
+
+**Diplomatie**
+- Beziehungswerte (-100..+100) zu den 3 direkten Nachbarn
+- Aktionen: Geschenk, Nichtangriffspakt, Handelsvertrag, Bündnis
+- KI-seitige Diplomatie-Initiative (Nachbarn handeln auch unabhängig vom
+  Spieler, §86)
+
+**Militär**
+- 5 Truppentypen: Bauernmiliz, Bogenschützen, Armbrustschützen, Ritter,
+  Söldner — mit echtem Unterschied zwischen Vasallendienst (braucht
+  Adelszufriedenheit für Ritter) und Söldnern (nur Gold, aber Fahnenflucht-
+  Risiko bei ausbleibendem Sold/niedriger Legitimität)
+- Schlachtformationen mit Bonuslogik vor der Kriegserklärung
+- Stärkeschätzung des Gegners als Unsicherheitsspanne (Informations-
+  unsicherheit), durch Spionage genauer einstellbar
+
+**Politik & Herrschaft**
+- Adelsleiter (10 Titel, Freiherr → Kaiser) mit Mehrfachbedingungen
+- Kaiserwahl: Kurfürstenstimmen (3 bekannte + 4 abstrakte), Bestechung
+  möglich — einziger Weg zum Sieg, kein reiner Schwellenwert-Aufstieg mehr
+- Legitimität als eigene Kennzahl (beeinflusst Rebellion/Thronfolge/
+  Zufriedenheit)
+- Rebellionen mit echten Ursachen (niedrige Zufriedenheit UND Legitimität)
+- Intrigen: Sabotage-Aktion gegen Nachbarn
+- Religion als Kennzahl mit Zufriedenheitswirkung + 2 Ereignissen
+- Berater-System: 6 Ämter mit direkten Gameplay-Effekten (Steuern, Militär,
+  Diplomatie, Produktion, Zufriedenheit)
+
+**Ereignisse & Chronik**
+- 24 datengetriebene Ereignisse über mehrere Kategorien
+- Automatische Reichschronik
+
+**Technik & QA**
+- Deterministischer Zufalls-Seed (reproduzierbare Partien, Savegame-fest)
+- Debug-Panel (Geld, Jahr, Bevölkerung, Charaktere, Events, Kriege)
+- KI-Entscheidungsanalyse (Faktor-Aufschlüsselung für Kriegsentscheidungen)
+- Automatisierter Wirtschaftstest (`tests/economy_test.js`)
+- Zentrale Balancing-Konfiguration (keine Magic Numbers im Code)
+- Speichersystem: JSON-Export/Import mit Versionsprüfung
+
+**Präsentation & UX**
+- Start-/Charaktererstellungsbildschirm (Name, Geschlecht, Dynastie,
+  Schwierigkeitsgrad, 2 Persönlichkeitsschwerpunkte)
+- 4 Schwierigkeitsgrade (wirken über KI-Fehlerquote, keine versteckten Boni)
+- Tooltip-System für Preise, Bevölkerung, Kasse, Prestige
+- CRT-Filter und Sound-Effekte, beide abschaltbar
+- Localization-Grundstruktur (nur Deutsch befüllt, Architektur vorbereitet)
+
+**Bewusst noch offen** (siehe STATUS_ANALYSE.md für die vollständige,
+priorisierte Liste): Stadtentwicklungsstufen, Technologiesystem,
+mehrstufige Belagerungen, weitere Siegbedingungen neben Kaiserwahl,
+ausführliche Spielende-Auswertung, Staatsschulden/Kredite, mehr
+Diplomatie-Aktionen (Vasallisierung, Tribut, dynastische Ehe), echtes
+Sprite-/Canvas-Rendering, Musik, Intro/Easter-Eggs.
+
+---
+
+## Detailliertes Änderungsprotokoll
+
+## 2026-08-07 – Schritt 1: Grundgerüst + Vertical Slice v0.1
+
+**Implementiert:**
+- Projektstruktur (data/ js/ index.html)
+- Tech-Stack-Entscheidung: Vanilla HTML/CSS/JS + Canvas, Daten getrennt in JS-Objekten
+- GameState mit 1 Spielerregion + 3 KI-Nachbarregionen
+- Wirtschaftssystem: 6 Waren, Angebot/Nachfrage-Preisbildung, Lagerhaltung
+- Produktionsketten: Getreide→Mühle→Mehl(vereinfacht in v0.1 als Direktboost),
+  Holz→Sägewerk→Bretter, Eisen→Schmiede→Werkzeuge, Gerste-Substitut→Brauerei→Bier
+- Bevölkerungssystem: 5 Gruppen, Zufriedenheit, Geburten/Tode/Hungertote
+- Landwirtschaft: Fruchtbarkeit × zufälliges Wetter (regional, nicht global)
+- Einfache Handels-KI zwischen Regionen (baut Preisgefälle ab)
+- Steuersystem mit Auswirkung auf Zufriedenheit & Staatskasse
+- 10 Gebäudetypen mit Baukosten und Effekten
+- Event-System (datengetrieben) mit 8 Startereignissen inkl. Kornspeicher-Beispiel aus Spec §39
+- Adelsleiter Freiherr→Kaiser mit Aufstiegsprüfung
+- Chronik-System (automatischer Log wichtiger Vorkommnisse)
+- Rundenbasierte Zeit (Jahresschritte), Retro-Pixel-UI (Canvas, 320×200 Basis,
+  integer scaling, reduzierte Palette, Pixel-Look via CSS/Canvas)
+
+**Bekannte Einschränkungen (bewusst für v0.1):**
+- Kein Charakter-/Dynastiesystem, keine Diplomatie/Militär/Intrigen/Religion
+- Kaiserwahl vereinfacht (Schwellenwerte statt Kurfürstenvotum)
+- Kein Speichersystem (folgt Phase 2)
+- Keine echten Sprites/Chiptune-Audio (folgt später)
+
+## 2026-08-11 – Schritt 2: Charaktersystem, Dynastie, Speichersystem
+
+**Implementiert:**
+- Charaktersystem: Herrscher mit Werten (Intelligenz, Diplomatie, Verwaltung,
+  Militär, Handel, Charisma), Alter, Gesundheit, 2 zufälligen Eigenschaften
+  aus einem Trait-Pool (10 Traits mit echten Gameplay-Effekten auf Prestige,
+  Staatskasse, Zufriedenheit, Produktion – nicht nur dekorativ, §9)
+- Dynastiesystem: Heirat (Zufallschance ab 16, solange unverheiratet),
+  Kindergeburt, Alterung, Sterbewahrscheinlichkeit (steigt ab 50, verstärkt
+  durch schlechte Gesundheit), automatische Erbfolge (ältestes lebendes Kind);
+  kein Erbe vorhanden → Game Over "Dynastie ausgestorben"
+  Als HTML-Panel "HOF" sichtbar (Name, Alter, Gesundheit, Eigenschaften,
+  Werte, Gemahlin/Gemahl, Kinder)
+- Speichersystem: JSON-Export (Download-Button) / Import (Datei-Upload),
+  bewusst kein localStorage (in Artifacts nicht erlaubt); Versionsfeld im
+  Savegame für spätere Kompatibilitätsprüfung (§64)
+- Getestet: 120-Jahre-Simulation lief über mehrere Generationen inkl.
+  Erbfolgewechsel fehlerfrei durch; Save/Load-Zyklus verifiziert
+
+**Nächste Schritte (siehe ROADMAP.md):**
+- Balancing-Konfigurationsdatei (Werte aus Code in Datendatei auslagern)
+- 20+ Ereignisse, mehr Kategorien, Diplomatie-Grundgerüst
+- Automatisierter Wirtschaftstest als wiederholbares Testskript
+
+## 2026-08-11 – Schritt 3: Balancing-Config, mehr Events, Wirtschaftstest
+
+**Implementiert:**
+- `CONFIG`-Objekt in gamedata.js: sämtliche zuvor hartkodierten Zahlen
+  (Preisbildung, Wetterwahrscheinlichkeiten, Bevölkerungsraten, Handels-
+  Schwellen, KI-Bauverhalten, Dynastie-Wahrscheinlichkeiten, Sieg-/Niederlage-
+  Schwellen) sind jetzt zentral konfigurierbar (§71)
+- 12 neue Ereignisse (insgesamt 20): Handelsroute, Gelehrtenförderung,
+  Wilderer, Komet, Stadtbrand, Musiker, Bettlerplage, Handwerkerstreik,
+  Wunderheiler, fremder Gesandter, Erbstreit unter Adel, Steuerhinterziehung
+  — decken jetzt auch Kultur, Verbrechen, Diplomatie-Flavor ab
+- `tests/economy_test.js`: automatisierter Test gemäß §77 — 20 Partien à
+  100 Jahre ohne Eingriff, prüft Preisexplosionen, Bevölkerungskollaps,
+  Handelsaktivität. Mit `node tests/economy_test.js` ausführbar.
+
+**Testergebnis (wichtiger Balancing-Fund):**
+Ohne Spieler-Eingriff laufen Werkzeug-/Bierpreise in 8 von 20 Partien an die
+Preisobergrenze, weil die Spielerregion nie automatisch Schmiede/Brauerei
+baut (nur KI-Regionen bauen autonom, §86). Das ist beabsichtigtes Verhalten,
+kein Bug: Bautätigkeit muss eine echte, notwendige Spielerentscheidung
+bleiben. Sterberate des Herrschers wurde separat verifiziert (~0,15%
+gemessen vs. 0,2% konfiguriert im ersten Jahr — im Rahmen der Erwartung).
+
+**Nächste Schritte (siehe ROADMAP.md):**
+- Diplomatie-Grundgerüst (Beziehungen zu Nachbarregionen, erste Aktionen)
+- Erbfolgestreitigkeiten (mehrere Thronanwärter statt automatisch ältestes Kind)
+- Einfaches Militär-Grundgerüst
+
+## 2026-08-11 – Schritt 4: Diplomatie-Grundgerüst
+
+**Implementiert:**
+- Beziehungswerte (-100..+100) zu allen 3 Nachbarregionen, Start bei 30
+- 4 Diplomatie-Aktionen mit echten Konsequenzen und Voraussetzungen (§29):
+  Geschenk senden (kostet Taler, hebt Beziehung), Nichtangriffspakt
+  (ab Beziehung 20), Handelsvertrag (ab Beziehung 10, verstärkt tatsächlich
+  den Warentransfer zwischen den Regionen um Faktor 2), Bündnis (ab
+  Beziehung 50, gibt zusätzlich Prestige)
+- Jährliche Beziehungsdynamik: Beziehungen driften ohne Zutun langsam
+  Richtung neutral, bestehende Verträge wirken dem leicht entgegen,
+  zufälliges Rauschen sorgt für Unvorhersehbarkeit (§30 Erinnerung/Dynamik)
+- Diplomatie-UI-Panel mit Beziehungsbalken, Vertragskennzeichnung und
+  Aktionsbuttons pro Nachbarregion
+
+**Bewusste Einschränkung:** Kriegserklärung, Vasallisierung, dynastische Ehen
+zwischen Höfen und KI-seitige Diplomatie-Initiative fehlen noch — dafür wird
+erst das Militärsystem (Alpha) benötigt, damit Nichtangriffspakt/Bündnis
+mechanisch etwas bedeuten. Aktuell wirken die Verträge nur auf Handel und
+Prestige.
+
+**Regressionstest:** 80-Jahre-Testlauf + 20×100-Jahre-Wirtschaftstest liefen
+nach der Integration weiterhin stabil (keine neuen Auffälligkeiten).
+
+**Nächste Schritte (siehe ROADMAP.md):**
+- Erbfolgestreitigkeiten (mehrere Thronanwärter statt automatisch ältestes Kind)
+- Einfaches Militär-Grundgerüst (damit Diplomatie mechanisch relevant wird)
+- KI-seitige Diplomatie-Initiative (Nachbarn bieten selbst Verträge an)
+
+## 2026-08-11 – Schritt 5: Gebäudesystem überarbeitet (Karte, Mehrfachbau, Ausbaustufen)
+
+**Implementiert (auf expliziten Wunsch):**
+- Gebäude sind jetzt Parzellen-Instanzen (`{type, level, plotIndex}`) statt
+  einer einfachen Liste von Typen — jeder Gebäudetyp kann beliebig oft gebaut
+  werden (auf unterschiedlichen Parzellen), zusätzlich pro Instanz bis Stufe
+  4 ausbaubar (§26/§82: Erweiterbarkeit statt Fake-Komplexität)
+- Neue eigene Seite "KARTE & GEBÄUDE" (Tab-Navigation oben, `#pagetabs`):
+  4×3-Parzellenraster (12 Parzellen gesamt), leere Parzellen zum Bebauen,
+  belegte zeigen Icon-Kürzel + aktuelle Stufe; Klick öffnet Detailbereich mit
+  Bauoptionen bzw. Ausbau-Button und Kostenanzeige
+- Produktionslogik umgestellt: Boost-Gebäude (Bauernhof, Mühle) skalieren mit
+  der Summe aller Stufen aller eigenen Instanzen; "enables"-Gebäude
+  (Sägewerk/Schmiede/Brauerei) erhöhen die Produktionskapazität proportional
+  zur Stufensumme statt nur an/aus zu schalten
+  (Rückwärtskompatibel: eine einzelne Stufe-1-Instanz verhält sich exakt wie
+  das alte "gebaut ja/nein"-Modell)
+- Ausbaukosten steigen exponentiell (`cost * 1.6^Stufe`), Neubau-Kosten
+  bleiben konstant beim Basispreis (jede neue Instanz ist ein eigenständiges
+  Gebäude)
+- KI-Regionen nutzen dasselbe Modell: bauen neue Instanzen auf freien
+  Parzellen oder bauen bestehende aus, wenn alle 12 Parzellen belegt sind
+
+**Getestet:** Mehrfachbau (3 Bauernhöfe), Ausbau (Stufe 1→2), Parzellenlimit
+(Baustopp bei voller Karte bzw. leerer Kasse), 80-Jahre-Regressionstest und
+20×100-Jahre-Wirtschaftstest liefen nach der Umstellung weiterhin stabil.
+
+**Nächste Schritte (siehe ROADMAP.md):**
+- Erbfolgestreitigkeiten (mehrere Thronanwärter statt automatisch ältestes Kind)
+- Einfaches Militär-Grundgerüst
+- KI-seitige Diplomatie-Initiative
+
+## 2026-08-11 – Schritt 6: Restliche Alpha-Themen (Erbfolgestreit, KI-Diplomatie, Militär, mehr Regionen, Berater)
+
+**Implementiert:**
+- **Erbfolgestreitigkeiten (§10/§45):** Bei mehreren Erben mit ähnlichem Alter
+  (≤5 Jahre Abstand) besteht ein erhöhtes Risiko (15–50 %), dass die
+  Nachfolge angefochten wird — kostet Zufriedenheit, Taler und Prestige und
+  senkt die neue Kennzahl **Legitimität** (0–100, erholt sich langsam pro
+  Jahr, niedrige Legitimität drückt dauerhaft die Zufriedenheit)
+- **KI-seitige Diplomatie-Initiative (§30/§86):** Nachbarn senden gelegentlich
+  selbst Geschenke oder bieten von sich aus Nichtangriffspakt/Handelsvertrag
+  an — die Welt handelt jetzt auch diplomatisch unabhängig vom Spieler
+- **Einfaches Militärsystem (§33/§34/§35):** 3 Truppentypen (Bauernmiliz,
+  Infanterie, Kavallerie) mit Kosten, Unterhalt und Stärke; Rekrutierung
+  zieht Bevölkerung aus der Bauernschicht ab; Kaserne/Stadtmauer erhöhen die
+  eigene Stärke; Kriegserklärung löst eine sofortige, stärkevergleichs-
+  basierte Schlachtauflösung aus (Beute/Prestige bei Sieg, Verluste/
+  Zufriedenheitseinbruch bei Niederlage, Vertragsbruch wird bestraft) —
+  macht Nichtangriffspakt/Bündnis jetzt mechanisch relevant
+- **Mehr Regionen (§6):** 4 zusätzliche, vollständig simulierte Regionen
+  (Bayern, Sachsen, Böhmen, Schwaben) — insgesamt 8 Regionen im Handels-
+  netzwerk. Bewusste Einschränkung: nur die ursprünglichen 3 Nachbarn sind
+  Ziel von Diplomatie/Krieg (UI würde sonst überladen); die neuen Regionen
+  entwickeln sich eigenständig und beeinflussen Handel/Wirtschaft
+- **Berater-System (§42/§43):** 6 Ämter (Schatzmeister, Marschall, Diplomat,
+  Spionagemeister, Geistlicher, Handelsberater), gegen Einstellungsgebühr +
+  Jahresgehalt berufbar; Werte des Beraters wirken direkt auf Steuer-
+  einnahmen, Militärstärke, diplomatische Erfolge, Produktion bzw.
+  Zufriedenheit. Spionagemeister ist bewusst noch ohne mechanischen Effekt
+  (Platzhalter für die Informationsunsicherheit in Beta)
+- Neuer Tab "⚔ MILITÄR" (Armeeübersicht, Rekrutierung, Kriegserklärung je
+  Nachbar), neues Berater-Panel im Hof-Bereich der Provinz-Seite
+
+**Getestet:** Berater-Anstellung/-Bonus, Rekrutierung, Kriegsauflösung
+(Sieg/Niederlage), 8-Regionen-Wirtschaftstest (weiterhin stabil), sowie
+15×150-Jahre-Lauf zur Erbfolge — 7 von 13 Thronwechseln lösten tatsächlich
+einen Erbfolgestreit aus, Mechanik greift wie vorgesehen.
+
+**Damit ist die Alpha-Phase der Roadmap abgeschlossen.** Nächster Block:
+Beta-Themen (Kaiserwahl per Kurfürstenstimmen, Intrigen/Rebellionen mit
+echten Ursachen, Religion, Informationsunsicherheit, Belagerungen,
+Localization, CRT-Filter/Sound).
+
+## 2026-08-11 – Schritt 7: Beta-Phase abgearbeitet
+
+**Implementiert:**
+- **Kaiserwahl (§12):** Ab Titel "Kurfürst" kann jährlich eine Kaiserwahl
+  ausgelöst werden (Chronik-Banner erscheint). Der Spieler kann vor der
+  Wahl einzelne Kurfürsten bestechen; abgestimmt wird mit 3 bekannten
+  Stimmen (Beziehung ≥40 oder bestochen) + bis zu 4 "abstrakten" Stimmen
+  weiterer Kurfürsten (an Prestige-Schwellen gekoppelt). Bei Mehrheit
+  (≥4 von 7) wird der Spieler Kaiser (Sieg); bei Niederlage folgt eine
+  Abklingzeit und Prestigeverlust. Der reine Schwellenwert-Aufstieg zum
+  Kaiser wurde entfernt — nur die Wahl führt zum Sieg.
+- **Rebellionen mit echten Ursachen (§37):** Neues Ereignis, ausgelöst bei
+  gleichzeitig niedriger Zufriedenheit UND niedriger Legitimität (nicht
+  zufällig) — mit 3 Optionen: militärisch niederschlagen (braucht echte
+  Armee, sonst schlägt es fehl), Zugeständnisse machen (Steuersenkung) oder
+  ignorieren (Bevölkerungs-/Kassenverlust)
+- **Intrigen (§32):** Sabotage-Aktion gegen Nachbarregionen (reduziert deren
+  Lager, Entdeckungsrisiko mit Beziehungsschaden)
+- **Informationsunsicherheit (§41):** Für alle 3 Nachbarn wird die
+  militärische Stärke nur noch als Spanne angezeigt ("zwischen X und Y"),
+  deren Genauigkeit von einer neuen Spionage-Aktion abhängt (kostet Taler,
+  Genauigkeit klingt über Jahre wieder ab)
+- **Religion als politische Kraft (§46):** Neue Kennzahl `religiousInfluence`
+  mit Auswirkung auf Zufriedenheit bei sehr niedrigen/hohen Werten, dazu
+  zwei neue Ereignisse (Ketzerei, Wallfahrt)
+- **Erweitertes Schlachtsystem:** Stadtmauer/Kaserne-Ausbaustufen fließen
+  bereits in die geschätzte gegnerische Stärke ein (bestehende Mechanik aus
+  Alpha, jetzt mit sichtbarer Unsicherheitsspanne statt Einzelzahl)
+- **Localization-Grundstruktur (§80):** Neues `STRINGS`-Objekt mit
+  `de`-Locale und `t()`-Hilfsfunktion, vorbereitet für weitere Sprachen.
+  Bewusste Einschränkung: aktuell nur als Struktur/Machbarkeitsnachweis
+  angelegt, noch nicht die gesamte UI durchgängig darüber geführt — vor
+  einer echten Zusatzsprache müsste der komplette Text extrahiert werden
+- **CRT-Filter & Chiptune-Sound (§53/§57, abschaltbar):** Checkbox für
+  einen dezenten Scanline-Overlay (CSS, standardmäßig aus) und Checkbox für
+  einfache Web-Audio-Bleep-Sounds bei Jahreswechsel, Bau, Spionage,
+  Sabotage und Wahlausgang (standardmäßig an). Kein Musik-Soundtrack, da
+  keine Audio-Assets erzeugt werden können — als spätere Ergänzung offen.
+
+**Getestet:** Kaiserwahl-Ablauf (Bestechung → Sieg), Sabotage/Spionage
+(Spionage verengt sichtbar die Schätzspanne), Rebellions-Bedingung gezielt
+provoziert, 25×200-Jahre-Langzeittest (0 passive Siege — Kaiserwerdung
+erfordert aktives Spiel, wie beabsichtigt), 20×100-Jahre-Wirtschaftstest
+weiterhin stabil.
+
+**Damit ist die Beta-Phase der Roadmap inhaltlich abgearbeitet.** Bewusst
+vereinfacht blieben: mehrstufige Belagerungen (aktuell Sofortauflösung),
+vollständige Sprachumschaltung (nur Grundstruktur), Chiptune-Musik (nur
+Sound-Effekte). Nächster Block laut Roadmap: Version 1.0 (vollständige
+Kampagne, mehrere Siegbedingungen, KI-gegen-KI-Testsuite, Debug-Menü).
+
+## 2026-08-11 – Schritt 8: Priorisierte Lücken aus STATUS_ANALYSE.md abgearbeitet (Runde 1)
+
+Nach der vollständigen Abschnitt-für-Abschnitt-Prüfung gegen den Master-Prompt
+(siehe STATUS_ANALYSE.md) wurden die am höchsten priorisierten offenen Punkte
+umgesetzt:
+
+**§67 Deterministische Simulation:** Eigener Mulberry32-PRNG (`rnd()`) ersetzt
+sämtliche `Math.random()`-Aufrufe (41 Stellen in beiden Dateien). Seed wird im
+GameState (`state.seed`) und Aufrufzähler (`__rngCalls`) im Savegame
+mitgeschrieben (SAVE_VERSION auf 2 erhöht) — ein geladener Spielstand setzt den
+Zufallsstrom exakt an der Stelle fort, an der gespeichert wurde. Getestet:
+gleicher Seed → bit-identischer Partieverlauf (Bevölkerung, Chronik) über 40
+Jahre; unterschiedlicher Seed → unterschiedlicher Verlauf.
+
+**§69 Debug-Funktionen:** Neues, über Checkbox "🛠 Debug" einblendbares Panel:
+Geld hinzufügen, Jahr überspringen, Bevölkerungsgruppen manuell verändern,
+zufälligen Charakter erzeugen, beliebiges Event gezielt auslösen, Krieg gegen
+jeden Nachbarn direkt starten.
+
+**§70 KI-Debugging:** `evaluateAiWarDecision()` zeigt für jeden Nachbarn eine
+Faktor-Aufschlüsselung (militärische Überlegenheit, Beziehung, wahrgenommene
+Schwäche über Legitimität, bestehender Pakt) im Spec-Format inkl.
+Gesamtsumme und Entscheidung. Hinweis: Die KI erklärt in dieser Version noch
+selbst keinen Krieg — das ist die Grundlage für eine spätere echte
+KI-Aggression, macht aber schon jetzt nachvollziehbar, wie eine Bewertung
+aussähe.
+
+**§83 Spielerinformation:** `updatePopulation()` und `computeRegionalPrices()`
+schreiben jetzt eine vollständige Ursachen-Aufschlüsselung
+(`region.lastPopBreakdown`, `region.priceBreakdown`) statt nur der Endsumme.
+
+**§84 Tooltip-Prinzip:** Reines CSS-Tooltip-System (`[data-tip]`-Attribut,
+kein JS nötig) — angewendet auf alle Warenpreise (Basis/Nachfrage/Angebot/
+Multiplikator/Gesamt), Bevölkerungsgruppen (Geburten/Alterstod/Hungertote/
+Seuchentote), Schatzkasse und Prestige.
+
+**§48 Schwierigkeitsgrade:** 4 Stufen (Leicht/Normal/Schwer/Experte), wirken
+NICHT über versteckte KI-Ressourcenboni, sondern über KI-Fehlerquote
+(`aiMistakeChance`), KI-Bautempo-Multiplikator und Spionage-Grundgenauigkeit
+— exakt wie in §48 gefordert. Empirisch verifiziert: Leicht Ø11 vs. Experte
+Ø23 KI-Gebäude nach 30 Jahren über 8 Seeds.
+
+**§8/§89 Start-/Charaktererstellungsbildschirm:** Neuer Titelbildschirm
+(NEUES SPIEL / SPIEL LADEN / MEHRSPIELER [deaktiviert] / CHRONIK
+[deaktiviert] / OPTIONEN) vor Spielbeginn. Charaktererstellung mit Name,
+Geschlecht, Dynastiename, Startregion (nur eine verfügbar, siehe unten),
+Schwierigkeitsgrad und Wahl von genau 2 Persönlichkeitsschwerpunkten (Traits)
+statt zufälliger Zuweisung; alternativ "Zufälliger Herrscher"-Schnellstart.
+Das Spiel startet jetzt nicht mehr automatisch beim Laden der Seite.
+
+**Nebenbei gefundener und behobener Bug:** Beim gezielten Testen der
+Schwierigkeitsgrad-Wirkung fiel auf, dass KI-Regionen seit dem Gebäude-Update
+(Schritt 5) praktisch nie mehr neue Gebäude bauten — der "Wohlstands"-Näherungswert
+basierte nur auf volatilen Kornlagern, die durch den laufenden
+Bevölkerungsverbrauch tendenziell sanken und die Bauschwelle nie mehr
+erreichten. Fix: Die Formel bezieht jetzt zusätzlich die Bevölkerungsgröße
+ein (wachsende Regionen bauen wieder zuverlässig aus, §86). Vorher/Nachher
+über 8 Seeds × 30 Jahre: 6 Gebäude gesamt (eingefroren) → 9–29 Gebäude
+(aktive Entwicklung, differenziert nach Schwierigkeitsgrad).
+
+**Getestet:** Determinismus, Save/Load-Kontinuität, Charaktererstellungs-Werte
+(Name/Geschlecht/Dynastie/Traits/Schwierigkeit korrekt übernommen),
+Schwierigkeitsgrad-Wirkung auf KI-Bautätigkeit, 80-Jahre-Regressionstest,
+20×100-Jahre-Wirtschaftstest — alles weiterhin stabil bzw. verbessert.
+
+**Nächste Punkte aus STATUS_ANALYSE.md (Runde 2):** mehr Bevölkerungsgruppen/
+Waren/Produktionsketten/Gebäude (§13/§16/§17/§26), Stadtentwicklungsstufen
+(§25), Infrastruktur (§27), Technologiesystem (§28), Belagerungen/tieferes
+Schlachtsystem (§35/§36), mehrere Siegbedingungen (§47), Spielende-Auswertung
+(§87).
+
+## 2026-08-11 – Schritt 9: Gebäude-Karte ans Original angelehnt (auf Nutzerwunsch)
+
+Auf Basis von Screenshots des ursprünglichen C64-Spiels wurde die Kartenansicht
+der Gebäude überarbeitet:
+
+- Von starrem 4×3-Raster auf eine **Landschaftskarte mit organisch verstreuten
+  Gebäude-Symbolen** umgestellt (feste, aber unregelmäßige Positionen statt
+  Gitterzellen) — näher am Original, aber mit modernem Hover-/Klick-Verhalten
+- Terrain-Hintergrund (Grünverlauf), dezenter Fluss/Grenzverlauf als SVG-Pfad,
+  Hauptstadt-Symbol (🏰) fix positioniert, ein paar dekorative Grasbüschel
+- Neue **Zeichenerklärung** unterhalb der Karte, die jedes Gebäude-Icon mit
+  Namen auflistet — direkt angelehnt an "Die Symbole und ihre Bedeutung" aus
+  dem Original
+- Bau-/Ausbaulogik unverändert (getestet, weiterhin funktionsfähig)
+
+## 2026-08-11 – Schritt 10: Mittelalterliche Baustoffe (auf Nutzerhinweis, §16/§26)
+
+Auf Hinweis, dass echte mittelalterliche Ressourcen (Holz, Stein, Ton, Metall,
+Leder, Wolle) das tägliche Leben und Bauen prägten, wurde das Warensystem
+erweitert:
+
+- **3 neue Waren:** Stein, Ton, Leder (zusätzlich zu Holz/Eisen/Wolle) — damit
+  9 von den ursprünglich geforderten 20+ Waren abgedeckt (§16)
+- **3 neue Gebäude:** Steinbruch, Tongrube, Gerberei (analog zu Sägewerk/
+  Schmiede — "enables"-Gebäude, die die jeweilige Rohstoffproduktion
+  freischalten)
+- **Bauwerke kosten jetzt echte Baustoffe, nicht nur Taler:** Jedes Gebäude
+  hat einen `materialCost` (z. B. Stadtmauer: 50 Stein; Schmiede: 20 Stein +
+  5 Eisen; Bauernhof: 20 Holz). Fehlen Materialien, scheitert der Bau mit
+  konkreter Fehlermeldung, welche Ressource in welcher Menge fehlt. Das
+  verknüpft Wirtschaft und Bautätigkeit spürbar (§3 Kettenreaktionen): ohne
+  Steinbruch keine Stadtmauer, ohne Sägewerk kein Wachstum überhaupt.
+  Ausbaustufen bleiben bewusst reine Geldkosten (Vereinfachung).
+- **Leder als Verbrauchsgut:** Handwerker/Händler/Adel haben jetzt auch
+  Lederbedarf (analog zu Werkzeugen), Stein/Ton werden dagegen ausschließlich
+  als Baustoff verbraucht, nicht von der Bevölkerung konsumiert (historisch
+  korrekt: Baumaterial vs. Alltagsgut)
+- UI: Baumenü auf der Kartenseite zeigt jetzt die nötigen Materialien pro
+  Gebäude an, fehlende Mengen werden rot hervorgehoben
+
+**Getestet:** Materialkosten-Prüfung (Bau schlägt korrekt fehl bei fehlendem
+Stein), 80-Jahre-Regressionstest und 20×100-Jahre-Wirtschaftstest weiterhin
+stabil.
+
+## 2026-08-11 – Schritt 11: Feudales Militärsystem (auf Nutzerhinweis, §33/§34/§35)
+
+Auf Hinweis, dass mittelalterliche Militärs von Vasallenheeren, Söldnern und
+dezentraler Kriegsführung (keine stehende Armee) geprägt waren, wurde das
+Militärsystem grundlegend überarbeitet:
+
+- **5 statt 3 Truppentypen:** Bauernmiliz, Bogenschützen, Armbrustschützen,
+  Ritter, Söldner — mit klarer Herkunftsunterscheidung
+- **Vasallentruppen vs. Söldner (§33/§34):** Bauernmiliz/Bogenschützen/
+  Armbrustschützen werden aus der Bauernschaft ausgehoben (Bevölkerungskosten,
+  keine Zufriedenheitsvoraussetzung). **Ritter erfordern echte Lehenstreue** —
+  ohne ausreichende Adelszufriedenheit (≥45) verweigert der Adel den
+  Ritterdienst, mit klarer Fehlermeldung. **Söldner** sind dagegen jederzeit
+  gegen reines Gold verfügbar, ohne Bevölkerungskosten oder Zufriedenheits-
+  voraussetzung — dafür unzuverlässig.
+- **Fahnenflucht-Mechanik (neu):** Söldner desertieren mit Grundwahrschein-
+  lichkeit jedes Jahr, deutlich häufiger wenn der Sold nicht mehr gedeckt ist
+  (Staatskasse negativ) oder die Legitimität niedrig ist — Vasallentruppen
+  sind davon nicht betroffen (Lehenstreue statt Bezahlung).
+- **Schlachtformationen (§35):** Vor der Kriegserklärung wählbar — "Ritter im
+  Zentrum" (Bonus nur mit vorhandenen Rittern), "Schützen als Vorhut" (Bonus
+  nur mit Bogen-/Armbrustschützen), "Gleichmäßig verteilt" (kein Bonus, aber
+  auch kein Malus). Keine echte taktische Simulation, aber eine
+  nachvollziehbare Vorentscheidung mit Konsequenz.
+
+**Getestet:** Lehenstreue-Verweigerung bei niedriger Adelszufriedenheit,
+Söldner-Anwerbung unabhängig davon, erzwungene Fahnenflucht bei negativer
+Kasse (5→2 Söldner in einem Testfall), Formationsboni (24,0 → 27,6 Stärke
+mit passender Formation), 80-Jahre-Regressionstest und
+20×100-Jahre-Wirtschaftstest weiterhin stabil.
+
+## 2026-08-11 – Schritt 12: Systematische Abarbeitung STATUS_ANALYSE.md (Runde 2, Teil 1)
+
+Beginn der vollständigen, punktweisen Abarbeitung aller in STATUS_ANALYSE.md
+verbliebenen offenen Punkte, wie vom Nutzer gewünscht ("nach und nach").
+Dieser Schritt deckt die ersten beiden Prioritätspunkte ab:
+
+**§13/§16/§17/§26 Content-Erweiterung:**
+- **18 statt 9 Waren:** neu Gemüse, Fleisch, Fisch, Salz (Grundnahrung),
+  Kohle (Rohstoff), Wein, Waffen, Kleidung (Verarbeitet), Gewürze (Luxus —
+  bewusst ohne heimische Produktionskette, reines Importgut)
+- **10 statt 5 Bevölkerungsgruppen:** neu Landarbeiter, Bürger, Geistliche,
+  Soldaten, Tagelöhner — jede Gruppe mit eigenem Warenbedarf und
+  Bevölkerungsanteil (`share`), Summe exakt 1.0 geprüft
+- **25 statt 13 Gebäudetypen:** neu Gemüsegarten, Viehweide, Fischerteich,
+  Weingut, Kohlebergwerk, Salzsiederei, Waffenschmiede, Weberei, Kirche,
+  Kloster, Universität, Palast
+- **17 Produktionsketten** (vorher 8), jetzt mit `workerGroup`-Feld — jede
+  Kette bezieht ihre Arbeitskraft aus der historisch passenden
+  Bevölkerungsgruppe (Bauern/Landarbeiter Vollzeit-Urproduktion, Handwerker
+  Teilzeit-Gewerbe) statt pauschal aus einer einzigen Gruppe
+- Kirche/Kloster stärken jetzt aktiv den kirchlichen Einfluss, Palast liefert
+  passives Prestige — beide über echte Ausbaustufen skalierend
+
+**§25 Stadtentwicklung:** 8 Stufen (Weiler → Kaiserstadt) gemäß Spec-Vorgabe,
+abhängig von Bevölkerung UND Infrastrukturstufe (nicht nur einem Wert),
+jährlich geprüft, mit Chronik-Eintrag beim Stufenaufstieg und kleinem
+Zufriedenheitsbonus je erreichter Stufe.
+
+**§27 Infrastruktur:** Neue Ausbauleiste (0–6), kostet Taler + Stein/Holz,
+jede Stufe erhöht Handelsvolumen (+8 %) und Produktion (+2 %) und ist
+Voraussetzung für höhere Stadtentwicklungsstufen — echte Kopplung der
+beiden Systeme.
+
+**Kleiner Fund während des Tests:** Eine grammatisch falsche
+Chronik-Meldung ("zu einer Dorf herangewachsen" statt "zu einem Dorf") beim
+ersten Stufenaufstieg entdeckt und auf eine geschlechtsneutrale Formulierung
+umgestellt ("hat die Entwicklungsstufe „Dorf“ erreicht").
+
+**Getestet:** Warenanzahl (18), Bevölkerungsgruppen (10), Gebäudetypen (25)
+und Produktionsketten (17) verifiziert; Summe der Bevölkerungsanteile exakt
+1,0; Bau-/Materialkostenprüfung für neue Gebäude; Save/Load mit erweitertem
+Datenmodell; Infrastrukturausbau inkl. Stufenaufstieg gezielt provoziert;
+80-Jahre-Regressionstest und 20×100-Jahre-Wirtschaftstest weiterhin stabil
+(etwas mehr Preisdruck an der Obergrenze durch die vielen neuen Waren ohne
+automatischen Gebäudebau — erwartbar, dieselbe Ursache wie bereits in
+Schritt 3 dokumentiert).
+
+**Noch offen aus Runde 2 (folgt in den nächsten Schritten):**
+Technologiesystem (§28), Belagerungen (§36), mehrere Siegbedingungen (§47),
+Spielende-Auswertung (§87), Staatsschulden/Kredite (§24), erweiterte
+Diplomatie-Aktionen (§29), KI-gegen-KI-Testsuite (§78).
+
+## 2026-08-11 – Schritt 12: Ausrichtung am Original "Kaiser" (C64, 1984)
+
+Auf Nutzerwunsch am originalen Spielprinzip von "Kaiser" (CCD/Ariolasoft,
+1984) orientiert — recherchiert über C64-Wiki und Wikipedia. Folgende
+Original-Mechaniken wurden ergänzt:
+
+- **Land als Handelsware:** `region.land` (Start: proportional zur
+  Bevölkerung, Referenz 10.000 Hektar), schwankender Landpreis (16–70 Taler,
+  wie im Original), Kauf/Verkauf mit 10 % Verkaufsprovision (Original-Detail).
+  Baugrundstücks-Anzahl ist jetzt **dynamisch aus dem Landbesitz** abgeleitet
+  (mehr Land = mehr Baukapazität) statt fest auf 12 verdrahtet.
+- **Kornverteilung über den Bedarf hinaus:** neuer Regler, kostet Getreide,
+  hebt Zufriedenheit und lockt Zuwanderer an (Original-Strategietipp).
+- **Regierungsstil-Regler** ("Sehr fair" bis "Gierig"): zusätzlicher Hebel
+  neben der Steuer — mehr Einnahmen bei "gierig", aber Zufriedenheits- und
+  Legitimitätsverlust.
+- **Kriegsverbündete-Abfrage:** Vor jeder Kriegserklärung wird bei den
+  übrigen bekannten Nachbarn abgefragt, ob sie dich unterstützen, den Gegner
+  unterstützen oder neutral bleiben — abhängig von der Beziehung (statistisch
+  über 500 Läufe verifiziert). Genau das originale "Bündnis"-Feature, das in
+  Kritiken als einzige diplomatische Tiefe des Originals hervorgehoben wurde.
+- **Automatische Bürgermiliz:** Armeestärke erhält jetzt einen Bonus aus der
+  Anzahl von Markt/Mühle-Gebäuden — genau wie im Original ("Die Miliz ist
+  eine Bürgerwehr, die Sie automatisch, abhängig von der Menge an
+  Marktplätzen und Kornmühlen, erhalten").
+- **Palast-Pflicht für König, Kathedrale-Pflicht für Kaiserwahl:** Neues
+  Gebäude Kathedrale ergänzt; die Beförderung zum König ist jetzt an einen
+  gebauten Palast gebunden, die Kaiserwahl kann erst nach Bau einer
+  Kathedrale ausgelöst werden — direkt aus dem Original übernommen (per Test
+  verifiziert: Beförderung/Wahl bleiben ohne die Gebäude blockiert).
+- **Migration (schließt zusätzlich die §14-Lücke):** hohe Zufriedenheit
+  zieht jetzt Zuwanderer an, niedrige vertreibt Bevölkerung.
+
+## 2026-08-11 – Schritt 13: Kritischer Balancing-Bug behoben (Bevölkerungskollaps)
+
+Beim Abschluss-Test der "Kaiser"-Original-Erweiterung fiel ein **schwerwiegender
+Regressionsfehler** auf: 0 von 20 Wirtschaftstest-Partien liefen noch vollständig
+durch — jede Partie kollabierte auf ~20–200 Einwohner. Vier zusammenwirkende
+Ursachen wurden gefunden und behoben:
+
+1. **Bauernanteil zu niedrig:** Die Content-Erweiterung (Schritt 12 der
+   vorherigen Zählung/Runde 2) hatte den Bauernanteil von 45 % auf 24 %
+   gesenkt, ohne die Getreideproduktion entsprechend anzupassen. Korrigiert
+   auf 40 % Bauern + 8 % Landarbeiter (nahe am historischen Original-Anteil).
+2. **Unbegrenzt aufsummierte Bedarfsstrafen:** Mit bis zu 8 Warenbedarfen pro
+   Gruppe (z. B. Adel) addierten sich die Einzelstrafen bei Mangel unbegrenzt
+   auf, statt wie früher (max. 1–2 Bedarfe) begrenzt zu bleiben. Umgestellt auf
+   eine gewichtete Durchschnittsdefizit-Berechnung — die Gesamtstrafe bleibt
+   dadurch unabhängig von der Anzahl der Bedarfsarten vergleichbar mit vorher.
+3. **Fehlende Homöostase:** Zufriedenheit hatte grundsätzlich keine
+   stabilisierende Rückkehrkraft — jede noch so kleine Dauerbelastung (allein
+   schon der Standard-Steuersatz) führte unweigerlich in eine Todesspirale
+   Richtung 0. Eine milde Rückkehrkraft zur Mitte (Zielwert 50) wurde ergänzt,
+   die echte Schocks (Hunger, Kriegsniederlage, Rebellion) unverändert
+   durchschlagen lässt.
+4. **Migrationsfaktor um Faktor 10 zu stark:** Der in Schritt 12 neu
+   eingeführte Migrationsmechanismus (§14) ließ bei nur mäßig niedriger
+   Zufriedenheit (35 statt 50) bereits ~6 % der Bevölkerung pro Jahr
+   abwandern. Auf ein realistisches Maß reduziert.
+
+**Ergebnis:** 20×100-Jahre-Wirtschaftstest läuft jetzt wieder sauber durch —
+16 von 20 Partien erreichen das Testende ganz ohne jedes Abbruchereignis, die
+übrigen 4 enden ausschließlich an "kein Erbe" (normale Dynastie-Varianz),
+**keine einzige mehr an Bevölkerungskollaps oder Bankrott**. Diese Art von
+Fund ist genau der Zweck des automatisierten Wirtschaftstests aus §77 — ohne
+ihn wäre dieser Bug erst im Spielverlauf aufgefallen.
+
+**Lehre für weitere Content-Erweiterungen:** Jede neue Bevölkerungsgruppe mit
+mehreren Warenbedarfen und jeder neue Dauerhebel (Steuer, Regierungsstil,
+Migration) muss gegen den automatisierten Wirtschaftstest laufen, bevor er
+als abgeschlossen gilt — nicht nur gegen einen einzelnen 80-Jahre-Lauf, der
+Kollaps-Trends noch nicht zuverlässig zeigt.
+
+## 2026-08-12 – Schritt 14: Restliche STATUS_ANALYSE.md-Punkte abgearbeitet
+
+Die komplette verbliebene Prioritätenliste wurde umgesetzt:
+
+**§28 Technologiesystem:** 5 Kategorien (Landwirtschaft, Handwerk, Militär,
+Verwaltung, Handel), je bis Stufe 5 ausbaubar. Forschungspunkte entstehen aus
+Universität-Gebäuden (+ passivem Grundwert), investierbar über ein neues
+UI-Panel. Boni wirken direkt in Getreideproduktion, allgemeiner Produktion,
+Armeestärke, Steuereinnahmen und Handelsvolumen — keine reine Zahlenkosmetik.
+
+**§36 Belagerungen:** Kriegserklärung gegen eine Region mit Stadtmauer löst
+jetzt eine mehrjährige Belagerung aus (Dauer abhängig von der Mauerstufe)
+statt einer Sofortschlacht. Drei Spieleraktionen während der Belagerung:
+Sturmangriff (riskanter, höhere Verluste, sofortige Entscheidung), Aushungern
+(schwächt den Verteidiger schrittweise, kostet weiterhin reduzierten
+Unterhalt), Bestechung der Garnison (Geld gegen Erfolgschance, bei Fehlschlag
+Beziehungsschaden). Unbefestigte Ziele bleiben Sofortschlachten.
+
+**§47 Mehrere Siegbedingungen:** Bei der Charaktererstellung wählbar:
+Kaiser werden (klassisch, Kaiserwahl), Reichste Dynastie (Schatzkasse-Ziel,
+5 Jahre halten), Größte Handelsmacht (Lagerwert-Ziel, 5 Jahre halten),
+Militärische Dominanz (alle 3 Nachbarn im Krieg besiegen), Endlosmodus
+(kein Sieg-Ziel).
+
+**§87 Spielende-Auswertung:** Der Game-Over-Bildschirm zeigt jetzt eine
+vollständige Chronik-Zusammenfassung: Regierungsjahre, Dynastiegenerationen,
+höchster erreichter Titel, größte je erreichte Bevölkerung/Staatskasse,
+Kriegsbilanz (gewonnen/verloren), überstandene Katastrophen, erreichte
+Stadtentwicklungsstufe. Alle Werte werden laufend in `state.stats`
+mitgeschrieben, nicht erst am Ende berechnet.
+
+**§24 Staatsschulden:** Kredite aufnehmbar, Zinssatz hängt von Prestige und
+Legitimität ab (bessere Herrschaft = günstigere Kredite), jährlich fällige
+Zinszahlung, Teilrückzahlung möglich. Eigenes UI-Panel neben dem Landhandel.
+
+**§29 Erweiterte Diplomatie:** Vasallisierung (ab hoher Beziehung, liefert
+danach laufenden Tribut), Tribut fordern (Erfolgschance, bei Fehlschlag
+Beziehungsschaden), dynastische Ehe (setzt eine dauerhafte Beziehungs-
+Untergrenze, die auch bei negativer Drift nicht mehr unterschritten wird),
+Geiselaustausch (einfacher Beziehungsschub).
+
+**§78 KI-gegen-KI-Testsuite:** Neues `tests/ai_vs_ai_test.js` — lässt 100
+Partien über je 100 Jahre komplett ohne Spielereingriff laufen und prüft,
+ob eine der 7 KI-Regionen unangemessen häufig zur bevölkerungsreichsten
+wird (Hinweis auf einen unbeabsichtigten Startvorteil, §81 "keine Strategie
+darf nahezu immer gewinnen"). Prüft zusätzlich, dass der Spieler bei rein
+passivem Spiel nicht versehentlich gewinnen kann.
+
+**Wichtiger Fund durch die neue Testsuite:** Der erste Lauf deckte auf, dass
+Bayern (ai4) in 57 von 100 Partien die bevölkerungsreichste KI-Region wurde —
+verursacht durch zu große Unterschiede in der Startbevölkerung zwischen den
+7 KI-Regionen (2200–4200 Einwohner). Alle Regionen wurden auf einen engeren
+Bereich (2700–2900) mit Fruchtbarkeit als verbleibender Differenzierung
+angeglichen. Nach der Korrektur: höchste Dominanz-Häufigkeit einer einzelnen
+Region nur noch 27 % (vorher 57 %), keine kritische Auffälligkeit mehr.
+Ohne die neue Testsuite wäre dieses Ungleichgewicht nicht aufgefallen — genau
+der Zweck von §78.
+
+**Getestet:** Alle neuen Funktionen (Technologie-Investition, Belagerung mit
+allen drei Aktionen, alle 4 neuen Diplomatie-Aktionen, Kredit-Auf-/Abnahme,
+alternative Siegbedingungen) einzeln verifiziert; 100-Jahre-Regressionstest,
+20×100-Jahre-Wirtschaftstest und 100×100-Jahre-KI-Testsuite laufen alle
+stabil ohne kritische Befunde.
+
+**Damit sind alle Punkte aus STATUS_ANALYSE.md, die in der letzten
+Prioritätenliste genannt wurden, abgearbeitet.** Verbleibende, bewusst nicht
+umgesetzte Punkte (siehe STATUS_ANALYSE.md für die vollständige Liste):
+echtes Sprite-/Canvas-Rendering, Chiptune-Musik, Intro-Sequenz, Easter Eggs,
+vollständige Sprachumschaltung — allesamt laut Spec selbst niedrigste
+Priorität (§101).
+
+## 2026-08-12 – Schritt 15: Marktplatz — direkter Warenkauf/-verkauf (§20/§21/§73)
+
+Auf Nutzeranfrage ergänzt: Der Spieler kann Waren jetzt direkt kaufen und
+verkaufen, statt nur indirekt über Produktion und die automatische
+KI-Handelslogik zwischen Regionen zu wirtschaften — schließt eine seit dem
+ursprünglichen Prototyp offene Anforderung aus §73 ("Getreide kaufen",
+"Getreide verkaufen").
+
+- Neues Marktplatz-Panel: Warenauswahl (alle 18 Waren), Mengenfeld,
+  Kaufen-/Verkaufen-Buttons
+- Transaktionen laufen zum aktuellen Regionalpreis, mit Aufschlag beim Kauf
+  (+8 %) bzw. Provision beim Verkauf (−8 %) — bewusst analog zur bereits
+  bestehenden 10 %-Provision beim Landverkauf, für ein konsistentes Bild
+- Bewusst **kein separates Preismodell**: Käufe/Verkäufe verändern nur den
+  Lagerbestand, der Preis reagiert ganz normal übers bestehende Angebot/
+  Nachfrage-System im nächsten Jahr — keine Doppelbuchführung nötig
+- Damit hat der Spieler einen dritten echten Wirtschaftshebel neben Steuern
+  und Regierungsstil: gezielt Engpässe überbrücken (z. B. Getreide in einer
+  Hungersnot zukaufen) oder Überschüsse zu Geld machen
+
+**Getestet:** Kauf/Verkauf-Logik direkt verifiziert (inkl. Fehlerfall bei zu
+geringem Lagerbestand), 80-Jahre-Regressionstest, 20×100-Jahre-Wirtschaftstest
+(19/20 vollständig ohne Abbruch) und 100×100-Jahre-KI-Testsuite laufen alle
+weiterhin stabil ohne kritische Befunde.
+
+**Mögliche spätere Erweiterung (nicht umgesetzt):** echter Handel zwischen
+zwei konkreten Regionen mit Preisunterschied als bewusste Arbitrage-Strategie
+(näher am §21-Beispiel mit Getreidepreisen in Köln/Mainz/München) — aktuell
+handelt der Spieler pauschal "mit dem Markt seiner eigenen Region", nicht
+gezielt mit einem bestimmten Nachbarn.
+
+## 2026-08-12 – Schritt 16: Regionalhandel — echte Arbitrage zwischen zwei Regionen (§20/§21)
+
+Direkt im Anschluss auf Nutzerwunsch umgesetzt: der Spieler kann jetzt gezielt
+mit einer bestimmten anderen Region handeln, nicht mehr nur pauschal mit dem
+eigenen lokalen Markt — genau das Beispiel aus §21 der Spec (unterschiedliche
+Getreidepreise in Köln/Mainz/München gezielt ausnutzen).
+
+- Neues Panel "Regionalhandel (Arbitrage)": Ware + Zielregion wählbar (alle
+  7 KI-Regionen erreichbar, nicht nur die 3 diplomatisch bekannten Nachbarn —
+  Handel setzt keine Grenznähe voraus), zeigt Preis bei dir und dort direkt
+  nebeneinander mit Handlungsempfehlung ("dort teurer → Export lohnt sich")
+- **Exportieren:** Ware aus dem eigenen Lager wird zum Preis der Zielregion
+  verkauft (abzüglich Transportkosten)
+- **Importieren:** Ware wird zum Preis der Zielregion gekauft und ins eigene
+  Lager gebracht (zuzüglich Transportkosten)
+- Transportkosten (12 %) höher als beim lokalen Markt (8 %) — Fernhandel ist
+  teurer, aber bei großen Preisunterschieden trotzdem lohnend
+- **Räuberrisiko (§20 "Gefahren: Räuber, Piraten...")**: ca. 6 % Chance, dass
+  ein Handelszug überfallen wird und nur ein Teil der Ware ankommt bzw.
+  verkauft werden kann — macht Fernhandel spürbar riskanter als den
+  Lokalmarkt, ohne ihn unspielbar zu machen
+- Export/Import verändern tatsächlich den Lagerbestand beider beteiligter
+  Regionen — wirkt sich über das bestehende Angebot/Nachfrage-System auch auf
+  deren künftige Preise aus (echte Marktdynamik, keine isolierte Transaktion)
+
+**Getestet:** Export/Import-Logik direkt verifiziert (inkl. Fehlerfällen bei
+zu geringem Lagerbestand/Guthaben), Räuberrisiko statistisch bestätigt
+(6,7 % über 2000 Würfe, erwartet ~6 %), 80-Jahre-Regressionstest,
+20×100-Jahre-Wirtschaftstest und 100×100-Jahre-KI-Testsuite laufen weiterhin
+stabil ohne kritische Befunde.
+
+## 2026-08-12 – Schritt 17: Gebäude-Karte visuell aufgewertet (Pixel-Art-Icons)
+
+Auf Nutzerwunsch ("mehr bildliche Darstellung") wurde die Kartenansicht
+grundlegend überarbeitet:
+
+- **26 individuelle Pixel-Art-Icons**, ein eigenes für jeden Gebäudetyp
+  (Bauernhof, Windmühle mit Flügeln, Steinbruch als gestufte Felsblöcke,
+  Schmiede mit Amboss, Waffenschmiede mit gekreuzten Schwertern, Kathedrale
+  mit Rosette, Palast mit goldenen Türmen, uvm.) — aus einfachen Rechtecken/
+  Polygonen auf 20×20-Pixelraster zusammengesetzt, konsistent mit der
+  reduzierten Retro-Palette (keine Verläufe, harte Kanten, §49–52)
+- **Pixel-Art-Schloss statt Emoji** für die Hauptstadt — Emojis rendern
+  plattformabhängig und passen nicht zum einheitlichen 8-Bit-Look
+  (eigenes SVG mit drei Türmen und Wappentürmchen)
+- **Landschaftsdeko erweitert**: Bäume, Büsche und angedeutete Hügel als
+  Pixel-Art statt der bisherigen Text-Symbole (♣), Terrain zusätzlich mit
+  dezenter Diagonal-Textur statt reinem Farbverlauf
+- **Ausbaustufe jetzt visuell statt als Text**: kleine Punkte-Anzeige
+  (gefüllt = erreichte Stufe) statt "St. X/Y"-Beschriftung
+- Icons konsistent auch in der Zeichenerklärung, der Bauauswahl-Liste und
+  der Grundstücks-Detailansicht verwendet — nicht nur auf der Karte selbst
+
+**Getestet:** Vollständigkeit verifiziert (alle 26 Gebäudetypen haben ein
+eigenes Icon, kein Rückfall auf Platzhalter), Syntaxprüfung beider Script-
+Blöcke nach den umfangreichen Template-String-Änderungen, Regressionstest
+inkl. Bauaktion weiterhin fehlerfrei.
+
+## 2026-08-12 – Schritt 18: Siedler-Ästhetik (Wege, Holzrahmen, mehr Naturdeko)
+
+Auf Nutzer-Screenshot ("Die Siedler") hin die Kartenansicht weiter Richtung
+verbundene, natürliche Spielwelt entwickelt (echte Siedler-Sprite-Qualität
+würde den Rahmen sprengen, aber Bildsprache übernommen):
+
+- **Holzrahmen um die Karte**: gemasertes Holzmuster als Rand mit vier
+  Metall-Nieten in den Ecken (reines CSS, keine Bildassets)
+- **Wege zwischen Hauptstadt und jedem bebauten Grundstück**: leicht
+  geschwungene, gestrichelte Feldwege (SVG-Pfade), dynamisch neu berechnet
+  bei jedem Kartenaufbau — verbindet die Szene optisch wie im Vorbild
+- **Felsen als weitere Landschaftsdeko** (4 Positionen) zusätzlich zu Bäumen/
+  Büschen/Hügeln aus Schritt 17
+- **Schlagschatten unter jedem Gebäude-Marker** (dunkle Ellipse), verstärkt
+  den Eindruck, dass die Gebäude auf dem Terrain "stehen" statt zu schweben
+
+**Getestet:** Syntaxprüfung beider Script-Blöcke, Regressionstest weiterhin
+fehlerfrei.
+
+## 2026-08-12 – Schritt 19: Eigene Icons für alle 18 Handelswaren
+
+Auf Nutzerwunsch bekommt jetzt auch jede Ware ein individuelles Pixel-Art-
+Symbol (bisher hatten nur Gebäude eigene Icons) — Getreide als Ährenbund,
+Fisch als Silhouette mit Flosse, Bier als Krug mit Henkel und Schaum, Wein
+als Flasche, Werkzeuge als gekreuzter Hammer/Schraubenschlüssel, Waffen als
+Schwert, Gewürze als Sack mit bunten Punkten, uvm. — alle 18 Waren einzeln
+unterscheidbar, im selben 20×20-Pixelraster-Stil wie die Gebäude-Icons.
+
+- Preistabelle zeigt jetzt Icon + Name pro Zeile statt nur Text
+- Marktplatz- und Regionalhandel-Panel zeigen eine größere Icon-Vorschau der
+  aktuell gewählten Ware neben dem Auswahlmenü
+- Palette um sechs weitere Farbtöne erweitert (Orange, Fleischtöne, Lila,
+  Gelb, Creme, Silber) für mehr visuelle Unterscheidbarkeit zwischen den
+  Warenkategorien
+
+**Getestet:** Vollständigkeit verifiziert (alle 18 Waren haben ein eigenes
+Icon), Syntaxprüfung, Regressionstest weiterhin fehlerfrei.
+
+## 2026-08-12 – Schritt 20: Design-Bereinigung — einheitliches Design-System
+
+Auf Nutzerhinweis ("sieht alles ziemlich durcheinander aus") das komplette
+Erscheinungsbild aufgeräumt. Eine Bestandsaufnahme zeigte den Grund klar:
+nach 19 Entwicklungsschritten hatten sich **13 verschiedene Schriftgrößen**
+(7–32px, oft nur 1px auseinander), **12 verschiedene Abstandswerte** und eine
+abweichende Schriftart (`monospace` statt der Pixel-Schrift) im Tooltip
+angesammelt — jede neue Funktion hatte ihre eigenen Ad-hoc-Werte mitgebracht.
+
+- **Design-System eingeführt:** feste Typografie-Skala (`--fs-micro` 7px bis
+  `--fs-logo` 32px, 7 Stufen statt 13 wild gestreuter Werte) und
+  Abstands-Skala (`--sp-1` bis `--sp-5`) als CSS-Variablen im `:root`-Block
+- **Alle 45 Schriftgrößen- und 33 Abstands-Deklarationen** im gesamten
+  Dokument (sowohl im `<style>`-Block als auch in den dynamisch generierten
+  Inline-Styles der JS-Render-Funktionen) automatisiert auf die neuen Tokens
+  umgestellt — keine harten Pixelwerte mehr verstreut im Code
+- **Eine einzige Schriftart konsequent überall** (`var(--font)` = Press
+  Start 2P), die abweichende `monospace`-Deklaration im Preis-Tooltip behoben
+- **Neue `.subhead`-Komponente** für klare Unterabschnitte: Land,
+  Staatsschulden und Infrastruktur waren bisher ohne eigene Überschrift
+  einfach unter "Deine Provinz" durchgereicht worden und wirkten wie ein
+  undifferenzierter Textblock — jetzt klar als eigene Abschnitte
+  gekennzeichnet
+- Überflüssige, sich wiederholende Inline-`margin-top`-Overrides an den
+  Panel-Überschriften entfernt — eine zentrale CSS-Regel
+  (`.panel h2.title:not(:first-child)`) sorgt jetzt automatisch für
+  einheitliche Abstände zwischen Abschnitten
+
+**Getestet:** Syntaxprüfung beider Script-Blöcke nach den umfangreichen,
+automatisiert über das gesamte Dokument angewendeten Ersetzungen,
+80-Jahre-Regressionstest und 20×100-Jahre-Wirtschaftstest weiterhin stabil.
+
+**Nächster sinnvoller Schritt** (nicht in diesem Durchgang umgesetzt): den
+Kampfbildschirm (`battle.html`) auf dasselbe Design-System umstellen, sowie
+ggf. die stark gewachsene Provinz-Seite in Unterreiter (Hof/Wirtschaft/
+Diplomatie) statt einer langen Zweispalten-Liste aufzuteilen, falls weiterhin
+Unübersichtlichkeit empfunden wird.
+
+## 2026-08-12 – Schritt 21: Provinz-Seite in eigene Reiter aufgeteilt
+
+Auf Nutzerwunsch die bisherige Zweispalten-Sammelseite (Hof, Berater,
+Technologie, Bevölkerung, Regierung, Land, Schulden, Infrastruktur links;
+Preise, Markt, Handel, Diplomatie, Chronik rechts — alles auf einmal
+sichtbar) in sechs klar getrennte Reiter aufgeteilt:
+
+- **🏰 PROVINZ** (erste Seite, wie gewünscht nur diese Inhalte): Hof,
+  Regierung (Steuersatz/Regierungsstil/Kornausgabe), Bevölkerungstabelle,
+  Zufriedenheit, Siedlungsstufe
+- **📚 BERATER & FORSCHUNG**: Berater-Ämter, Technologie
+- **💰 WIRTSCHAFT**: Marktpreise/Lager, Marktplatz, Regionalhandel, Land,
+  Staatsschulden, Infrastruktur
+- **🤝 DIPLOMATIE**: Diplomatie-Panel, Reichschronik
+- **🗺 KARTE & GEBÄUDE** und **⚔ MILITÄR** unverändert
+
+Technisch risikoarm umgesetzt: alle Panel-Inhalte (Element-IDs) wurden nur in
+neue Container-`<div>`s verschoben, ohne die IDs selbst zu ändern — die
+komplette `render()`-Logik greift weiterhin unverändert per `getElementById`
+darauf zu, unabhängig davon, in welchem Reiter das Element gerade sichtbar
+ist. Tab-Leiste ist jetzt umbruchfähig gestaltet (6 statt 3 Reiter bei
+gleichbleibender Breite).
+
+**Getestet:** Statischer Abgleich aller 82 im Code referenzierten
+Element-IDs gegen die tatsächlich vorhandenen IDs im Dokument — keine einzige
+fehlt. Syntaxprüfung beider Script-Blöcke, Regressionstest und
+20×100-Jahre-Wirtschaftstest weiterhin fehlerfrei.
+
+## 2026-08-12 – Schritt 22: Chronik auf die Provinz-Seite verschoben
+
+Kurze Nachbesserung auf Nutzerhinweis: die Reichschronik gehörte laut
+Rückmeldung ebenfalls auf die erste Seite (Provinz), nicht zur Diplomatie.
+Verschoben — Provinz-Reiter zeigt jetzt Hof, Regierung, Bevölkerung und
+Chronik zusammen; Diplomatie-Reiter enthält nur noch das Diplomatie-Panel.
+
+## 2026-08-12 – Schritt 23: Marktspekulation — Preise schwanken jetzt auch ohne Angebots-/Nachfrageänderung
+
+Auf Nutzerwunsch ("Marktpreise sollen sich Jahr für Jahr verändern, wie auf
+einem richtigen Markt"): Bisher waren Preise rein mechanisch aus Angebot und
+Nachfrage berechnet — blieb die Lagermenge stabil, blieb auch der Preis
+stabil, was sich träge anfühlte.
+
+- Neue **Marktstimmungs-Komponente** pro Ware und Region: ein
+  mittelwert-rückkehrender Zufallsprozess (0,75×–1,35×), der sich jedes Jahr
+  leicht verschiebt — technisch dieselbe Art von Mechanik wie bereits beim
+  Landpreis aus Schritt 12, jetzt auch für alle 18 Waren einzeln
+- Preis-Tooltip zeigt die Marktstimmung jetzt als eigene Zeile neben
+  Nachfrage/Angebot — bleibt damit weiterhin vollständig nachvollziehbar
+  (§84), nicht einfach ein unsichtbarer Zufallsfaktor
+- Bewusst moderat kalibriert: spürbare Schwankungen von Jahr zu Jahr, aber
+  keine Verzerrung der Wirtschaftsbalance (mit Wirtschaftstest verifiziert)
+
+**Getestet:** Preisverlauf über mehrere Jahre beobachtet (z. B. Gewürze
+26→24→24…, Waffen 19→20→19→18…) — sichtbare, aber maßvolle Bewegung.
+80-Jahre-Regressionstest und 20×100-Jahre-Wirtschaftstest weiterhin stabil
+ohne kritische Auffälligkeiten.
+
+## 2026-08-12 – Schritt 24: Kampf-Engine ins Hauptspiel integriert
+
+Die separat entwickelte Kampf-Engine (`battle-engine/`) ersetzt jetzt die
+bisherige Sofortauflösung im Militär-Reiter vollständig. Eine
+Kriegserklärung öffnet den vollen interaktiven Kampfbildschirm (Formation,
+Taktik, Gelände-abhängiger Verteidigerbonus, Moral, Entscheidungspunkte,
+Schlachtbericht) statt nur einen simplen Stärkevergleich zu würfeln.
+
+**Technische Umsetzung:**
+- **Namenskollision behoben:** Beide Systeme hatten eine eigene `FORMATIONS`-
+  Konstante mit unterschiedlichem Aufbau — die der Kampf-Engine wurde
+  durchgängig zu `BATTLE_FORMATIONS` umbenannt (in allen drei Engine-Dateien
+  und `battle.html`), damit sie beim Zusammenführen nicht die
+  Hauptspiel-Version überschreibt.
+- **Neue Brücken-Datei `js/battle-bridge.js`:**
+  - `buildPlayerBattleArmy()` — rechnet die 5 Hauptspiel-Truppentypen
+    (Miliz/Bogenschützen/Armbrustschützen/Ritter/Söldner) auf die 5
+    Kampf-Engine-Einheitentypen um (Bogen- und Armbrustschützen werden zu
+    einer Fernkampf-Einheit zusammengefasst, Ritter→Kavallerie,
+    Söldner→Infanterie); Kaserne-/Markt-/Mühle-Bonus wird als zusätzliche
+    ausgebildete Miliz übersetzt; der Kommandant entsteht aus den
+    Herrscherwerten (Militär→Führung, Diplomatie→Taktik, Charisma→Mut)
+  - `buildAiBattleArmy()` — da KI-Regionen keine echten Truppenstapel
+    besaßen (nur einen abstrakten Stärkewert), wird eine plausible
+    Zusammensetzung aus Bevölkerung und Kaserne-Ausbaustufe generiert
+  - `determineWarTerrain()` — eine Stadtmauer beim Verteidiger löst jetzt
+    das Gelände "Burg" mit dessen eingebautem, sehr starkem
+    Verteidigerbonus aus, statt der bisherigen separaten mehrjährigen
+    Belagerungs-Zustandsmaschine
+  - `applyBattleResultToGame()` — rechnet die Truppenverluste anteilig
+    zurück auf die ursprünglichen Hauptspiel-Truppentypen, verbucht Beute/
+    Prestige/Beziehungsschaden/Zufriedenheitsverlust, aktualisiert die
+    Kriegsstatistik für die Siegbedingung "Militärische Dominanz" und die
+    Spielende-Auswertung
+- **UI:** Neues Overlay (`#btOverlay`) mit Aufstellung, Schlachtfeld
+  (Truppenblöcke mit Moralbalken), Kampfprotokoll, Entscheidungspunkten und
+  Schlachtbericht — konsequent mit den bestehenden Design-Tokens
+  (`--fs-*`, `--sp-*`) des Hauptspiels gestaltet, nicht mit eigenen Werten
+  wie im ursprünglichen `battle.html`-Prototyp
+- **Bewusste Vereinfachung:** Die bisherige mehrjährige Belagerungs-
+  Zustandsmaschine (Sturmangriff/Aushungern/Bestechung über mehrere Jahre)
+  wurde entfernt zugunsten des Gelände-basierten Festungsbonus in der neuen
+  Engine — zwei parallele, unabhängig komplexe Belagerungssysteme
+  gleichzeitig zu pflegen hätte den Umfang gesprengt. Die alten Funktionen
+  (`resolveSiegeStorm` usw.) bleiben unbenutzt im Code stehen, falls das
+  Konzept später wieder aufgegriffen werden soll.
+
+**Getestet:** Truppenumrechnung in beide Richtungen verifiziert (Rekrutierung
+→ Kampfarmee → Rückübertragung nach Schlacht), vollständige Beispielschlacht
+end-to-end durchlaufen (alle 6 Phasen, Ergebnis korrekt zurückverbucht:
+Truppenverluste, Beute, Prestige, Beziehungseinbruch), globaler ID-Abgleich
+(keine doppelten, keine fehlenden IDs im ganzen Dokument), 80-Jahre-
+Regressionstest, 20×100-Jahre-Wirtschaftstest und 100×100-Jahre-
+KI-Testsuite weiterhin stabil ohne kritische Befunde.
+
+## 2026-08-12 – Schritt 25: Startbildschirm-Grafik durch goldene Krone ersetzt
+
+Auf Nutzerwunsch die bisherige ASCII-Art (Berge, Schloss-Emoji, Stadtraster,
+"FLUSS"-Text) auf dem Startbildschirm durch ein einziges, sauberes
+Pixel-Art-Krone-Symbol in Gold ersetzt — im selben Stil wie die 26
+Gebäude- und 18 Waren-Icons aus den Schritten 17/19 (SVG aus einfachen
+Formen, reduzierte Palette, harte Kanten, mit Schlagschatten).
+
+## 2026-08-12 – Schritt 26: Datei-Modularisierung (`sim.js` in 8 Module aufgeteilt)
+
+Auf Nutzerwunsch Punkt 8 der offenen Prioritätenliste umgesetzt: `sim.js` war
+auf über 1600 Zeilen angewachsen und wurde zunehmend unübersichtlich.
+
+**Vorgehen (risikoarm, automatisiert statt von Hand kopiert):** Ein
+Python-Skript hat alle 98 Top-Level-Funktionen/Konstanten samt ihrer
+Kommentarblöcke automatisiert aus `sim.js` extrahiert und anhand einer
+Namenszuordnung auf 8 fachlich kohärente Module verteilt:
+
+- **`js/core.js`** — Zufallszahlen (§67), Gebäude-Parzellen-Utilities (§26),
+  Regions-/Spielerzeugung, Speichersystem (§64)
+- **`js/economy.js`** — Produktion, Preise (inkl. Marktspekulation), Handel
+  (Markt/Regionalhandel/Land), Steuern, Infrastruktur, Staatsschulden,
+  Technologie
+- **`js/population-dynasty.js`** — Bevölkerungsentwicklung, Migration,
+  Stadtentwicklung, Charaktere/Heirat/Erbfolge
+- **`js/politics.js`** — Titel-Aufstieg, Kaiserwahl, Regierungsstil,
+  Religion, alternative Siegbedingungen
+- **`js/diplomacy.js`** — Verträge, Vasallen/Tribut/Ehe/Geiseln, Intrigen,
+  Kriegsverbündete
+- **`js/military.js`** — Berater, Truppen, Armeestärke, Unterhalt,
+  KI-Stärkeschätzung (alte, seit der Kampf-Engine-Integration unbenutzte
+  Sofort-/Belagerungsauflösung bleibt hier als toter Code stehen)
+- **`js/debug.js`** — Entwicklungs-/QA-Werkzeuge, KI-Entscheidungsanalyse
+- **`js/advance-year.js`** — der zentrale jährliche Rundenschritt, der alle
+  anderen Module orchestriert (muss zuletzt geladen werden)
+
+**Verifikation (entscheidend bei einer reinen Umstrukturierung ohne
+Verhaltensänderung):** Ein automatisierter Vergleichstest hat dieselbe
+60-Jahre-Partie mit identischem Seed und identischen Aktionen einmal mit dem
+alten `sim.js` und einmal mit den neuen, zusammengefügten Modulen laufen
+lassen — das Ergebnis (kompletter Spielzustand als JSON) war **bitweise
+identisch**. Erst danach wurde die alte `sim.js` gelöscht.
+
+**Angepasst:** `index.html`-Build (8 `<script>`-Tags statt einem), beide
+Testsuiten (`economy_test.js`, `ai_vs_ai_test.js`) lesen jetzt alle 8 Module
+statt der alten Einzeldatei ein.
+
+**Getestet:** Bitweiser Determinismus-Vergleich alt/neu (bestanden),
+Syntaxprüfung aller 8 Module einzeln und kombiniert, globaler
+ID-Abgleich im HTML, 80-Jahre-Regressionstest inkl. Kampf-Engine-Bridge,
+20×100-Jahre-Wirtschaftstest und 100×100-Jahre-KI-Testsuite — alle weiterhin
+fehlerfrei.
+
+## 2026-08-12 – Schritt 27: Fehlende Waren + Produktionsketten ergänzt (§16/§17)
+
+Erster Punkt der neuen, selbst vorgeschlagenen Prioritätenliste: die letzte
+Content-Lücke bei Waren/Produktionsketten geschlossen.
+
+- **5 neue Waren**: Papier, Bücher, Schmuck, Seide, Glaswaren (damit 23 statt
+  18 Waren gesamt)
+- **4 neue Gebäude**: Papiermühle, Buchbinderei, Goldschmiede, Glasbläserei
+  (damit 30 statt 26 Gebäude gesamt), jeweils mit eigenem Pixel-Icon und
+  Baustoffkosten
+- **Erste echte zweistufige Produktionskette** (bisher nur einstufige
+  Ketten): Holz → Papier → Bücher, mit Buchbinderei-Arbeitskraft aus den
+  Geistlichen — passend zum historischen Vorbild klösterlicher
+  Buchherstellung
+- Seide bewusst ohne heimische Produktionskette (wie Gewürze) — reines
+  Importluxusgut
+- Bevölkerungsbedarfe entsprechend erweitert: Bürger/Händler/Adel/Geistliche
+  bekommen kleine Bedarfe an den neuen Luxusgütern
+
+**Gefundenes und behobenes Balancing-Problem:** Die erste Kalibrierung der
+Papier-Produktionsrate war zu niedrig, sodass praktisch kein Papier für die
+Bücherkette übrig blieb (Lagerbestand blieb nahe 0). Nach Erhöhung der
+Papiermühlen-Produktionsrate (0,15 → 0,4 pro Arbeiter) fließt jetzt
+tatsächlich Papier in die Bücherproduktion. Die verbleibende geringe
+Büchermenge (Geistliche sind mit 3 % Bevölkerungsanteil eine kleine Gruppe)
+ist bewusst so belassen — passt zum historischen Bild seltener, wertvoller
+Bücher.
+
+**Getestet:** Icon-Vollständigkeit verifiziert (alle 23 Waren, alle 30
+Gebäude haben ein eigenes Icon), Produktionskette isoliert nachgerechnet,
+80-Jahre-Regressionstest und 20×100-Jahre-Wirtschaftstest weiterhin stabil,
+globaler ID-Abgleich ohne Duplikate.
+
+**Nächste Punkte der Reihenfolge** (angekündigt, noch nicht umgesetzt):
+fehlende Diplomatie-Aktionen (Durchmarschrecht, Garantien, Friedensvertrag,
+Gebietsforderungen), danach Belagerungen mit der Kampf-Engine kombinieren.
+
+## 2026-08-12 – Schritt 28: Fehlende Diplomatie-Aktionen ergänzt (§29)
+
+Zweiter Punkt der Reihenfolge: die restlichen 4 der 12 in der Spec genannten
+Diplomatie-Aktionen ergänzt — bewusst nicht als isolierte Textbausteine,
+sondern an bereits aktive Systeme angebunden statt an den seit der
+Kampf-Engine-Integration toten `rollWarAllies`-Code:
+
+- **Durchmarschrecht**: neuer Vertragstyp `treaties.durchmarsch`; halbiert
+  Transportkosten UND Räuberrisiko beim Regionalhandel mit der betreffenden
+  Region (echte Kopplung an das aktive Handelssystem aus Schritt 16, nicht
+  nur eine kosmetische Beziehungs-Aktion)
+- **Garantie**: setzt wie die dynastische Ehe eine dauerhafte
+  Beziehungs-Untergrenze (`guaranteeFloor`), aber günstiger und ohne
+  Heiratsvoraussetzung — sichtbar als "Garantiert"-Badge
+- **Friedensvertrag**: großer einmaliger Beziehungssprung; die Kosten
+  steigen automatisch, je schlechter die aktuelle Beziehung ist (mehr
+  Zugeständnisse nötig für eine echte Aussöhnung)
+- **Gebietsforderung**: fordert Land von einer Region — Erfolgschance hängt
+  vom Kräfteverhältnis ab (`armyStrength` vs. `estimateAiStrength`), bei
+  Erfolg wandert echtes Land vom Ziel zur Spielerregion (dieselbe
+  Land-Ressource wie beim Landhandel aus dem Original "Kaiser"), bei
+  Misserfolg Beziehungsschaden
+
+**Getestet:** Alle 4 Funktionen einzeln verifiziert (inkl. Erfolgs- und
+Fehlschlagfällen), UI-Buttons und Vertragskennzeichnungen ergänzt,
+80-Jahre-Regressionstest, 20×100-Jahre-Wirtschaftstest weiterhin stabil,
+globaler ID-Abgleich ohne Duplikate.
+
+**Nächster Punkt der Reihenfolge:** Belagerungen mit der Kampf-Engine
+kombinieren (§36).
+
+## 2026-08-12 – Schritt 29: Belagerungen mit der Kampf-Engine kombiniert (§36)
+
+Dritter und letzter Punkt der Reihenfolge: die in Schritt 24 bewusst
+zurückgebaute mehrjährige Belagerung ist jetzt wieder da — diesmal richtig
+kombiniert statt als zwei getrennte Systeme.
+
+- **Kriegserklärung gegen eine befestigte Region** (Stadtmauer) löst wieder
+  eine mehrjährige Belagerung aus (Dauer abhängig von der Mauerstufe) statt
+  sofort in die Schlacht zu gehen
+- **Neues Belagerungs-Panel** im Militär-Reiter mit drei Aktionen:
+  - **Sturmangriff** — eröffnet die volle interaktive Kampf-Engine-Schlacht
+    (Formation/Taktik/Moral/Entscheidungspunkte), nicht mehr die alte reine
+    Wahrscheinlichkeitsformel
+  - **Aushungern** — ein Jahr warten, schwächt den Verteidiger spürbar
+    (Soldatenzahl UND Moral sinken tatsächlich in der später generierten
+    Kampf-Engine-Armee, nicht nur kosmetisch), kostet reduzierten Unterhalt
+  - **Garnison bestechen** — Chance auf kampflosen Sieg gegen Gold
+- **Echte Verzahnung statt Nebeneinander**: `buildAiBattleArmy()` akzeptiert
+  jetzt einen Schwächungsfaktor, den `Aushungern` tatsächlich beeinflusst —
+  eine ausgehungerte Garnison tritt beim Sturmangriff mit weniger Soldaten
+  und niedrigerer Moral an. Solange eine Belagerung läuft, ist eine weitere
+  Kriegserklärung gesperrt (ein Konflikt nach dem anderen)
+
+**Getestet:** Komplette Kette isoliert durchgespielt (Belagerung starten →
+Aushungern → geschwächte Armee verifiziert → Bestechungsversuch), Syntax
+aller geänderten Dateien, globaler ID-Abgleich, 80-Jahre-Regressionstest,
+20×100-Jahre-Wirtschaftstest und 100×100-Jahre-KI-Testsuite — alle weiterhin
+stabil ohne kritische Befunde.
+
+**Damit ist die selbst vorgeschlagene Dreier-Reihenfolge
+(Content-Lücken → Diplomatie-Aktionen → Belagerungen) vollständig
+abgearbeitet.**
+

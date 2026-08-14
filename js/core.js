@@ -1,0 +1,259 @@
+// ============================================================
+// CORE — Zufallszahlen, Gebäude-Parzellen-Utilities, Regions-/Spielerzeugung,
+// Speichersystem (§64/§67/§26)
+// ============================================================
+
+// ============================================================
+// SIMULATIONSKERN — Die Simulation ist die Wahrheit (§102)
+// ============================================================
+
+// ---------- Deterministische Simulation (§67) ----------
+// Mulberry32-PRNG: schnell, gut genug für Spielzwecke, vollständig reproduzierbar.
+// Der Zustand wird im Savegame mitgeschrieben (state.seed + state._rngCalls),
+// sodass ein geladener Spielstand exakt an derselben Stelle im Zufallsstrom
+// weiterläuft wie vor dem Speichern.
+let __rngState = 0;
+
+let __rngCalls = 0;
+
+function seedRng(seed) {
+  __rngState = seed >>> 0;
+  __rngCalls = 0;
+}
+
+function rnd() {
+  __rngCalls++;
+  __rngState |= 0;
+  __rngState = (__rngState + 0x6D2B79F5) | 0;
+  let t = Math.imul(__rngState ^ (__rngState >>> 15), 1 | __rngState);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+function generateFreshSeed() {
+  // Nur bei echtem Neustart: einmalig eine Startzahl ziehen (kein Anspruch
+  // auf Reproduzierbarkeit dieses einen Schritts — ab hier läuft alles deterministisch).
+  return (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0;
+}
+
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+// ---------- Gebäude als Parzellen-Instanzen (§26: mehrfach baubar, erweiterbar) ----------
+// §Original "Kaiser": mehr Land schaltet mehr Baukapazität frei, statt eines
+// fest verdrahteten Parzellenlimits
+
+function regionPlotsAvailable(region) {
+  const fromLand = Math.floor((region.land || 0) / CONFIG.land.hectaresPerPlot);
+  return Math.max(1, Math.min(fromLand, 40)); // Obergrenze gegen Kartenüberladung
+}
+
+function freePlotIndex(region) {
+  const used = new Set(region.buildings.map(b => b.plotIndex));
+  const maxPlots = regionPlotsAvailable(region);
+  for (let i = 0; i < maxPlots; i++) {
+    if (!used.has(i)) return i;
+  }
+  return null; // keine freie Parzelle mehr — mehr Land kaufen!
+}
+
+function buildingInstances(region, type) {
+  return region.buildings.filter(b => b.type === type);
+}
+
+function hasBuilding(region, type) {
+  return buildingInstances(region, type).length > 0;
+}
+
+function buildingLevelSum(region, type) {
+  return buildingInstances(region, type).reduce((s, b) => s + b.level, 0);
+}
+
+function upgradeCost(type, currentLevel) {
+  return Math.round(BUILDINGS[type].cost * Math.pow(CONFIG.buildings.upgradeCostMultiplier, currentLevel));
+}
+
+function buildNewBuilding(state, region, type) {
+  const b = BUILDINGS[type];
+  if (!b) return { ok: false, reason: "Unbekannter Gebäudetyp." };
+  const plot = freePlotIndex(region);
+  if (plot === null) return { ok: false, reason: "Keine freie Parzelle mehr auf der Karte." };
+  if (state.treasury < b.cost) return { ok: false, reason: "Nicht genug Taler in der Staatskasse." };
+  // §26/mittelalterliche Baustoffe: echte Materialien statt nur Geld nötig
+  const materials = b.materialCost || {};
+  const missing = [];
+  for (const gid in materials) {
+    if ((region.warehouse[gid] || 0) < materials[gid]) {
+      missing.push(`${materials[gid]} ${GOODS[gid].name} (vorhanden: ${Math.round(region.warehouse[gid]||0)})`);
+    }
+  }
+  if (missing.length) return { ok: false, reason: `Fehlende Baustoffe: ${missing.join(", ")}.` };
+
+  state.treasury -= b.cost;
+  for (const gid in materials) region.warehouse[gid] -= materials[gid];
+  region.buildings.push({ type, level: 1, plotIndex: plot });
+  addChronicle(state, `Ein neues ${b.name} wurde in ${region.name} errichtet (Parzelle ${plot + 1}).`);
+  return { ok: true };
+}
+
+function upgradeBuildingAt(state, region, plotIndex) {
+  const inst = region.buildings.find(b => b.plotIndex === plotIndex);
+  if (!inst) return { ok: false, reason: "Auf dieser Parzelle steht kein Gebäude." };
+  const b = BUILDINGS[inst.type];
+  if (inst.level >= CONFIG.buildings.maxLevel) return { ok: false, reason: `${b.name} hat bereits die höchste Ausbaustufe erreicht.` };
+  const cost = upgradeCost(inst.type, inst.level);
+  if (state.treasury < cost) return { ok: false, reason: "Nicht genug Taler für den Ausbau." };
+  state.treasury -= cost;
+  inst.level += 1;
+  addChronicle(state, `${b.name} in ${region.name} wurde auf Stufe ${inst.level} ausgebaut.`);
+  return { ok: true };
+}
+
+function makeRegion(name, isPlayer, fertility, startPop) {
+  const population = {};
+  for (const gid in POP_GROUPS) {
+    population[gid] = {
+      count: Math.round(startPop * POP_GROUPS[gid].share),
+      wealth: 50,
+      satisfaction: 55,
+    };
+  }
+  const warehouse = {};
+  for (const gid in GOODS) warehouse[gid] = 0;
+  Object.assign(warehouse, {
+    getreide: 300, gemuese: 80, fleisch: 40, fisch: 30, salz: 25,
+    holz: 100, stein: 40, ton: 30, eisen: 20, kohle: 20, wolle: 40, leder: 15,
+    bier: 50, wein: 15, werkzeuge: 10, waffen: 5, kleidung: 10, gewuerze: 3,
+  });
+  const buildings = isPlayer
+    ? [{ type: "bauernhof", level: 1, plotIndex: 0 }]
+    : [{ type: "bauernhof", level: 1, plotIndex: 0 }, { type: "saegewerk", level: 1, plotIndex: 1 }];
+  const priceNoise = {};
+  for (const gid in GOODS) priceNoise[gid] = 1.0;
+  return {
+    name, isPlayer, fertility,
+    population, warehouse,
+    buildings,
+    taxRate: 0.15,
+    lastHarvestFactor: 1.0,
+    plagueMitigated: null,
+    productionBonus: 0,
+    satisfactionAvg: 55,
+    settlementTier: 0,     // §25: Stadtentwicklung
+    infrastructureLevel: 0, // §27: Infrastruktur
+    land: Math.round(startPop * (CONFIG.land.startHectares / 2400)), // proportional zur Startbevölkerung, 2400=Referenzgröße Spieler
+    extraGrainRate: 0,      // §Original: freiwillige Kornverteilung über den Bedarf hinaus
+    governanceStyle: 15,    // §Original: Regierungsstil 0=sehr fair .. 100=gierig (moderater Startwert)
+    priceNoise,             // Marktspekulation: jährliche Preisschwankung unabhängig von Angebot/Nachfrage
+  };
+}
+
+let __charIdCounter = 1;
+
+function nextCharId() { return "c" + (__charIdCounter++); }
+
+function newGame(options) {
+  options = options || {};
+  const seed = options.seed !== undefined ? options.seed : generateFreshSeed();
+  seedRng(seed);
+
+  const difficultyKey = options.difficulty || "normal";
+  const diffCfg = CONFIG.difficulty[difficultyKey] || CONFIG.difficulty.normal;
+  const dynastyName = options.dynastyName || "von Kaisersberg";
+
+  const state = {
+    year: 1500,
+    seed: seed,
+    difficulty: difficultyKey,
+    treasury: Math.round(1500 * diffCfg.startTreasuryMultiplier),
+    prestige: 10,
+    titleIndex: 0,
+    legitimacy: CONFIG.succession.legitimacyStart,
+    chronicle: [],
+    regions: {
+      player: makeRegion("Deine Provinz", true, 1.0, 2400),
+      ai1: makeRegion("Mainau (Nachbar)", false, 1.05, 2850),
+      ai2: makeRegion("Rheinfeld (Nachbar)", false, 0.95, 2750),
+      ai3: makeRegion("Bergheim (Nachbar)", false, 1.0, 2800),
+    },
+    diplomacy: {
+      ai1: { relation: CONFIG.diplomacy.startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
+      ai2: { relation: CONFIG.diplomacy.startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
+      ai3: { relation: CONFIG.diplomacy.startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
+    },
+    army: { miliz: 0, bogenschuetzen: 0, armbrustschuetzen: 0, ritter: 0, soeldner: 0 },
+    advisors: { schatzmeister: null, marschall: null, diplomat: null, spionagemeister: null, geistlicher: null, handelsberater: null },
+    religiousInfluence: CONFIG.religion.startInfluence,
+    intel: {
+      ai1: { accuracy: clamp(CONFIG.intrigue.baseIntelAccuracy + diffCfg.intelAccuracyBonus, 0.05, 1) },
+      ai2: { accuracy: clamp(CONFIG.intrigue.baseIntelAccuracy + diffCfg.intelAccuracyBonus, 0.05, 1) },
+      ai3: { accuracy: clamp(CONFIG.intrigue.baseIntelAccuracy + diffCfg.intelAccuracyBonus, 0.05, 1) },
+    },
+    pendingElection: null,
+    landPrice: Math.round((CONFIG.land.priceMin + CONFIG.land.priceMax) / 2),
+    electionCooldown: 0,
+    victoryCondition: options.victoryCondition || "kaiser",
+    victoryProgressYears: 0, // §47: Jahre in Folge, in denen eine alternative Siegbedingung erfüllt ist
+    debt: 0, // §24 Staatsschulden
+    vassals: {}, // §29 Vasallisierung: { aiId: true }
+    stats: { // §87 Spielende-Auswertung
+      maxPopulation: 0, maxTreasury: 0, warsWon: 0, warsLost: 0,
+      generations: 1, disastersCount: 0, highestTitleIndex: 0,
+    },
+    log: [],
+    pendingEvent: null,
+    gameOver: null,
+    dynastyName: dynastyName,
+    characters: {},
+    rulerId: null,
+  };
+
+  for (const ext of EXTRA_REGIONS) {
+    state.regions[ext.id] = makeRegion(ext.name, false, ext.fertility, ext.pop);
+  }
+
+  const gender = options.gender || (rnd() < 0.5 ? "m" : "f");
+  const age = options.age || (24 + Math.floor(rnd()*12));
+  const ruler = createCharacter(gender, age, dynastyName);
+  if (options.rulerName) ruler.name = options.rulerName;
+  if (options.chosenTraits && options.chosenTraits.length) {
+    ruler.traits = options.chosenTraits.slice(0, 2);
+  }
+  const id = nextCharId();
+  state.characters[id] = ruler;
+  state.rulerId = id;
+
+  addChronicle(state, `Im Jahre 1500 übernahm ${ruler.name} ${dynastyName} die Herrschaft über ${state.regions.player.name}.`);
+  return state;
+}
+
+function addChronicle(state, text) {
+  state.chronicle.unshift(`${state.year}: ${text}`);
+  if (state.chronicle.length > 200) state.chronicle.pop();
+}
+
+// ---------- Landwirtschaft (§18/§19) ----------
+
+const SAVE_VERSION = 2;
+
+function serializeSave(state) {
+  return JSON.stringify({
+    saveVersion: SAVE_VERSION,
+    charIdCounter: __charIdCounter,
+    rngCalls: __rngCalls,
+    state,
+  }, null, 0);
+}
+
+function deserializeSave(json) {
+  const parsed = JSON.parse(json);
+  if (parsed.saveVersion !== SAVE_VERSION) {
+    throw new Error("Inkompatible Spielstand-Version: " + parsed.saveVersion);
+  }
+  __charIdCounter = parsed.charIdCounter;
+  // Deterministische Simulation (§67): RNG mit demselben Seed neu starten und
+  // exakt so viele Schritte vorspulen, wie beim Speichern bereits verbraucht waren —
+  // der Zufallsstrom setzt sich dadurch nahtlos fort.
+  seedRng(parsed.state.seed);
+  for (let i = 0; i < parsed.rngCalls; i++) rnd();
+  return parsed.state;
+}

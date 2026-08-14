@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>SCHLACHT BEI MAINZ — Kampf-Engine-Prototyp</title>
+<style>
+  @import url('https://fonts.cdnfonts.com/css/press-start-2p');
+  :root {
+    --bg:#14171f; --panel:#d8cba8; --panel-dark:#2b2f3a; --ink:#1c1c1c;
+    --accent:#7a2222; --accent2:#1f4b3f; --gold:#b8963e; --blue:#23344d;
+    --font: 'Press Start 2P', monospace;
+    --fs-micro: 12px; --fs-body: 13px; --fs-md: 15px; --fs-lg: 17px; --fs-xl: 19px;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:var(--bg); display:flex; align-items:center; justify-content:center;
+    font-family: var(--font); font-size: var(--fs-body); }
+  #frame { width:960px; background:var(--blue); border:6px solid #0a0c11;
+    box-shadow:0 0 0 2px #4a5570 inset, 0 0 40px rgba(0,0,0,0.6); padding:10px; }
+  h1.title { text-align:center; color:var(--gold); font-size:var(--fs-xl); letter-spacing:2px; margin:4px 0 10px; text-shadow:2px 2px 0 #0a0c11; }
+  .panel { background:var(--panel); color:var(--ink); border:3px solid #0a0c11; padding:10px; font-size:var(--fs-body); box-shadow:3px 3px 0 #0a0c11; margin-bottom:8px; }
+  .panelTitle { background:var(--accent); color:#f2e6c9; margin:-10px -10px 8px -10px; padding:6px 8px; font-size:var(--fs-md); letter-spacing:1px; }
+  button { font-family:inherit; font-size:var(--fs-body); background:var(--gold); color:#1c1c1c; border:2px solid #0a0c11;
+    padding:6px 8px; cursor:pointer; margin:3px 3px 3px 0; box-shadow:2px 2px 0 #0a0c11; }
+  button:hover { background:#d1af52; } button:active { transform:translate(2px,2px); box-shadow:none; }
+  button:disabled { opacity:0.4; cursor:not-allowed; }
+  select { font-family:inherit; font-size:var(--fs-body); padding:4px; background:var(--panel); border:2px solid #0a0c11; }
+
+  #battlefield { display:flex; justify-content:space-between; align-items:center; background:#3a5a2d;
+    border:3px solid #0a0c11; padding:14px; margin-bottom:8px; min-height:120px; position:relative; }
+  #battlefield::before { content:"SCHLACHTFELD"; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    color:rgba(255,255,255,0.15); font-size:var(--fs-md); letter-spacing:3px; }
+  .armySide { display:flex; flex-direction:column; gap:4px; width:42%; z-index:1; }
+  .armySide.right { align-items:flex-end; }
+  .unitRow { display:flex; gap:4px; flex-wrap:wrap; }
+  .unitRow.right { justify-content:flex-end; }
+  .unitBlock { background:var(--panel); border:2px solid #0a0c11; padding:3px 5px; font-size:var(--fs-micro); text-align:center;
+    box-shadow:1px 1px 0 #0a0c11; min-width:44px; }
+  .unitBlock.hit { animation: flashHit 0.3s; }
+  @keyframes flashHit { 0%,100%{background:var(--panel);} 50%{background:var(--accent); color:#f2e6c9;} }
+  .unitBlock .cnt { font-weight:bold; }
+  .moraleBar { width:100%; height:5px; background:#00000033; border:1px solid #0a0c11; margin-top:2px; }
+  .moraleBar > div { height:100%; background:var(--accent2); }
+
+  #messageBanner { background:var(--accent); color:#f2e6c9; text-align:center; padding:10px; font-size:var(--fs-md);
+    letter-spacing:1px; margin-bottom:8px; min-height:20px; border:2px solid #0a0c11; }
+  #decisionBox { background:var(--panel-dark); color:#f2e6c9; padding:10px; margin-bottom:8px; border:2px solid var(--gold); display:none; }
+  #decisionBox .dtext { color:var(--gold); margin-bottom:6px; }
+
+  #log { max-height:120px; overflow-y:auto; font-size:var(--fs-body); line-height:1.6; }
+  #log div { margin-bottom:2px; }
+  #log .t { color:var(--accent2); margin-right:6px; }
+
+  #setupPanel .col { display:inline-block; width:48%; vertical-align:top; }
+  .settingRow { margin-bottom:6px; }
+  .settingRow label { display:block; margin-bottom:2px; font-size:var(--fs-body); }
+
+  #report { display:none; }
+  #report table { width:100%; border-collapse:collapse; font-size:var(--fs-body); }
+  #report td, #report th { padding:3px 5px; border-bottom:1px solid #0a0c1133; }
+  .resultBanner { text-align:center; font-size:var(--fs-lg); color:var(--gold); text-shadow:2px 2px 0 #0a0c11; padding:10px; }
+
+  #debugPanel { display:none; white-space:pre; font-size:var(--fs-body); background:#0a0c11; color:#7fffa0; padding:8px; margin-top:8px; max-height:150px; overflow-y:auto; }
+</style>
+</head>
+<body>
+<div id="frame">
+  <h1 class="title">⚔ SCHLACHT BEI MAINZ ⚔</h1>
+
+  <div id="setupPanel" class="panel">
+    <div class="panelTitle">AUFSTELLUNG</div>
+    <div class="col">
+      <b>EIGENE ARMEE (Angreifer)</b>
+      <div class="settingRow"><label>Formation</label>
+        <select id="pFormation"></select>
+      </div>
+      <div class="settingRow"><label>Taktik</label>
+        <select id="pTactic"></select>
+      </div>
+    </div>
+    <div class="col">
+      <b>GELÄNDE &amp; WETTER</b>
+      <div class="settingRow"><label>Gelände</label><select id="pTerrain"></select></div>
+      <div class="settingRow"><label>Wetter</label><select id="pWeather"></select></div>
+      <div class="settingRow"><label>Zufalls-Seed</label><input type="number" id="pSeed" value="12345" style="width:100px; font-family:inherit; padding:3px;"></div>
+    </div>
+    <div style="text-align:center; margin-top:8px;">
+      <button onclick="startBattleScreen()">⚔ SCHLACHT BEGINNEN ⚔</button>
+      <label style="font-size:var(--fs-body);"><input type="checkbox" id="debugToggle"> Debug-Modus</label>
+    </div>
+  </div>
+
+  <div id="battleUi" style="display:none;">
+    <div id="messageBanner">Die Armeen stehen sich gegenüber...</div>
+
+    <div id="battlefield">
+      <div class="armySide">
+        <div id="labelA" style="margin-bottom:4px;"></div>
+        <div class="unitRow" id="unitsA"></div>
+      </div>
+      <div class="armySide right">
+        <div id="labelB" style="margin-bottom:4px;"></div>
+        <div class="unitRow right" id="unitsB"></div>
+      </div>
+    </div>
+
+    <div id="decisionBox">
+      <div class="dtext" id="decisionText"></div>
+      <div id="decisionOptions"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panelTitle">KAMPFPROTOKOLL</div>
+      <div id="log"></div>
+    </div>
+
+    <div style="text-align:center;">
+      <button id="nextStepBtn" onclick="doNextStep()">▶ NÄCHSTE PHASE</button>
+      <button id="autoBtn" onclick="doAutoResolve()">⏩ AUTOMATISCH BEENDEN</button>
+    </div>
+
+    <div id="debugPanel"></div>
+  </div>
+
+  <div id="report" class="panel">
+    <div class="panelTitle">SCHLACHTBERICHT</div>
+    <div class="resultBanner" id="reportBanner"></div>
+    <table>
+      <tr><th></th><th id="repNameA"></th><th id="repNameB"></th></tr>
+      <tr><td>Soldaten zu Beginn</td><td id="repStartA"></td><td id="repStartB"></td></tr>
+      <tr><td>Soldaten am Ende</td><td id="repEndA"></td><td id="repEndB"></td></tr>
+      <tr><td>Verluste gesamt</td><td id="repCasA"></td><td id="repCasB"></td></tr>
+      <tr><td>&nbsp;&nbsp;davon gefallen</td><td id="repDeadA"></td><td id="repDeadB"></td></tr>
+      <tr><td>&nbsp;&nbsp;davon verwundet</td><td id="repWoundedA"></td><td id="repWoundedB"></td></tr>
+      <tr><td>&nbsp;&nbsp;davon vermisst</td><td id="repMissingA"></td><td id="repMissingB"></td></tr>
+      <tr><td>Moral am Ende</td><td id="repMoraleA"></td><td id="repMoraleB"></td></tr>
+    </table>
+    <div id="whyLost" style="margin-top:8px; font-size:var(--fs-body);"></div>
+    <div style="text-align:center; margin-top:10px;"><button onclick="location.reload()">NEUE SCHLACHT</button></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// KAMPF-ENGINE — DATENSCHICHT (§39: alles konfigurierbar, keine
+// Magic Numbers tief im Code)
+// ============================================================
+
+// ---------- §5 Truppentypen ----------
+const UNIT_TYPES = {
+  infanterie: {
+    name: "Infanterie", attack: 6, defense: 7, rangedAttack: 0, armor: 4,
+    speed: 3, moraleBase: 65, disciplineBase: 55, costPerSoldier: 1.0,
+  },
+  bogenschuetzen: {
+    name: "Bogenschützen", attack: 2, defense: 3, rangedAttack: 7, armor: 2,
+    speed: 3, moraleBase: 55, disciplineBase: 45, costPerSoldier: 1.5,
+  },
+  kavallerie: {
+    name: "Kavallerie", attack: 9, defense: 4, rangedAttack: 0, armor: 5,
+    speed: 8, moraleBase: 70, disciplineBase: 60, costPerSoldier: 4.0,
+  },
+  artillerie: {
+    name: "Artillerie", attack: 1, defense: 2, rangedAttack: 10, armor: 1,
+    speed: 1, moraleBase: 50, disciplineBase: 50, costPerSoldier: 6.0,
+  },
+  miliz: {
+    name: "Miliz", attack: 3, defense: 3, rangedAttack: 0, armor: 1,
+    speed: 3, moraleBase: 40, disciplineBase: 30, costPerSoldier: 0.4,
+  },
+};
+
+// ---------- §6 Schere-Stein-Papier-Konter (additive Modifikatoren) ----------
+// counterModifier(A, B) = wie stark A im Kampf gegen B verstärkt/geschwächt wird
+const UNIT_COUNTERS = {
+  kavallerie: { bogenschuetzen: 0.40, infanterie: -0.25 },
+  bogenschuetzen: { infanterie: 0.20 }, // gilt nur in der Fernkampfphase, siehe meleeMalus unten
+  artillerie: { grossFormationBonus: 0.30, kavallerieErreichtMalus: -0.50 },
+  miliz: { heimatBonus: 0.25 },
+};
+// Bogenschützen im direkten Nahkampf (Hauptkampfphase) sind stark benachteiligt
+const ARCHER_MELEE_MALUS = -0.40;
+// "Große Formation" für den Artillerie-Bonus: Gegner hat mehr als dieser Anteil an Soldaten in einem einzigen Stack
+const LARGE_FORMATION_SOLDIER_THRESHOLD = 400;
+
+// ---------- §12 Gelände ----------
+const TERRAIN_TYPES = {
+  ebene:  { name: "Ebene",  desc: "Offenes Feld — ideal für Reiterei.",
+    unitMods: { kavallerie: { attack: 0.20 } }, defenderBonus: 0 },
+  wald:   { name: "Wald",   desc: "Dichter Wald — hemmt Kavallerie, begünstigt Schützen.",
+    unitMods: { kavallerie: { attack: -0.30 }, bogenschuetzen: { rangedAttack: 0.10 } }, defenderBonus: 0.05 },
+  huegel: { name: "Hügel",  desc: "Erhöhte Stellung — Verteidiger und Artillerie im Vorteil.",
+    unitMods: { artillerie: { rangedAttack: 0.10 } }, defenderBonus: 0.20 },
+  sumpf:  { name: "Sumpf",  desc: "Morastiger Boden — alle Einheiten stark verlangsamt.",
+    unitMods: {}, defenderBonus: 0.10, speedMalus: 0.5 },
+  stadt:  { name: "Stadt",  desc: "Enge Gassen — Infanterie im Vorteil, Kavallerie stark behindert.",
+    unitMods: { infanterie: { defense: 0.15 }, kavallerie: { attack: -0.40 } }, defenderBonus: 0.15 },
+  burg:   { name: "Burg",   desc: "Befestigte Stellung — der Verteidiger ist massiv im Vorteil.",
+    unitMods: {}, defenderBonus: 0.50 },
+};
+
+// ---------- §13 Wetter ----------
+const WEATHER_TYPES = {
+  klar:  { name: "Klar",  unitMods: {} },
+  regen: { name: "Regen", unitMods: { bogenschuetzen: { rangedAttack: -0.15 }, artillerie: { rangedAttack: -0.10 }, kavallerie: { attack: -0.05 } } },
+  nebel: { name: "Nebel", rangedMalus: -0.30, surpriseBonus: 0.15 },
+  schnee:{ name: "Schnee", speedMalus: 0.25 },
+  sturm: { name: "Sturm",  unitMods: { bogenschuetzen: { rangedAttack: -0.25 }, artillerie: { rangedAttack: -0.20 } } },
+};
+
+// ---------- §10 Formationen ----------
+const FORMATIONS = {
+  ausgewogen:       { name: "Ausgewogen",           attackMod: 0,     defenseMod: 0,     desc: "Keine starken Boni oder Mali." },
+  defensiv:         { name: "Defensive Linie",      attackMod: -0.15, defenseMod: 0.20,  desc: "Sicherer, aber weniger Schlagkraft." },
+  aggressiv:        { name: "Aggressiver Angriff",  attackMod: 0.20,  defenseMod: -0.15, casualtyMod: 0.15, desc: "Mehr Schlagkraft, aber höhere eigene Verluste." },
+  kavallerieflanke: { name: "Kavallerieflanke",     attackMod: 0,     defenseMod: -0.10, flankManeuver: true, desc: "Hohes Risiko, hohe Belohnung — Kavallerie umgeht die Front." },
+  fernkampfstellung:{ name: "Fernkampfstellung",    rangedMod: 0.20,  meleeStartMod: -0.10, desc: "Schützen/Artillerie verstärkt, Nahkämpfer starten defensiver." },
+};
+
+// ---------- §11 Taktik ----------
+const TACTICS = {
+  halten:         { name: "Gegner halten" },
+  frontalangriff: { name: "Frontalangriff", attackMod: 0.10, casualtyMod: 0.10 },
+  flankenangriff: { name: "Flankenangriff", flankSynergy: true },
+  fernkampf:      { name: "Fernkampf",      rangedMod: 0.15 },
+  verteidigen:    { name: "Verteidigen",    defenseMod: 0.15 },
+  ermueden:       { name: "Gegner ermüden", enemyMoraleDrain: 0.03 },
+  rueckzugVorbereiten: { name: "Rückzug vorbereiten", retreatSafety: 0.20 },
+};
+
+// ---------- §33 Taktische Konter zwischen Formationen ----------
+const FORMATION_COUNTERS = [
+  { attacker: "kavallerieflanke", defender: "defensiv", effect: "flankWeakened", value: -0.35 },
+  { attacker: "fernkampfstellung", defender: "aggressiv", effect: "defenderClosesDistance", value: 0.10 },
+];
+
+// ---------- §17 Moralstufen ----------
+const MORALE_TIERS = [
+  { min: 80, name: "Kampfstark" },
+  { min: 60, name: "Stabil" },
+  { min: 40, name: "Unsicher" },
+  { min: 20, name: "Wankend" },
+  { min: 0,  name: "Fluchtgefahr" },
+];
+
+// ---------- Balancing-Konfiguration (§39) ----------
+const BATTLE_CONFIG = {
+  randomModifierMin: 0.85, randomModifierMax: 1.15,
+  moraleFactorAtZero: 0.5, moraleFactorAtHundred: 1.5,
+  experienceFactorAtZero: 0.7, experienceFactorAtHundred: 1.3,
+  commanderLeadershipDivisor: 200, // Führung wirkt moderat auf Moral/Angriff
+  meleeRounds: 3,
+  meleeCasualtyFactor: 1.3,
+  winnerCasualtyRange: [0.05, 0.20],
+  loserCasualtyRange: [0.10, 0.35],
+  catastropheCasualtyMax: 0.55,
+  woundedShareOfCasualties: 0.45,
+  missingShareOfCasualties: 0.15, // Rest = gefallen
+  moraleLossPerCasualtyShare: 60, // Moralverlust proportional zum Anteil eigener Verluste
+  moraleGainOnWinningRound: 4,
+  moraleLossOnLosingRound: 7,
+  commanderDeathMoraleLoss: 20,
+  encirclementMoraleLoss: 15,
+  lowSupplyMoraleLossPerRound: 3,
+  routMoraleThreshold: 20,       // darunter: hohe Fluchtwahrscheinlichkeit
+  routCheckBaseChance: 0.10,     // Basis-Fluchtchance/Runde unterhalb der Schwelle
+  disciplineFleeReduction: 0.006,// pro Disziplinpunkt sinkt die Fluchtchance
+  commanderEventChancePerPhase: 0.05,
+  fleeingExtraCasualtyShare: 0.10,
+  decisionTriggerMoraleThreshold: 50, // ab hier: "Flanke wankt"-Entscheidungspunkt
+};
+
+// ============================================================
+// KAMPF-ENGINE — LOGIK (§37: vollständig von der UI getrennt)
+// ============================================================
+
+// ---------- §36 Deterministischer Seed ----------
+let __battleRngState = 0;
+function seedBattleRng(seed) { __battleRngState = seed >>> 0; }
+function battleRnd() {
+  __battleRngState |= 0;
+  __battleRngState = (__battleRngState + 0x6D2B79F5) | 0;
+  let t = Math.imul(__battleRngState ^ (__battleRngState >>> 15), 1 | __battleRngState);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+function battleClamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+// ---------- §4 UnitStack ----------
+let __stackIdCounter = 1;
+function createUnitStack(unitType, soldiers, opts) {
+  opts = opts || {};
+  const base = UNIT_TYPES[unitType];
+  if (!base) throw new Error("Unbekannter Einheitentyp: " + unitType);
+  return {
+    id: "u" + (__stackIdCounter++),
+    unitType, name: base.name,
+    soldiers, maxSoldiers: soldiers,
+    attack: base.attack, defense: base.defense, rangedAttack: base.rangedAttack, armor: base.armor,
+    speed: base.speed,
+    morale: opts.morale !== undefined ? opts.morale : base.moraleBase,
+    experience: opts.experience !== undefined ? opts.experience : 35,
+    discipline: opts.discipline !== undefined ? opts.discipline : base.disciplineBase,
+    supply: opts.supply !== undefined ? opts.supply : 100,
+    fatigue: 0,
+    terrainBonus: 0, commanderBonus: 0,
+    casualties: { dead: 0, wounded: 0, missing: 0 },
+    routed: false,
+  };
+}
+
+// ---------- §8 Befehlshaber ----------
+function createCommander(name, tactics, leadership, courage, experience) {
+  return { name, tactics, leadership, courage, experience, alive: true };
+}
+
+// ---------- §7 Armee ----------
+function createArmy(name, commander, stacks, opts) {
+  opts = opts || {};
+  return {
+    name, commander, stacks, // Array von UnitStacks aller 5 Typen gemischt
+    foodSupply: opts.foodSupply !== undefined ? opts.foodSupply : 100,
+    ammunition: opts.ammunition !== undefined ? opts.ammunition : 100,
+    fatigue: 0,
+    position: opts.position || "feld",
+    isAttacker: !!opts.isAttacker,
+    isHomeTerritory: !!opts.isHomeTerritory,
+    formation: null, tactic: null,
+  };
+}
+
+function totalSoldiers(army) { return army.stacks.reduce((s, u) => s + u.soldiers, 0); }
+function livingStacks(army) { return army.stacks.filter(u => u.soldiers > 0 && !u.routed); }
+function overallMorale(army) {
+  const total = totalSoldiers(army);
+  if (total <= 0) return 0;
+  return army.stacks.reduce((s, u) => s + u.morale * u.soldiers, 0) / total;
+}
+function overallExperience(army) {
+  const total = totalSoldiers(army);
+  if (total <= 0) return 0;
+  return army.stacks.reduce((s, u) => s + u.experience * u.soldiers, 0) / total;
+}
+function moraleTierName(morale) {
+  for (const tier of MORALE_TIERS) if (morale >= tier.min) return tier.name;
+  return MORALE_TIERS[MORALE_TIERS.length - 1].name;
+}
+
+// ---------- §15 Kampfmathematik ----------
+// effectiveAttack = base * soldierFactor * moraleFactor * experienceFactor
+//                  * formationModifier * terrainModifier * commanderModifier
+//                  * counterModifier * randomModifier
+// Gibt { value, breakdown } zurück (breakdown fürs §40 Debug-Menü)
+function computeEffectiveValue(stack, army, opponentArmy, terrain, weather, context) {
+  const cfg = BATTLE_CONFIG;
+  const base = context.ranged ? stack.rangedAttack : (context.defending ? stack.defense : stack.attack);
+  if (base <= 0) return { value: 0, breakdown: { base: 0 } };
+
+  const soldierFactor = stack.soldiers / 100;
+
+  const moraleFactor = cfg.moraleFactorAtZero +
+    (stack.morale / 100) * (cfg.moraleFactorAtHundred - cfg.moraleFactorAtZero);
+
+  const experienceFactor = cfg.experienceFactorAtZero +
+    (stack.experience / 100) * (cfg.experienceFactorAtHundred - cfg.experienceFactorAtZero);
+
+  const formation = FORMATIONS[army.formation] || FORMATIONS.ausgewogen;
+  let formationModifier = 1;
+  if (context.ranged) formationModifier += (formation.rangedMod || 0);
+  else formationModifier += context.defending ? (formation.defenseMod || 0) : (formation.attackMod || 0);
+  if (formation.meleeStartMod && !context.ranged && context.round === 1) formationModifier += formation.meleeStartMod;
+
+  const tactic = TACTICS[army.tactic] || TACTICS.halten;
+  if (context.ranged) formationModifier += (tactic.rangedMod || 0);
+  else if (!context.defending) formationModifier += (tactic.attackMod || 0);
+  else formationModifier += (tactic.defenseMod || 0);
+
+  // Gelände
+  const terr = TERRAIN_TYPES[terrain] || TERRAIN_TYPES.ebene;
+  let terrainModifier = 1;
+  const tMod = terr.unitMods[stack.unitType];
+  if (tMod) {
+    if (context.ranged && tMod.rangedAttack) terrainModifier += tMod.rangedAttack;
+    if (!context.ranged && tMod.attack) terrainModifier += tMod.attack;
+    if (context.defending && tMod.defense) terrainModifier += tMod.defense;
+  }
+  if (context.defending) terrainModifier += (terr.defenderBonus || 0);
+
+  // Wetter
+  const weat = WEATHER_TYPES[weather] || WEATHER_TYPES.klar;
+  if (context.ranged && weat.rangedMalus) terrainModifier += weat.rangedMalus;
+  const wMod = weat.unitMods && weat.unitMods[stack.unitType];
+  if (wMod) {
+    if (context.ranged && wMod.rangedAttack) terrainModifier += wMod.rangedAttack;
+    if (!context.ranged && wMod.attack) terrainModifier += wMod.attack;
+  }
+
+  // Kommandant: Führung wirkt moderat, Taktik-Attribut erhöht bei erfahrenen Kommandanten leicht
+  const commanderModifier = 1 + (army.commander.leadership - 50) / cfg.commanderLeadershipDivisor
+    + (army.commander.experience - 50) / (cfg.commanderLeadershipDivisor * 2);
+
+  // §6 Konter (Schere-Stein-Papier) — abhängig von der gegnerischen Zusammensetzung
+  let counterModifier = 1 + computeCounterBonus(stack, opponentArmy, context);
+
+  // Heimvorteil für Miliz
+  if (stack.unitType === "miliz" && army.isHomeTerritory) {
+    counterModifier += UNIT_COUNTERS.miliz.heimatBonus;
+  }
+
+  const randomModifier = battleClamp(
+    cfg.randomModifierMin + battleRnd() * (cfg.randomModifierMax - cfg.randomModifierMin),
+    cfg.randomModifierMin, cfg.randomModifierMax
+  );
+
+  const value = Math.max(0, base * soldierFactor * moraleFactor * experienceFactor *
+    formationModifier * terrainModifier * commanderModifier * counterModifier * randomModifier);
+
+  return {
+    value,
+    breakdown: {
+      base, soldierFactor: round2(soldierFactor), moraleFactor: round2(moraleFactor),
+      experienceFactor: round2(experienceFactor), formationModifier: round2(formationModifier),
+      terrainModifier: round2(terrainModifier), commanderModifier: round2(commanderModifier),
+      counterModifier: round2(counterModifier), randomModifier: round2(randomModifier),
+    },
+  };
+}
+function round2(v) { return Math.round(v * 100) / 100; }
+
+// ---------- §40 Debug-Modus: Kampfberechnung nachvollziehbar aufschlüsseln ----------
+function debugPrintEffectiveValue(stack, army, opponentArmy, terrain, weather, context) {
+  const { value, breakdown } = computeEffectiveValue(stack, army, opponentArmy, terrain, weather, context);
+  const lines = [`${UNIT_TYPES[stack.unitType].name} ${context.ranged ? "Fernkampf" : "Angriff"}`, ""];
+  lines.push(`Basis: ${breakdown.base}`);
+  if (breakdown.soldierFactor !== undefined) {
+    lines.push(`Soldaten: ×${breakdown.soldierFactor}`);
+    lines.push(`Moral: ×${breakdown.moraleFactor}`);
+    lines.push(`Erfahrung: ×${breakdown.experienceFactor}`);
+    lines.push(`Formation/Taktik: ×${breakdown.formationModifier}`);
+    lines.push(`Gelände/Wetter: ×${breakdown.terrainModifier}`);
+    lines.push(`Kommandant: ×${breakdown.commanderModifier}`);
+    lines.push(`Konter: ×${breakdown.counterModifier}`);
+    lines.push(`Zufall: ×${breakdown.randomModifier}`);
+  }
+  lines.push("", `Effektive Stärke: ${round2(value)}`);
+  return lines.join("\n");
+}
+
+
+function computeCounterBonus(stack, opponentArmy, context) {
+  let bonus = 0;
+  const opponentSoldiersByType = {};
+  for (const u of opponentArmy.stacks) {
+    if (u.soldiers <= 0) continue;
+    opponentSoldiersByType[u.unitType] = (opponentSoldiersByType[u.unitType] || 0) + u.soldiers;
+  }
+  const totalOpp = Object.values(opponentSoldiersByType).reduce((a, b) => a + b, 0) || 1;
+
+  if (stack.unitType === "kavallerie") {
+    const c = UNIT_COUNTERS.kavallerie;
+    for (const type in c) {
+      const share = (opponentSoldiersByType[type] || 0) / totalOpp;
+      bonus += c[type] * share;
+    }
+  }
+  if (stack.unitType === "bogenschuetzen") {
+    if (context.ranged) {
+      const share = (opponentSoldiersByType.infanterie || 0) / totalOpp;
+      bonus += UNIT_COUNTERS.bogenschuetzen.infanterie * share;
+    } else {
+      bonus += ARCHER_MELEE_MALUS; // im Nahkampf immer benachteiligt
+    }
+  }
+  if (stack.unitType === "artillerie" && context.ranged) {
+    const hasLargeFormation = opponentArmy.stacks.some(u => u.soldiers >= LARGE_FORMATION_SOLDIER_THRESHOLD);
+    if (hasLargeFormation) bonus += UNIT_COUNTERS.artillerie.grossFormationBonus;
+    if (context.cavalryReachedArtillery) bonus += UNIT_COUNTERS.artillerie.kavallerieErreichtMalus;
+  }
+  return bonus;
+}
+
+// ---------- §20/§21 Verlustsystem ----------
+function applyCasualties(army, totalCasualties, log, side) {
+  const cfg = BATTLE_CONFIG;
+  const alive = livingStacks(army);
+  const totalAlive = alive.reduce((s, u) => s + u.soldiers, 0);
+  if (totalAlive <= 0 || totalCasualties <= 0) return 0;
+  let actuallyLost = 0;
+  for (const stack of alive) {
+    const share = stack.soldiers / totalAlive;
+    let lost = Math.round(totalCasualties * share);
+    lost = Math.min(lost, stack.soldiers);
+    stack.soldiers -= lost;
+    actuallyLost += lost;
+    const dead = Math.round(lost * (1 - cfg.woundedShareOfCasualties - cfg.missingShareOfCasualties));
+    const wounded = Math.round(lost * cfg.woundedShareOfCasualties);
+    const missing = lost - dead - wounded;
+    stack.casualties.dead += dead;
+    stack.casualties.wounded += wounded;
+    stack.casualties.missing += missing;
+    // Verluste drücken die Moral proportional zum Anteil der verlorenen Soldaten dieses Stacks
+    const lossShareOfStack = stack.maxSoldiers > 0 ? lost / stack.maxSoldiers : 0;
+    stack.morale = battleClamp(stack.morale - lossShareOfStack * cfg.moraleLossPerCasualtyShare, 0, 100);
+  }
+  return actuallyLost;
+}
+
+// ---------- §16/§17 Moralsystem ----------
+function applyMoraleShift(army, delta) {
+  for (const stack of livingStacks(army)) {
+    stack.morale = battleClamp(stack.morale + delta, 0, 100);
+  }
+}
+
+// ---------- §18 Flucht ----------
+function checkRouts(army, state, sideLabel) {
+  const cfg = BATTLE_CONFIG;
+  let routedSoldiers = 0;
+  for (const stack of livingStacks(army)) {
+    if (stack.morale >= cfg.routMoraleThreshold) continue;
+    const deficitFactor = (cfg.routMoraleThreshold - stack.morale) / cfg.routMoraleThreshold;
+    const fleeChance = battleClamp(
+      cfg.routCheckBaseChance + deficitFactor * 0.5 - stack.discipline * cfg.disciplineFleeReduction,
+      0, 0.9
+    );
+    if (battleRnd() < fleeChance) {
+      const extraLoss = Math.round(stack.soldiers * BATTLE_CONFIG.fleeingExtraCasualtyShare);
+      stack.soldiers -= extraLoss;
+      stack.casualties.missing += extraLoss;
+      stack.routed = true;
+      routedSoldiers += stack.soldiers + extraLoss;
+      logMsg(state, `${stack.name} (${sideLabel}) gerät in Panik und flieht vom Schlachtfeld!`);
+    }
+  }
+  return routedSoldiers;
+}
+
+// ---------- §23 Kommandantenereignisse (selten) ----------
+function rollCommanderEvents(armyA, armyB, state) {
+  const cfg = BATTLE_CONFIG;
+  const events = [];
+  if (battleRnd() < cfg.commanderEventChancePerPhase) {
+    const target = battleRnd() < 0.5 ? armyA : armyB;
+    if (target.commander.alive) {
+      const severe = battleRnd() < 0.3;
+      if (severe) {
+        target.commander.alive = false;
+        applyMoraleShift(target, -cfg.commanderDeathMoraleLoss);
+        logMsg(state, `⚔ ${target.commander.name} fällt in der Schlacht! Die Truppen von ${target.name} sind erschüttert.`);
+        events.push("commander_death");
+      } else {
+        applyMoraleShift(target, -Math.round(cfg.commanderDeathMoraleLoss / 2));
+        logMsg(state, `${target.commander.name} wird verwundet, bleibt aber im Kommando.`);
+        events.push("commander_wounded");
+      }
+    }
+  } else if (battleRnd() < cfg.commanderEventChancePerPhase) {
+    const target = battleRnd() < 0.5 ? armyA : armyB;
+    const artilleryStack = target.stacks.find(u => u.unitType === "artillerie" && u.soldiers > 0);
+    if (artilleryStack) {
+      const loss = Math.round(artilleryStack.soldiers * 0.2);
+      artilleryStack.soldiers -= loss;
+      artilleryStack.casualties.dead += loss;
+      logMsg(state, `Eine Explosion reißt Teile der Artillerie von ${target.name} in den Tod!`);
+      events.push("artillery_explosion");
+    }
+  }
+  return events;
+}
+
+// ---------- §34 Kampf-KI (bewertet, ohne verbotenes Wissen zu nutzen — §35) ----------
+function chooseAiFormationAndTactic(army, knownEnemyEstimate, terrain) {
+  const commander = army.commander;
+  const aggressive = commander.courage > 60;
+  const cavalryShare = totalSoldiers(army) > 0
+    ? army.stacks.filter(u => u.unitType === "kavallerie").reduce((s, u) => s + u.soldiers, 0) / totalSoldiers(army)
+    : 0;
+
+  let formation = "ausgewogen";
+  if (aggressive && cavalryShare > 0.15 && terrain !== "wald" && terrain !== "stadt") {
+    formation = "kavallerieflanke";
+  } else if (aggressive) {
+    formation = "aggressiv";
+  } else if (commander.courage < 35) {
+    formation = "defensiv";
+  } else {
+    const rangedShare = totalSoldiers(army) > 0
+      ? army.stacks.filter(u => u.unitType === "bogenschuetzen" || u.unitType === "artillerie").reduce((s, u) => s + u.soldiers, 0) / totalSoldiers(army)
+      : 0;
+    formation = rangedShare > 0.3 ? "fernkampfstellung" : "ausgewogen";
+  }
+
+  let tactic = "halten";
+  if (formation === "kavallerieflanke") tactic = "flankenangriff";
+  else if (formation === "aggressiv") tactic = "frontalangriff";
+  else if (formation === "defensiv") tactic = "verteidigen";
+  else if (formation === "fernkampfstellung") tactic = "fernkampf";
+
+  return { formation, tactic };
+}
+
+// Standard-Entscheidungspolitik für die KI (und für automatisierte Tests/Monte-Carlo)
+function aiDecisionPolicy(battleState, decision) {
+  const army = decision.forArmy === "A" ? battleState.armyA : battleState.armyB;
+  if (decision.type === "flankeWankt") {
+    return army.commander.courage > 50 ? "nachsetzen" : "halten";
+  }
+  if (decision.type === "weiterkaempfenOderRueckzug") {
+    return army.commander.courage > 40 ? "weiterkaempfen" : "rueckzug";
+  }
+  return "halten";
+}
+
+// ---------- §9 Vor-der-Schlacht-Info (§41 Informationsunsicherheit auch für den Spieler) ----------
+function estimateEnemyComposition(enemyArmy, scoutingAccuracy) {
+  const acc = battleClamp(scoutingAccuracy !== undefined ? scoutingAccuracy : 0.4, 0.1, 1);
+  const byType = {};
+  for (const u of enemyArmy.stacks) {
+    byType[u.unitType] = (byType[u.unitType] || 0) + u.soldiers;
+  }
+  const estimate = {};
+  for (const type in byType) {
+    const real = byType[type];
+    const spread = real * (1 - acc) * 0.6;
+    estimate[type] = { low: Math.max(0, Math.round(real - spread)), high: Math.round(real + spread) };
+  }
+  return estimate;
+}
+
+// ============================================================
+// BATTLE ENGINE — schrittweise Zustandsmaschine über die 6 Phasen (§14)
+// Kann jederzeit zwischengespeichert werden (§38 BattleState)
+// ============================================================
+
+const BATTLE_PHASES = ["aufstellung", "fernkampf", "annaeherung", "hauptkampf", "moralpruefung", "entscheidung"];
+
+// ---------- §38 BattleState erzeugen ----------
+function createBattle(armyA, armyB, terrain, weather, seed) {
+  seedBattleRng(seed);
+  return {
+    seed,
+    armyA, armyB,
+    terrain: terrain || "ebene",
+    weather: weather || "klar",
+    phaseIndex: 0,
+    round: 0,
+    log: [],
+    pendingDecision: null,
+    finished: false,
+    result: null,
+    meleeRoundsDone: 0,
+  };
+}
+
+function currentPhase(state) { return BATTLE_PHASES[state.phaseIndex]; }
+
+function logMsg(state, text) {
+  state.log.push({ time: formatBattleTime(state), text });
+}
+function formatBattleTime(state) {
+  const startHour = 8, startMinute = 0;
+  const minutesElapsed = state.phaseIndex * 25 + state.meleeRoundsDone * 12 + Math.round(battleRnd() * 4);
+  const total = startHour * 60 + startMinute + minutesElapsed;
+  const h = Math.floor(total / 60) % 24, m = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+// ---------- Hauptschritt: eine Phase (oder Teilschritt) ausführen ----------
+// decision: Antwort auf eine vorherige pendingDecision, falls vorhanden
+function advanceBattle(state, decision) {
+  if (state.finished) return state;
+  if (state.pendingDecision) {
+    resolveDecision(state, decision);
+    if (state.pendingDecision) return state; // weitere Entscheidung nötig
+  }
+
+  const phase = currentPhase(state);
+  if (phase === "aufstellung") runAufstellung(state);
+  else if (phase === "fernkampf") runFernkampf(state);
+  else if (phase === "annaeherung") runAnnaeherung(state);
+  else if (phase === "hauptkampf") runHauptkampfRound(state);
+  else if (phase === "moralpruefung") runMoralpruefung(state);
+  else if (phase === "entscheidung") runEntscheidung(state);
+
+  return state;
+}
+
+function resolveDecision(state, decision) {
+  const d = state.pendingDecision;
+  state.pendingDecision = null;
+  if (!decision) decision = aiDecisionPolicy(state, d); // falls niemand entscheidet: KI-Standardpolitik
+  if (d.type === "flankeWankt") {
+    const attackerArmy = d.forArmy === "A" ? state.armyA : state.armyB;
+    const defenderArmy = d.forArmy === "A" ? state.armyB : state.armyA;
+    if (decision === "nachsetzen") {
+      const bonusDamage = Math.round(totalSoldiers(defenderArmy) * 0.05);
+      applyCasualties(defenderArmy, bonusDamage, state.log, defenderArmy.name);
+      applyMoraleShift(defenderArmy, -6);
+      logMsg(state, `${attackerArmy.name} nutzt die Schwäche aus und setzt nach — die Linie von ${defenderArmy.name} gerät weiter unter Druck!`);
+    } else {
+      logMsg(state, `${attackerArmy.name} hält die eigene Formation, statt das Risiko einzugehen.`);
+    }
+  } else if (d.type === "weiterkaempfenOderRueckzug") {
+    const army = d.forArmy === "A" ? state.armyA : state.armyB;
+    if (decision === "rueckzug") {
+      army.retreatedEarly = true;
+      logMsg(state, `${army.name} zieht sich geordnet vom Schlachtfeld zurück.`);
+      state.phaseIndex = BATTLE_PHASES.indexOf("moralpruefung");
+    } else {
+      logMsg(state, `${army.name} kämpft entschlossen weiter.`);
+    }
+  }
+}
+
+// ---------- Phase 1: Aufstellung (§14) ----------
+function runAufstellung(state) {
+  if (!state.armyA.formation) {
+    const choice = chooseAiFormationAndTactic(state.armyA, null, state.terrain);
+    state.armyA.formation = choice.formation; state.armyA.tactic = choice.tactic;
+  }
+  if (!state.armyB.formation) {
+    const choice = chooseAiFormationAndTactic(state.armyB, null, state.terrain);
+    state.armyB.formation = choice.formation; state.armyB.tactic = choice.tactic;
+  }
+  logMsg(state, `${state.armyA.name} formiert sich (${FORMATIONS[state.armyA.formation].name}). ${state.armyB.name} formiert sich (${FORMATIONS[state.armyB.formation].name}).`);
+  state.phaseIndex++;
+}
+
+// ---------- Phase 2: Fernkampf (§14) ----------
+function runFernkampf(state) {
+  const rangedDamage = (attacker, defender) => {
+    let total = 0;
+    for (const stack of livingStacks(attacker)) {
+      if (stack.rangedAttack <= 0) continue;
+      const result = computeEffectiveValue(stack, attacker, defender, state.terrain, state.weather, { ranged: true, round: 1 });
+      total += result.value;
+    }
+    return total;
+  };
+  const dmgAtoB = rangedDamage(state.armyA, state.armyB);
+  const dmgBtoA = rangedDamage(state.armyB, state.armyA);
+
+  const lostB = applyCasualties(state.armyB, Math.round(dmgAtoB * 0.4), state.log, state.armyB.name);
+  const lostA = applyCasualties(state.armyA, Math.round(dmgBtoA * 0.4), state.log, state.armyA.name);
+
+  if (lostA > 0 || lostB > 0) {
+    logMsg(state, `Fernkampf: ${state.armyA.name} verliert ${lostA} Soldaten, ${state.armyB.name} verliert ${lostB} Soldaten durch Pfeil- und Kanonenbeschuss.`);
+  } else {
+    logMsg(state, `Keine nennenswerten Fernkampfeinheiten im Einsatz — die Armeen rücken direkt vor.`);
+  }
+  rollCommanderEvents(state.armyA, state.armyB, state);
+  state.phaseIndex++;
+}
+
+// ---------- Phase 3: Annäherung (§14) — Kavallerieflanke ----------
+function runAnnaeherung(state) {
+  for (const [side, army, enemy] of [["A", state.armyA, state.armyB], ["B", state.armyB, state.armyA]]) {
+    if (army.formation !== "kavallerieflanke") continue;
+    const cavStack = army.stacks.find(u => u.unitType === "kavallerie" && u.soldiers > 0);
+    if (!cavStack) continue;
+    const successChance = battleClamp(0.5 + (army.commander.tactics - 50) / 200 + (cavStack.speed - 5) / 20, 0.15, 0.85);
+    if (battleRnd() < successChance) {
+      const archerTarget = enemy.stacks.find(u => (u.unitType === "bogenschuetzen" || u.unitType === "artillerie") && u.soldiers > 0);
+      if (archerTarget) {
+        const loss = Math.round(archerTarget.soldiers * 0.35);
+        archerTarget.soldiers -= loss;
+        archerTarget.casualties.dead += Math.round(loss * 0.5);
+        archerTarget.casualties.missing += loss - Math.round(loss * 0.5);
+        applyMoraleShift(enemy, -8);
+        logMsg(state, `Die Kavallerie von ${army.name} umgeht die Front und trifft ${enemy.name}s Fernkämpfer hart — ${loss} Verluste!`);
+      }
+    } else {
+      const loss = Math.round(cavStack.soldiers * 0.20);
+      cavStack.soldiers -= loss;
+      cavStack.casualties.dead += loss;
+      applyMoraleShift(army, -5);
+      logMsg(state, `Der Flankenangriff der Kavallerie von ${army.name} schlägt fehl und kostet ${loss} Reiter.`);
+    }
+  }
+  state.phaseIndex++;
+}
+
+// ---------- Phase 4: Hauptkampf (§14) — mehrere Nahkampfrunden ----------
+function runHauptkampfRound(state) {
+  const cfg = BATTLE_CONFIG;
+  state.round++;
+  state.meleeRoundsDone++;
+
+  const cavalryReachedArty = (army) => army.formation === "kavallerieflanke";
+
+  // §15: Nettoschaden ergibt sich aus Angriffsstärke UND der tatsächlichen
+  // Verteidigungsstärke der Zielarmee (Rüstung/Formation/Gelände-Verteidigerbonus
+  // fließen über den "defending"-Kontext ein) — vorher wurde nur der Angreifer
+  // berechnet, wodurch Verteidigungsboni wirkungslos blieben (Balancing-Fund).
+  const meleeExchange = (attacker, defender) => {
+    let attackTotal = 0;
+    for (const stack of livingStacks(attacker)) {
+      if (stack.attack <= 0) continue;
+      const ctx = { ranged: false, defending: false, round: state.meleeRoundsDone, cavalryReachedArtillery: cavalryReachedArty(defender) };
+      attackTotal += computeEffectiveValue(stack, attacker, defender, state.terrain, state.weather, ctx).value;
+    }
+    let defenseTotal = 0;
+    for (const stack of livingStacks(defender)) {
+      const ctx = { ranged: false, defending: true, round: state.meleeRoundsDone };
+      defenseTotal += computeEffectiveValue(stack, defender, attacker, state.terrain, state.weather, ctx).value;
+    }
+    // Verhältnisformel: hohe Verteidigung dämpft den Nettoschaden spürbar,
+    // ohne ihn je auf 0 fallen zu lassen (kein "Patt")
+    return attackTotal * (attackTotal / (attackTotal + defenseTotal + 1));
+  };
+
+  const dmgAtoB = meleeExchange(state.armyA, state.armyB);
+  const dmgBtoA = meleeExchange(state.armyB, state.armyA);
+
+  const lostB = applyCasualties(state.armyB, Math.round(dmgAtoB * cfg.meleeCasualtyFactor), state.log, state.armyB.name);
+  const lostA = applyCasualties(state.armyA, Math.round(dmgBtoA * cfg.meleeCasualtyFactor), state.log, state.armyA.name);
+
+  if (lostA > lostB) { applyMoraleShift(state.armyB, cfg.moraleGainOnWinningRound); applyMoraleShift(state.armyA, -cfg.moraleLossOnLosingRound); }
+  else if (lostB > lostA) { applyMoraleShift(state.armyA, cfg.moraleGainOnWinningRound); applyMoraleShift(state.armyB, -cfg.moraleLossOnLosingRound); }
+
+  logMsg(state, `Nahkampfrunde ${state.meleeRoundsDone}: ${state.armyA.name} verliert ${lostA}, ${state.armyB.name} verliert ${lostB} Soldaten.`);
+  rollCommanderEvents(state.armyA, state.armyB, state);
+
+  const moraleA = overallMorale(state.armyA), moraleB = overallMorale(state.armyB);
+
+  // §29 wichtiger Entscheidungspunkt: eine Flanke wankt deutlich
+  if (!state._decisionAsked && (moraleA < cfg.decisionTriggerMoraleThreshold || moraleB < cfg.decisionTriggerMoraleThreshold)) {
+    state._decisionAsked = true;
+    const weakerSide = moraleA < moraleB ? "A" : "B";
+    const strongerSideKey = weakerSide === "A" ? "B" : "A";
+    state.pendingDecision = {
+      type: "flankeWankt", forArmy: strongerSideKey,
+      text: `DIE LINKE FLANKE VON ${(weakerSide === "A" ? state.armyA.name : state.armyB.name).toUpperCase()} WANKT!`,
+      options: [
+        { id: "nachsetzen", label: "Nachsetzen und den Vorteil ausnutzen (Risiko/Chance)" },
+        { id: "halten", label: "Stellung halten" },
+      ],
+    };
+    return; // Entscheidung muss erst beantwortet werden, bevor es weitergeht
+  }
+
+  if (state.meleeRoundsDone >= cfg.meleeRounds || moraleA < 5 || moraleB < 5) {
+    state.phaseIndex++;
+  }
+}
+
+// ---------- Phase 5: Moralprüfung (§14/§18) ----------
+function runMoralpruefung(state) {
+  checkRouts(state.armyA, state, state.armyA.name);
+  checkRouts(state.armyB, state, state.armyB.name);
+  logMsg(state, `Moralprüfung: ${state.armyA.name} (${moraleTierName(overallMorale(state.armyA))}), ${state.armyB.name} (${moraleTierName(overallMorale(state.armyB))}).`);
+  state.phaseIndex++;
+}
+
+// ---------- Phase 6: Entscheidung (§14/§24 Schlachtbericht) ----------
+function runEntscheidung(state) {
+  const startA = state.armyA.stacks.reduce((s, u) => s + u.maxSoldiers, 0);
+  const startB = state.armyB.stacks.reduce((s, u) => s + u.maxSoldiers, 0);
+  const nowA = totalSoldiers(state.armyA);
+  const nowB = totalSoldiers(state.armyB);
+  const casualtiesA = startA - nowA, casualtiesB = startB - nowB;
+  const casualtyShareA = startA > 0 ? casualtiesA / startA : 0;
+  const casualtyShareB = startB > 0 ? casualtiesB / startB : 0;
+
+  let winner, outcome;
+  const aRetreated = state.armyA.retreatedEarly;
+  const bRetreated = state.armyB.retreatedEarly;
+
+  if (aRetreated && !bRetreated) { winner = "B"; outcome = "geordneterRueckzugA"; }
+  else if (bRetreated && !aRetreated) { winner = "A"; outcome = "geordneterRueckzugB"; }
+  else if (casualtyShareA > 0.6 && casualtyShareB < 0.3) { winner = "B"; outcome = "vernichtendeNiederlageA"; }
+  else if (casualtyShareB > 0.6 && casualtyShareA < 0.3) { winner = "A"; outcome = "vernichtendeNiederlageB"; }
+  else if (casualtyShareA > casualtyShareB + 0.08) { winner = "B"; outcome = "siegB"; }
+  else if (casualtyShareB > casualtyShareA + 0.08) { winner = "A"; outcome = "siegA"; }
+  else { winner = casualtyShareA <= casualtyShareB ? "A" : "B"; outcome = "knapperSieg"; }
+
+  const result = {
+    winner, outcome,
+    armyA: { name: state.armyA.name, startStrength: startA, endStrength: nowA, casualties: casualtiesA,
+      dead: sumCasualtyField(state.armyA, "dead"), wounded: sumCasualtyField(state.armyA, "wounded"), missing: sumCasualtyField(state.armyA, "missing"),
+      moraleStart: undefined, moraleEnd: Math.round(overallMorale(state.armyA)) },
+    armyB: { name: state.armyB.name, startStrength: startB, endStrength: nowB, casualties: casualtiesB,
+      dead: sumCasualtyField(state.armyB, "dead"), wounded: sumCasualtyField(state.armyB, "wounded"), missing: sumCasualtyField(state.armyB, "missing"),
+      moraleStart: undefined, moraleEnd: Math.round(overallMorale(state.armyB)) },
+    rounds: state.meleeRoundsDone,
+    terrain: state.terrain, weather: state.weather,
+  };
+  state.result = result;
+  state.finished = true;
+
+  const outcomeText = {
+    siegA: `SIEG ${state.armyA.name.toUpperCase()}`, siegB: `SIEG ${state.armyB.name.toUpperCase()}`,
+    knapperSieg: `KNAPPER SIEG ${(winner === "A" ? state.armyA.name : state.armyB.name).toUpperCase()}`,
+    vernichtendeNiederlageA: `VERNICHTENDE NIEDERLAGE FÜR ${state.armyA.name.toUpperCase()}`,
+    vernichtendeNiederlageB: `VERNICHTENDE NIEDERLAGE FÜR ${state.armyB.name.toUpperCase()}`,
+    geordneterRueckzugA: `${state.armyA.name.toUpperCase()} ZIEHT SICH ZURÜCK`,
+    geordneterRueckzugB: `${state.armyB.name.toUpperCase()} ZIEHT SICH ZURÜCK`,
+  }[outcome];
+  logMsg(state, outcomeText + "!");
+}
+
+function sumCasualtyField(army, field) {
+  return army.stacks.reduce((s, u) => s + u.casualties[field], 0);
+}
+
+// ---------- Komplettdurchlauf ohne UI (für Tests/Monte-Carlo/KI-vs-KI) ----------
+function simulateBattle(armyA, armyB, terrain, weather, seed, decisionPolicy) {
+  const state = createBattle(armyA, armyB, terrain, weather, seed);
+  const policy = decisionPolicy || aiDecisionPolicy;
+  let guard = 0;
+  while (!state.finished && guard < 200) {
+    if (state.pendingDecision) {
+      const choice = policy(state, state.pendingDecision);
+      advanceBattle(state, choice);
+    } else {
+      advanceBattle(state);
+    }
+    guard++;
+  }
+  return state;
+}
+
+</script>
+<script>
+let battleState = null;
+let debugMode = false;
+
+// ---------- Aufstellung: Auswahlmenüs füllen ----------
+function fillSelect(id, obj) {
+  document.getElementById(id).innerHTML = Object.entries(obj).map(([k,v]) => `<option value="${k}">${v.name}</option>`).join('');
+}
+fillSelect('pFormation', FORMATIONS);
+fillSelect('pTactic', TACTICS);
+fillSelect('pTerrain', TERRAIN_TYPES);
+fillSelect('pWeather', WEATHER_TYPES);
+
+// ---------- Beispielarmeen (§44 erster spielbarer Bildschirm) ----------
+function buildDemoArmies() {
+  const commanderA = createCommander('Graf Friedrich von Hessen', 60, 55, 62, 45);
+  const armyA = createArmy('Hessen', commanderA, [
+    createUnitStack('infanterie', 1200),
+    createUnitStack('bogenschuetzen', 400),
+    createUnitStack('kavallerie', 180),
+    createUnitStack('artillerie', 12),
+  ], { isAttacker: true });
+
+  const commanderB = createCommander('Kurfürst Albrecht von der Pfalz', 48, 58, 40, 50);
+  const armyB = createArmy('Pfalz', commanderB, [
+    createUnitStack('infanterie', 950),
+    createUnitStack('bogenschuetzen', 320),
+    createUnitStack('kavallerie', 110),
+  ], { isHomeTerritory: true });
+
+  return { armyA, armyB };
+}
+
+function startBattleScreen() {
+  debugMode = document.getElementById('debugToggle').checked;
+  const { armyA, armyB } = buildDemoArmies();
+  armyA.formation = document.getElementById('pFormation').value;
+  armyA.tactic = document.getElementById('pTactic').value;
+  const terrain = document.getElementById('pTerrain').value;
+  const weather = document.getElementById('pWeather').value;
+  const seed = parseInt(document.getElementById('pSeed').value, 10) || 1;
+
+  battleState = createBattle(armyA, armyB, terrain, weather, seed);
+  document.getElementById('setupPanel').style.display = 'none';
+  document.getElementById('battleUi').style.display = 'block';
+  document.getElementById('debugPanel').style.display = debugMode ? 'block' : 'none';
+  renderBattleUi();
+}
+
+function unitBlockHtml(stack) {
+  const abbr = { infanterie:'INF', bogenschuetzen:'BOG', kavallerie:'KAV', artillerie:'ART', miliz:'MIL' }[stack.unitType];
+  const dead = stack.soldiers <= 0 || stack.routed;
+  return `<div class="unitBlock" style="${dead ? 'opacity:0.3;' : ''}">
+    [${abbr}]<br><span class="cnt">${Math.max(0, Math.round(stack.soldiers))}</span>
+    <div class="moraleBar"><div style="width:${Math.round(stack.morale)}%;"></div></div>
+  </div>`;
+}
+
+function renderBattleUi() {
+  const s = battleState;
+  document.getElementById('labelA').innerHTML = `<b>${s.armyA.name}</b> (${s.armyA.commander.name})<br>Moral: ${Math.round(overallMorale(s.armyA))}% — ${moraleTierName(overallMorale(s.armyA))}`;
+  document.getElementById('labelB').innerHTML = `<b>${s.armyB.name}</b> (${s.armyB.commander.name})<br>Moral: ${Math.round(overallMorale(s.armyB))}% — ${moraleTierName(overallMorale(s.armyB))}`;
+  document.getElementById('unitsA').innerHTML = s.armyA.stacks.map(unitBlockHtml).join('');
+  document.getElementById('unitsB').innerHTML = s.armyB.stacks.map(unitBlockHtml).join('');
+
+  const lastMsg = s.log.length ? s.log[s.log.length-1].text : 'Die Armeen stehen sich gegenüber...';
+  document.getElementById('messageBanner').textContent = lastMsg.toUpperCase();
+
+  document.getElementById('log').innerHTML = s.log.map(l => `<div><span class="t">${l.time}</span>${l.text}</div>`).join('');
+  document.getElementById('log').scrollTop = 999999;
+
+  const decisionBox = document.getElementById('decisionBox');
+  if (s.pendingDecision) {
+    decisionBox.style.display = 'block';
+    document.getElementById('decisionText').textContent = s.pendingDecision.text;
+    document.getElementById('decisionOptions').innerHTML = s.pendingDecision.options.map(o =>
+      `<button onclick="doDecision('${o.id}')">${o.label}</button>`).join('');
+    document.getElementById('nextStepBtn').disabled = true;
+  } else {
+    decisionBox.style.display = 'none';
+    document.getElementById('nextStepBtn').disabled = s.finished;
+  }
+  document.getElementById('autoBtn').disabled = s.finished;
+
+  if (debugMode) renderDebugPanel();
+  if (s.finished) showReport();
+}
+
+function renderDebugPanel() {
+  const s = battleState;
+  const lines = [`Phase: ${currentPhase(s)} | Runde: ${s.meleeRoundsDone} | Seed: ${s.seed}`];
+  const stackA = s.armyA.stacks.find(u => u.soldiers > 0);
+  if (stackA) {
+    lines.push('', debugPrintEffectiveValue(stackA, s.armyA, s.armyB, s.terrain, s.weather, { ranged: stackA.rangedAttack>0, defending:false, round: s.meleeRoundsDone||1 }));
+  }
+  document.getElementById('debugPanel').textContent = lines.join('\n');
+}
+
+function doNextStep() {
+  advanceBattle(battleState);
+  renderBattleUi();
+}
+function doDecision(choiceId) {
+  advanceBattle(battleState, choiceId);
+  renderBattleUi();
+}
+function doAutoResolve() {
+  let guard = 0;
+  while (!battleState.finished && guard < 200) {
+    if (battleState.pendingDecision) {
+      advanceBattle(battleState, aiDecisionPolicy(battleState, battleState.pendingDecision));
+    } else {
+      advanceBattle(battleState);
+    }
+    guard++;
+  }
+  renderBattleUi();
+}
+
+function showReport() {
+  const r = battleState.result;
+  document.getElementById('battleUi').style.display = 'none';
+  document.getElementById('report').style.display = 'block';
+
+  const outcomeLabel = {
+    siegA: `SIEG ${r.armyA.name.toUpperCase()}`, siegB: `SIEG ${r.armyB.name.toUpperCase()}`,
+    knapperSieg: `KNAPPER SIEG ${(r.winner==='A'?r.armyA.name:r.armyB.name).toUpperCase()}`,
+    vernichtendeNiederlageA: `VERNICHTENDE NIEDERLAGE FÜR ${r.armyA.name.toUpperCase()}`,
+    vernichtendeNiederlageB: `VERNICHTENDE NIEDERLAGE FÜR ${r.armyB.name.toUpperCase()}`,
+    geordneterRueckzugA: `${r.armyA.name.toUpperCase()} ZOG SICH ZURÜCK`,
+    geordneterRueckzugB: `${r.armyB.name.toUpperCase()} ZOG SICH ZURÜCK`,
+  }[r.outcome];
+  document.getElementById('reportBanner').textContent = outcomeLabel;
+
+  document.getElementById('repNameA').textContent = r.armyA.name;
+  document.getElementById('repNameB').textContent = r.armyB.name;
+  document.getElementById('repStartA').textContent = r.armyA.startStrength;
+  document.getElementById('repStartB').textContent = r.armyB.startStrength;
+  document.getElementById('repEndA').textContent = r.armyA.endStrength;
+  document.getElementById('repEndB').textContent = r.armyB.endStrength;
+  document.getElementById('repCasA').textContent = r.armyA.casualties + ` (${Math.round(r.armyA.casualties/r.armyA.startStrength*100)}%)`;
+  document.getElementById('repCasB').textContent = r.armyB.casualties + ` (${Math.round(r.armyB.casualties/r.armyB.startStrength*100)}%)`;
+  document.getElementById('repDeadA').textContent = r.armyA.dead;
+  document.getElementById('repDeadB').textContent = r.armyB.dead;
+  document.getElementById('repWoundedA').textContent = r.armyA.wounded;
+  document.getElementById('repWoundedB').textContent = r.armyB.wounded;
+  document.getElementById('repMissingA').textContent = r.armyA.missing;
+  document.getElementById('repMissingB').textContent = r.armyB.missing;
+  document.getElementById('repMoraleA').textContent = r.armyA.moraleEnd + '%';
+  document.getElementById('repMoraleB').textContent = r.armyB.moraleEnd + '%';
+
+  // §46: Nachvollziehbare Erklärung für den Verlierer
+  const loserArmy = r.winner === 'A' ? battleState.armyB : battleState.armyA;
+  const loserKey = r.winner === 'A' ? 'B' : 'A';
+  const reasons = [];
+  if (loserArmy.formation === 'aggressiv' || loserArmy.formation === 'kavallerieflanke') reasons.push('die gewählte Formation war riskant und bot wenig Verteidigung');
+  if (overallMorale(loserArmy) < 40) reasons.push('die Moral der Truppen brach im Kampfverlauf ein');
+  if (!loserArmy.commander.alive) reasons.push('der Verlust des Kommandanten erschütterte die Truppen');
+  const terr = TERRAIN_TYPES[battleState.terrain];
+  if (terr.unitMods.kavallerie && loserArmy.stacks.some(u=>u.unitType==='kavallerie') && terr.unitMods.kavallerie.attack < 0) reasons.push(`das Gelände (${terr.name}) benachteiligte die eigene Kavallerie stark`);
+  if (!reasons.length) reasons.push('die gegnerische Armee war in dieser Schlacht schlicht überlegen');
+  document.getElementById('whyLost').innerHTML = `<b>Warum ${loserArmy.name} verlor:</b><br>` + reasons.map(r=>'– '+r).join('<br>');
+}
+</script>
+</body>
+</html>

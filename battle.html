@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>SCHLACHT BEI MAINZ — Kampf-Engine-Prototyp</title>
+<style>
+  @import url('https://fonts.cdnfonts.com/css/press-start-2p');
+  :root {
+    --bg:#14171f; --panel:#d8cba8; --panel-dark:#2b2f3a; --ink:#1c1c1c;
+    --accent:#7a2222; --accent2:#1f4b3f; --gold:#b8963e; --blue:#23344d;
+    --font: 'Press Start 2P', monospace;
+    --fs-micro: 12px; --fs-body: 13px; --fs-md: 15px; --fs-lg: 17px; --fs-xl: 19px;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:var(--bg); display:flex; align-items:center; justify-content:center;
+    font-family: var(--font); font-size: var(--fs-body); }
+  #frame { width:960px; background:var(--blue); border:6px solid #0a0c11;
+    box-shadow:0 0 0 2px #4a5570 inset, 0 0 40px rgba(0,0,0,0.6); padding:10px; }
+  h1.title { text-align:center; color:var(--gold); font-size:var(--fs-xl); letter-spacing:2px; margin:4px 0 10px; text-shadow:2px 2px 0 #0a0c11; }
+  .panel { background:var(--panel); color:var(--ink); border:3px solid #0a0c11; padding:10px; font-size:var(--fs-body); box-shadow:3px 3px 0 #0a0c11; margin-bottom:8px; }
+  .panelTitle { background:var(--accent); color:#f2e6c9; margin:-10px -10px 8px -10px; padding:6px 8px; font-size:var(--fs-md); letter-spacing:1px; }
+  button { font-family:inherit; font-size:var(--fs-body); background:var(--gold); color:#1c1c1c; border:2px solid #0a0c11;
+    padding:6px 8px; cursor:pointer; margin:3px 3px 3px 0; box-shadow:2px 2px 0 #0a0c11; }
+  button:hover { background:#d1af52; } button:active { transform:translate(2px,2px); box-shadow:none; }
+  button:disabled { opacity:0.4; cursor:not-allowed; }
+  select { font-family:inherit; font-size:var(--fs-body); padding:4px; background:var(--panel); border:2px solid #0a0c11; }
+
+  #battlefield { display:flex; justify-content:space-between; align-items:center; background:#3a5a2d;
+    border:3px solid #0a0c11; padding:14px; margin-bottom:8px; min-height:120px; position:relative; }
+  #battlefield::before { content:"SCHLACHTFELD"; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    color:rgba(255,255,255,0.15); font-size:var(--fs-md); letter-spacing:3px; }
+  .armySide { display:flex; flex-direction:column; gap:4px; width:42%; z-index:1; }
+  .armySide.right { align-items:flex-end; }
+  .unitRow { display:flex; gap:4px; flex-wrap:wrap; }
+  .unitRow.right { justify-content:flex-end; }
+  .unitBlock { background:var(--panel); border:2px solid #0a0c11; padding:3px 5px; font-size:var(--fs-micro); text-align:center;
+    box-shadow:1px 1px 0 #0a0c11; min-width:44px; }
+  .unitBlock.hit { animation: flashHit 0.3s; }
+  @keyframes flashHit { 0%,100%{background:var(--panel);} 50%{background:var(--accent); color:#f2e6c9;} }
+  .unitBlock .cnt { font-weight:bold; }
+  .moraleBar { width:100%; height:5px; background:#00000033; border:1px solid #0a0c11; margin-top:2px; }
+  .moraleBar > div { height:100%; background:var(--accent2); }
+
+  #messageBanner { background:var(--accent); color:#f2e6c9; text-align:center; padding:10px; font-size:var(--fs-md);
+    letter-spacing:1px; margin-bottom:8px; min-height:20px; border:2px solid #0a0c11; }
+  #decisionBox { background:var(--panel-dark); color:#f2e6c9; padding:10px; margin-bottom:8px; border:2px solid var(--gold); display:none; }
+  #decisionBox .dtext { color:var(--gold); margin-bottom:6px; }
+
+  #log { max-height:120px; overflow-y:auto; font-size:var(--fs-body); line-height:1.6; }
+  #log div { margin-bottom:2px; }
+  #log .t { color:var(--accent2); margin-right:6px; }
+
+  #setupPanel .col { display:inline-block; width:48%; vertical-align:top; }
+  .settingRow { margin-bottom:6px; }
+  .settingRow label { display:block; margin-bottom:2px; font-size:var(--fs-body); }
+
+  #report { display:none; }
+  #report table { width:100%; border-collapse:collapse; font-size:var(--fs-body); }
+  #report td, #report th { padding:3px 5px; border-bottom:1px solid #0a0c1133; }
+  .resultBanner { text-align:center; font-size:var(--fs-lg); color:var(--gold); text-shadow:2px 2px 0 #0a0c11; padding:10px; }
+
+  #debugPanel { display:none; white-space:pre; font-size:var(--fs-body); background:#0a0c11; color:#7fffa0; padding:8px; margin-top:8px; max-height:150px; overflow-y:auto; }
+</style>
+</head>
+<body>
+<div id="frame">
+  <h1 class="title">⚔ SCHLACHT BEI MAINZ ⚔</h1>
+
+  <div id="setupPanel" class="panel">
+    <div class="panelTitle">AUFSTELLUNG</div>
+    <div class="col">
+      <b>EIGENE ARMEE (Angreifer)</b>
+      <div class="settingRow"><label>Formation</label>
+        <select id="pFormation"></select>
+      </div>
+      <div class="settingRow"><label>Taktik</label>
+        <select id="pTactic"></select>
+      </div>
+    </div>
+    <div class="col">
+      <b>GELÄNDE &amp; WETTER</b>
+      <div class="settingRow"><label>Gelände</label><select id="pTerrain"></select></div>
+      <div class="settingRow"><label>Wetter</label><select id="pWeather"></select></div>
+      <div class="settingRow"><label>Zufalls-Seed</label><input type="number" id="pSeed" value="12345" style="width:100px; font-family:inherit; padding:3px;"></div>
+    </div>
+    <div style="text-align:center; margin-top:8px;">
+      <button onclick="startBattleScreen()">⚔ SCHLACHT BEGINNEN ⚔</button>
+      <label style="font-size:var(--fs-body);"><input type="checkbox" id="debugToggle"> Debug-Modus</label>
+    </div>
+  </div>
+
+  <div id="battleUi" style="display:none;">
+    <div id="messageBanner">Die Armeen stehen sich gegenüber...</div>
+
+    <div id="battlefield">
+      <div class="armySide">
+        <div id="labelA" style="margin-bottom:4px;"></div>
+        <div class="unitRow" id="unitsA"></div>
+      </div>
+      <div class="armySide right">
+        <div id="labelB" style="margin-bottom:4px;"></div>
+        <div class="unitRow right" id="unitsB"></div>
+      </div>
+    </div>
+
+    <div id="decisionBox">
+      <div class="dtext" id="decisionText"></div>
+      <div id="decisionOptions"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panelTitle">KAMPFPROTOKOLL</div>
+      <div id="log"></div>
+    </div>
+
+    <div style="text-align:center;">
+      <button id="nextStepBtn" onclick="doNextStep()">▶ NÄCHSTE PHASE</button>
+      <button id="autoBtn" onclick="doAutoResolve()">⏩ AUTOMATISCH BEENDEN</button>
+    </div>
+
+    <div id="debugPanel"></div>
+  </div>
+
+  <div id="report" class="panel">
+    <div class="panelTitle">SCHLACHTBERICHT</div>
+    <div class="resultBanner" id="reportBanner"></div>
+    <table>
+      <tr><th></th><th id="repNameA"></th><th id="repNameB"></th></tr>
+      <tr><td>Soldaten zu Beginn</td><td id="repStartA"></td><td id="repStartB"></td></tr>
+      <tr><td>Soldaten am Ende</td><td id="repEndA"></td><td id="repEndB"></td></tr>
+      <tr><td>Verluste gesamt</td><td id="repCasA"></td><td id="repCasB"></td></tr>
+      <tr><td>&nbsp;&nbsp;davon gefallen</td><td id="repDeadA"></td><td id="repDeadB"></td></tr>
+      <tr><td>&nbsp;&nbsp;davon verwundet</td><td id="repWoundedA"></td><td id="repWoundedB"></td></tr>
+      <tr><td>&nbsp;&nbsp;davon vermisst</td><td id="repMissingA"></td><td id="repMissingB"></td></tr>
+      <tr><td>Moral am Ende</td><td id="repMoraleA"></td><td id="repMoraleB"></td></tr>
+    </table>
+    <div id="whyLost" style="margin-top:8px; font-size:var(--fs-body);"></div>
+    <div style="text-align:center; margin-top:10px;"><button onclick="location.reload()">NEUE SCHLACHT</button></div>
+  </div>
+</div>
+
+<script src="battle-engine/battle-data.js"></script>
+<script src="battle-engine/battle-engine.js"></script>
+<script src="battle-engine/battle-state-machine.js"></script>
+<script>
+let battleState = null;
+let debugMode = false;
+
+// ---------- Aufstellung: Auswahlmenüs füllen ----------
+function fillSelect(id, obj) {
+  document.getElementById(id).innerHTML = Object.entries(obj).map(([k,v]) => `<option value="${k}">${v.name}</option>`).join('');
+}
+fillSelect('pFormation', BATTLE_FORMATIONS);
+fillSelect('pTactic', TACTICS);
+fillSelect('pTerrain', TERRAIN_TYPES);
+fillSelect('pWeather', WEATHER_TYPES);
+
+// ---------- Beispielarmeen (§44 erster spielbarer Bildschirm) ----------
+function buildDemoArmies() {
+  const commanderA = createCommander('Graf Friedrich von Hessen', 60, 55, 62, 45);
+  const armyA = createArmy('Hessen', commanderA, [
+    createUnitStack('infanterie', 1200),
+    createUnitStack('bogenschuetzen', 400),
+    createUnitStack('kavallerie', 180),
+    createUnitStack('artillerie', 12),
+  ], { isAttacker: true });
+
+  const commanderB = createCommander('Kurfürst Albrecht von der Pfalz', 48, 58, 40, 50);
+  const armyB = createArmy('Pfalz', commanderB, [
+    createUnitStack('infanterie', 950),
+    createUnitStack('bogenschuetzen', 320),
+    createUnitStack('kavallerie', 110),
+  ], { isHomeTerritory: true });
+
+  return { armyA, armyB };
+}
+
+function startBattleScreen() {
+  debugMode = document.getElementById('debugToggle').checked;
+  const { armyA, armyB } = buildDemoArmies();
+  armyA.formation = document.getElementById('pFormation').value;
+  armyA.tactic = document.getElementById('pTactic').value;
+  const terrain = document.getElementById('pTerrain').value;
+  const weather = document.getElementById('pWeather').value;
+  const seed = parseInt(document.getElementById('pSeed').value, 10) || 1;
+
+  battleState = createBattle(armyA, armyB, terrain, weather, seed);
+  document.getElementById('setupPanel').style.display = 'none';
+  document.getElementById('battleUi').style.display = 'block';
+  document.getElementById('debugPanel').style.display = debugMode ? 'block' : 'none';
+  renderBattleUi();
+}
+
+function unitBlockHtml(stack) {
+  const abbr = { infanterie:'INF', bogenschuetzen:'BOG', kavallerie:'KAV', artillerie:'ART', miliz:'MIL' }[stack.unitType];
+  const dead = stack.soldiers <= 0 || stack.routed;
+  return `<div class="unitBlock" style="${dead ? 'opacity:0.3;' : ''}">
+    [${abbr}]<br><span class="cnt">${Math.max(0, Math.round(stack.soldiers))}</span>
+    <div class="moraleBar"><div style="width:${Math.round(stack.morale)}%;"></div></div>
+  </div>`;
+}
+
+function renderBattleUi() {
+  const s = battleState;
+  document.getElementById('labelA').innerHTML = `<b>${s.armyA.name}</b> (${s.armyA.commander.name})<br>Moral: ${Math.round(overallMorale(s.armyA))}% — ${moraleTierName(overallMorale(s.armyA))}`;
+  document.getElementById('labelB').innerHTML = `<b>${s.armyB.name}</b> (${s.armyB.commander.name})<br>Moral: ${Math.round(overallMorale(s.armyB))}% — ${moraleTierName(overallMorale(s.armyB))}`;
+  document.getElementById('unitsA').innerHTML = s.armyA.stacks.map(unitBlockHtml).join('');
+  document.getElementById('unitsB').innerHTML = s.armyB.stacks.map(unitBlockHtml).join('');
+
+  const lastMsg = s.log.length ? s.log[s.log.length-1].text : 'Die Armeen stehen sich gegenüber...';
+  document.getElementById('messageBanner').textContent = lastMsg.toUpperCase();
+
+  document.getElementById('log').innerHTML = s.log.map(l => `<div><span class="t">${l.time}</span>${l.text}</div>`).join('');
+  document.getElementById('log').scrollTop = 999999;
+
+  const decisionBox = document.getElementById('decisionBox');
+  if (s.pendingDecision) {
+    decisionBox.style.display = 'block';
+    document.getElementById('decisionText').textContent = s.pendingDecision.text;
+    document.getElementById('decisionOptions').innerHTML = s.pendingDecision.options.map(o =>
+      `<button onclick="doDecision('${o.id}')">${o.label}</button>`).join('');
+    document.getElementById('nextStepBtn').disabled = true;
+  } else {
+    decisionBox.style.display = 'none';
+    document.getElementById('nextStepBtn').disabled = s.finished;
+  }
+  document.getElementById('autoBtn').disabled = s.finished;
+
+  if (debugMode) renderDebugPanel();
+  if (s.finished) showReport();
+}
+
+function renderDebugPanel() {
+  const s = battleState;
+  const lines = [`Phase: ${currentPhase(s)} | Runde: ${s.meleeRoundsDone} | Seed: ${s.seed}`];
+  const stackA = s.armyA.stacks.find(u => u.soldiers > 0);
+  if (stackA) {
+    lines.push('', debugPrintEffectiveValue(stackA, s.armyA, s.armyB, s.terrain, s.weather, { ranged: stackA.rangedAttack>0, defending:false, round: s.meleeRoundsDone||1 }));
+  }
+  document.getElementById('debugPanel').textContent = lines.join('\n');
+}
+
+function doNextStep() {
+  advanceBattle(battleState);
+  renderBattleUi();
+}
+function doDecision(choiceId) {
+  advanceBattle(battleState, choiceId);
+  renderBattleUi();
+}
+function doAutoResolve() {
+  let guard = 0;
+  while (!battleState.finished && guard < 200) {
+    if (battleState.pendingDecision) {
+      advanceBattle(battleState, aiDecisionPolicy(battleState, battleState.pendingDecision));
+    } else {
+      advanceBattle(battleState);
+    }
+    guard++;
+  }
+  renderBattleUi();
+}
+
+function showReport() {
+  const r = battleState.result;
+  document.getElementById('battleUi').style.display = 'none';
+  document.getElementById('report').style.display = 'block';
+
+  const outcomeLabel = {
+    siegA: `SIEG ${r.armyA.name.toUpperCase()}`, siegB: `SIEG ${r.armyB.name.toUpperCase()}`,
+    knapperSieg: `KNAPPER SIEG ${(r.winner==='A'?r.armyA.name:r.armyB.name).toUpperCase()}`,
+    vernichtendeNiederlageA: `VERNICHTENDE NIEDERLAGE FÜR ${r.armyA.name.toUpperCase()}`,
+    vernichtendeNiederlageB: `VERNICHTENDE NIEDERLAGE FÜR ${r.armyB.name.toUpperCase()}`,
+    geordneterRueckzugA: `${r.armyA.name.toUpperCase()} ZOG SICH ZURÜCK`,
+    geordneterRueckzugB: `${r.armyB.name.toUpperCase()} ZOG SICH ZURÜCK`,
+  }[r.outcome];
+  document.getElementById('reportBanner').textContent = outcomeLabel;
+
+  document.getElementById('repNameA').textContent = r.armyA.name;
+  document.getElementById('repNameB').textContent = r.armyB.name;
+  document.getElementById('repStartA').textContent = r.armyA.startStrength;
+  document.getElementById('repStartB').textContent = r.armyB.startStrength;
+  document.getElementById('repEndA').textContent = r.armyA.endStrength;
+  document.getElementById('repEndB').textContent = r.armyB.endStrength;
+  document.getElementById('repCasA').textContent = r.armyA.casualties + ` (${Math.round(r.armyA.casualties/r.armyA.startStrength*100)}%)`;
+  document.getElementById('repCasB').textContent = r.armyB.casualties + ` (${Math.round(r.armyB.casualties/r.armyB.startStrength*100)}%)`;
+  document.getElementById('repDeadA').textContent = r.armyA.dead;
+  document.getElementById('repDeadB').textContent = r.armyB.dead;
+  document.getElementById('repWoundedA').textContent = r.armyA.wounded;
+  document.getElementById('repWoundedB').textContent = r.armyB.wounded;
+  document.getElementById('repMissingA').textContent = r.armyA.missing;
+  document.getElementById('repMissingB').textContent = r.armyB.missing;
+  document.getElementById('repMoraleA').textContent = r.armyA.moraleEnd + '%';
+  document.getElementById('repMoraleB').textContent = r.armyB.moraleEnd + '%';
+
+  // §46: Nachvollziehbare Erklärung für den Verlierer
+  const loserArmy = r.winner === 'A' ? battleState.armyB : battleState.armyA;
+  const loserKey = r.winner === 'A' ? 'B' : 'A';
+  const reasons = [];
+  if (loserArmy.formation === 'aggressiv' || loserArmy.formation === 'kavallerieflanke') reasons.push('die gewählte Formation war riskant und bot wenig Verteidigung');
+  if (overallMorale(loserArmy) < 40) reasons.push('die Moral der Truppen brach im Kampfverlauf ein');
+  if (!loserArmy.commander.alive) reasons.push('der Verlust des Kommandanten erschütterte die Truppen');
+  const terr = TERRAIN_TYPES[battleState.terrain];
+  if (terr.unitMods.kavallerie && loserArmy.stacks.some(u=>u.unitType==='kavallerie') && terr.unitMods.kavallerie.attack < 0) reasons.push(`das Gelände (${terr.name}) benachteiligte die eigene Kavallerie stark`);
+  if (!reasons.length) reasons.push('die gegnerische Armee war in dieser Schlacht schlicht überlegen');
+  document.getElementById('whyLost').innerHTML = `<b>Warum ${loserArmy.name} verlor:</b><br>` + reasons.map(r=>'– '+r).join('<br>');
+}
+</script>
+</body>
+</html>
