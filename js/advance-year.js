@@ -88,6 +88,7 @@ function advanceYear(state) {
   checkElectionTrigger(state);
   updateIntel(state);
   updateReligion(state, r);
+  checkAiWarInitiative(state); // §31: KI wägt nicht nur ab, sondern erklärt ggf. tatsächlich Krieg
 
   // §24 Staatsschulden: Zinsen fällig
   payDebtInterest(state);

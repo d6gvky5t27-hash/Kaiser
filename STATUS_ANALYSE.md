@@ -81,8 +81,8 @@ Stand: nach Abschluss von MVP + Alpha + Beta (siehe ROADMAP.md).
 |---|---|---|---|
 | 29 | Diplomatische Aktionen | ✅ | 12 von 12 Aktionen umgesetzt (zuletzt: Durchmarschrecht mit echter Handelsanbindung, Garantie, Friedensvertrag, Gebietsforderung) |
 | 30 | Beziehungssystem | ✅ | -100..+100, viele Einflussfaktoren, "Erinnerung" durch persistenten Wert |
-| 31 | KI-Herrscher | 🟡 | Einfache Heuristiken (Bauverhalten, Diplomatie-Initiative); jede KI-Region hat jetzt einen individuellen, benannten Hauptmann mit eigenen Werten, der über mehrere Schlachten hinweg besteht (Erfahrung wächst, Tod führt zu einem Nachfolger) — aber weiterhin keine echte Herrscher-Persönlichkeit/Risikoprofil/Chancen-Risiko-Abwägung vor Kriegserklärungen (KI erklärt selbst nie Krieg) |
-| 32 | Intrigen | 🟡 | Nur Sabotage vorhanden; Gerüchte, Erpressung, Verschwörung, Dokumentenfälschung, Rebellenunterstützung, politische Manipulation fehlen |
+| 31 | KI-Herrscher | ✅ | Jede KI-Region hat einen individuellen, benannten Hauptmann mit eigenen Werten, der über mehrere Schlachten hinweg besteht; die KI wägt jährlich echte Chancen-Risiko-Faktoren ab (militärische Überlegenheit, Beziehung, wahrgenommene Schwäche, bestehende Pakte, Schwierigkeitsgrad) und **erklärt inzwischen tatsächlich selbst Krieg**, wenn die Lage günstig genug ist — löst den interaktiven Kampfbildschirm als Verteidigung für den Spieler aus, statt nur eine folgenlose Analyse zu bleiben |
+| 32 | Intrigen | 🟡 | Sabotage, Gerüchte (billig, sozialer Schaden statt Wareneinbußen) und Erpressung (nutzt die eigene Spionage-Genauigkeit als Druckmittel) vorhanden; Verschwörung, Dokumentenfälschung, Rebellenunterstützung, politische Manipulation fehlen weiterhin |
 | 33 | Militär (Truppentypen) | 🟡 | Rekrutierung: 7 Hauptspiel-Typen (Vasall-vs-Söldner-Unterscheidung, jetzt inkl. Pikeniere und Schwerer Kavallerie); Kampfebene: eigene Kampf-Engine mit 7 Einheitentypen (Infanterie/Bogen/Kavallerie/Artillerie/Miliz/Pikeniere/Schwere Kavallerie), mit echter individueller Moral/Erfahrung/Disziplin pro Einheit; Pikeniere kontern (schwere) Kavallerie als historischer Hartkonter |
 | 34 | Armeeversorgung | 🟡 | Unterhaltskosten (Geld) + Söldner-Fahnenflucht bei ausbleibendem Sold/niedriger Legitimität; in der Kampf-Engine zusätzlich Fatigue-Feld vorbereitet (noch ungenutzt); keine Nahrungsversorgung/Krankheit/Plünderung |
 | 35 | Schlachtsystem | ✅ | Eigenständige Kampf-Engine vollständig integriert: 6 Kampfphasen, 5 Formationen + 7 Taktiken, Schere-Stein-Papier-Konter, 6 Geländearten, 5 Wettertypen, Moralsystem mit Fluchtmechanik, Kommandanten-Ereignisse, Entscheidungspunkte während der Schlacht, deterministischer Seed, Debug-Modus, 6 automatisierte Tests — kein reiner Stärkevergleich mehr |
@@ -121,7 +121,7 @@ Stand: nach Abschluss von MVP + Alpha + Beta (siehe ROADMAP.md).
 | 67 | Deterministische Simulation (Seed) | ✅ | Eigener Mulberry32-PRNG, Seed + Aufrufzähler im Savegame, geladene Stände laufen deterministisch weiter |
 | 68 | Performance (Kohorten) | ✅ | Bevölkerung als Gruppenmodell, nur wichtige Charaktere einzeln simuliert |
 | 69 | Debugging-Funktionen | ✅ | Debug-Panel: Geld, Jahr, Bevölkerung, Charakter erzeugen, Event auslösen, Krieg starten |
-| 70 | KI-Debugging (Entscheidungsgründe) | 🟡 | Faktor-Aufschlüsselung für hypothetische Kriegsentscheidung im Spec-Format vorhanden; KI erklärt selbst noch keinen Krieg (Analyse ohne Konsequenz) |
+| 70 | KI-Debugging (Entscheidungsgründe) | ✅ | Faktor-Aufschlüsselung für die Kriegsentscheidung im Spec-Format vorhanden; die Analyse ist keine reine Simulation mehr — sie deckt sich jetzt exakt mit der tatsächlichen Entscheidungslogik der KI (§31), die dieselbe Berechnung nutzt |
 | 71 | Balancing-Konfiguration | ✅ | Zentrales `CONFIG`-Objekt, keine Magic Numbers im Code |
 | 72 | Erster technischer Meilenstein | ✅ | Vertical Slice mit allen Kernsystemen erreicht (3 statt 5 Nachbarn, 6 statt 10 Waren — im MVP bewusst reduziert, seitdem aber ausgebaut) |
 | 73 | Erster spielbarer Prototyp | 🟡 | Fast alles erfüllt; "Land kaufen" (Gebietskauf/-erweiterung) fehlt weiterhin |
@@ -192,6 +192,14 @@ Mehl→Brot-Kette, individuelle KI-Kommandanten) sowie ein erster Aufschlag bei
 Punkt 3 (Intro-Sequenz & Easter Eggs — bewusst als schlanke, aber echte
 Umsetzung statt der zuvor komplett fehlenden Funktion).
 
+**Runde 4 umgesetzt** (siehe DEVELOPMENT.md Schritt 31): §31 ist jetzt ✅
+statt 🟡 — die KI erklärt tatsächlich selbst Krieg, statt es nur folgenlos zu
+"würden" (die bisherige Debug-Analysefunktion bekam eine echte Konsequenz,
+inkl. sorgfältiger Balancing-Kalibrierung, damit reine Wirtschafts-
+Erststrategien nicht unfair bestraft werden — militärische Schwäche allein
+reicht nicht, es braucht zusätzlich eine wirklich schlechte Beziehung).
+Dazu zwei weitere Intrigen-Arten (§32): Gerüchte streuen, Erpressung.
+
 Verbleibende bewusst offene Punkte, allesamt laut Spec selbst niedrigste
 Priorität (§101 — Grafik/Sound/Content-Menge stehen hinter Spielspaß/
 Simulation/KI/Wirtschaft):
@@ -204,11 +212,10 @@ Simulation/KI/Wirtschaft):
 4. **Multiplayer, Steam, Achievements, Szenarioeditor (§103, Post-Launch)**
 5. **Externe JSON-Datendateien statt JS-Objekte (§65/§79)** — Daten sind
    bereits von der Logik getrennt, aber noch nicht als eigenständige Dateien
-6. **Weitere Content-Tiefe** (optional, kein blinder Fleck mehr): eine echte
-   Herrscher-KI-Persönlichkeit mit Risikoprofil vor Kriegserklärungen (§31,
-   die KI erklärt weiterhin selbst nie Krieg), Migration zwischen Regionen
-   (§14 nur Zu-/Abwanderung zur Außenwelt, nicht zwischen den 8 Regionen),
-   weitere Intrigen-Arten neben Sabotage (§32)
+6. **Weitere Content-Tiefe** (optional, kein blinder Fleck mehr): Migration
+   zwischen den eigenen 8 Regionen (§14 kennt bisher nur Zu-/Abwanderung zur
+   Außenwelt), verbleibende Intrigen-Arten (Verschwörung, Dokumentenfälschung,
+   Rebellenunterstützung, politische Manipulation)
 
 Sag mir, mit welchem Punkt ich weitermachen soll — oder ich schlage eine
 Reihenfolge vor und arbeite sie eigenständig ab.

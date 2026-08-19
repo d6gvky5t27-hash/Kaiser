@@ -36,33 +36,26 @@ function debugCreateCharacter(state) {
 }
 
 // ---------- KI-Debugging (§70) — Entscheidungsgründe transparent machen ----------
-// Zeigt die Faktoren, die eine (hypothetische) Kriegsentscheidung der KI beeinflussen
-// würden. Die KI erklärt in v1 selbst keinen Krieg (siehe DEVELOPMENT.md), diese
-// Funktion macht aber schon jetzt sichtbar, wie eine solche Bewertung aussähe.
+// Zeigt die Faktoren, die die Kriegsentscheidung der KI beeinflussen (dieselbe
+// Berechnung wie in checkAiWarInitiative/military.js — seit §31 keine reine
+// Analyse mehr ohne Konsequenz: die KI erklärt inzwischen tatsächlich Krieg,
+// wenn `gesamt` die Schwelle überschreitet und Zufall/Schwierigkeit mitspielen).
 
 function evaluateAiWarDecision(state, aiId) {
   const region = state.regions[aiId];
-  const dip = state.diplomacy[aiId];
-  const playerStrength = armyStrength(state);
-  const aiStrength = estimateAiStrength(region);
-
-  const militaerFaktor = Math.round(((aiStrength - playerStrength) / Math.max(playerStrength, 1)) * 30);
-  const beziehungFaktor = Math.round(-dip.relation / 4); // schlechte Beziehung begünstigt Krieg
-  const legitimitaetFaktor = Math.round((50 - state.legitimacy) / 5); // schwacher Spieler wirkt einladend
-  const paktFaktor = dip.treaties.nichtangriff ? -40 : (dip.treaties.allianz ? -100 : 0);
-
-  const gesamt = militaerFaktor + beziehungFaktor + legitimitaetFaktor + paktFaktor;
-  const wuerdeAngreifen = gesamt > 25;
+  const f = evaluateAiAggressionFactors(state, aiId);
+  const relationOk = state.diplomacy[aiId].relation < CONFIG.military.aiWarMaxRelationForAggression;
+  const wuerdeAngreifen = relationOk && f.gesamt > CONFIG.military.aiWarThreshold;
 
   return {
     region: region.name,
     faktoren: [
-      { label: "Militärische Überlegenheit", wert: militaerFaktor },
-      { label: "Beziehung", wert: beziehungFaktor },
-      { label: "Wahrgenommene Schwäche (Legitimität)", wert: legitimitaetFaktor },
-      { label: "Bestehender Pakt", wert: paktFaktor },
+      { label: "Militärische Überlegenheit", wert: f.militaerFaktor },
+      { label: "Beziehung", wert: f.beziehungFaktor },
+      { label: "Wahrgenommene Schwäche (Legitimität)", wert: f.legitimitaetFaktor },
+      { label: "Bestehender Pakt", wert: f.paktFaktor },
     ],
-    gesamt,
+    gesamt: f.gesamt,
     entscheidung: wuerdeAngreifen ? "Würde angreifen" : "Angriff verworfen",
   };
 }

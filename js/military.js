@@ -139,6 +139,62 @@ function estimateAiStrength(region) {
   return base * (1 + (rnd() * 2 - 1) * spread);
 }
 
+// ---------- §31: Die KI erklärt jetzt tatsächlich selbst Krieg ----------
+// evaluateAiWarDecision() (debug.js) lieferte bisher nur eine Analyse ohne
+// Konsequenz ("würde angreifen", aber die KI griff nie wirklich an). Diese
+// Funktion nutzt dieselben Faktoren/dieselbe Schwelle (25) und gibt ihnen
+// eine echte Wirkung: Ist die Lage günstig genug, erklärt der Nachbar dem
+// Spieler tatsächlich den Krieg.
+function evaluateAiAggressionFactors(state, aiId) {
+  const region = state.regions[aiId];
+  const dip = state.diplomacy[aiId];
+  const playerStrength = armyStrength(state);
+  const aiStrength = estimateAiStrength(region);
+  // Auf einen plausiblen Rahmen begrenzt (§48-Analogie: einzelne Faktoren dürfen
+  // nicht unbegrenzt explodieren) — sonst könnte extreme militärische Schwäche
+  // des Spielers selbst ein Bündnis (paktFaktor -100) rechnerisch überstimmen,
+  // was ein Bündnis zu einem unzuverlässigen Versprechen machen würde. Der
+  // Mindestnenner (statt max(playerStrength,1)) verhindert außerdem, dass ein
+  // Spieler ganz ohne Heer — was in den ersten Jahrzehnten einer wirtschafts-
+  // orientierten Partie völlig normal ist — allein dadurch schon als maximal
+  // verlockendes Ziel erscheint.
+  const militaerFaktor = clamp(Math.round(((aiStrength - playerStrength) / Math.max(playerStrength, CONFIG.military.aiWarStrengthFloor)) * 30), -60, 90);
+  const beziehungFaktor = Math.round(-dip.relation / 4); // schlechte Beziehung begünstigt Krieg
+  const legitimitaetFaktor = Math.round((50 - state.legitimacy) / 5); // schwacher Spieler wirkt einladend
+  const paktFaktor = dip.treaties.nichtangriff ? -40 : (dip.treaties.allianz ? -100 : 0);
+  return { militaerFaktor, beziehungFaktor, legitimitaetFaktor, paktFaktor, gesamt: militaerFaktor + beziehungFaktor + legitimitaetFaktor + paktFaktor };
+}
+
+// Prüft jährlich, ob einer der 3 direkten Nachbarn dem Spieler den Krieg
+// erklärt. Löst die Schlacht selbst NICHT auf (das bleibt Sache der
+// interaktiven Kampf-Engine, die der Spieler steuert) — markiert nur
+// `state.incomingAiWar`, das die UI beim nächsten Rendern aufgreift und den
+// Kampfbildschirm öffnet. Verträge/Beziehungscrash werden erst dort über
+// applyBattleResultToGame() angewendet (einzige Quelle der Wahrheit für
+// Kriegsfolgen, egal wer erklärt hat — keine doppelte Bestrafung).
+function checkAiWarInitiative(state) {
+  const cfg = CONFIG.military;
+  if (state.gameOver || state.pendingSiege || state.incomingAiWar) return null;
+  if (state.year - 1500 < cfg.aiWarGraceYears) return null;
+  const diffCfg = CONFIG.difficulty[state.difficulty] || CONFIG.difficulty.normal;
+  if (!state.aiWarCooldown) state.aiWarCooldown = {};
+  for (const aiId in state.diplomacy) {
+    if ((state.aiWarCooldown[aiId] || 0) > 0) { state.aiWarCooldown[aiId] -= 1; continue; }
+    // Militärische Schwäche allein reicht nicht — es braucht auch eine wirklich
+    // schlechte Beziehung als Rechtfertigung (siehe aiWarMaxRelationForAggression).
+    if (state.diplomacy[aiId].relation >= cfg.aiWarMaxRelationForAggression) continue;
+    const { gesamt } = evaluateAiAggressionFactors(state, aiId);
+    if (gesamt <= cfg.aiWarThreshold) continue;
+    if (rnd() < diffCfg.aiMistakeChance) continue; // §48: Schwierigkeit wirkt auch hier über die KI-Fehlerquote
+    if (rnd() > cfg.aiWarInitiativeChance) continue; // nicht jede günstige Gelegenheit wird sofort genutzt
+    state.aiWarCooldown[aiId] = cfg.aiWarCooldownYears;
+    state.incomingAiWar = aiId;
+    addChronicle(state, `${state.regions[aiId].name} erklärt dir ohne Vorwarnung den Krieg!`);
+    return aiId;
+  }
+  return null;
+}
+
 function declareWar(state, aiId, formation) {
   const cfg = CONFIG.military;
   const dip = state.diplomacy[aiId];

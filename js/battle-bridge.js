@@ -9,7 +9,11 @@
 // zusammengefasst, Söldner kämpfen als Linieninfanterie, Ritter als
 // Kavallerie — die Kampf-Engine kennt keine Vasall-/Söldner-Unterscheidung
 // mehr, die bleibt eine reine Rekrutierungs-Eigenschaft des Hauptspiels.
-function buildPlayerBattleArmy(state) {
+// opts.defending: true, wenn der Spieler eine von der KI selbst ausgelöste
+// Kriegserklärung abwehrt (§31) statt selbst anzugreifen — wirkt sich auf
+// isAttacker/isHomeTerritory aus (u.a. Miliz-Heimvorteil, §Konter-System).
+function buildPlayerBattleArmy(state, opts) {
+  opts = opts || {};
   const r = state.regions.player;
   const stacks = [];
   const push = (unitType, count) => { if (count > 0) stacks.push(createUnitStack(unitType, Math.round(count))); };
@@ -43,13 +47,18 @@ function buildPlayerBattleArmy(state) {
   const marschallBonus = advisorEffectBonus(state, "marschall");
   if (marschallBonus) commander.leadership = clamp(commander.leadership + marschallBonus * 100, 10, 99);
 
-  return createArmy(r.name, commander, stacks, { isAttacker: true, isHomeTerritory: false });
+  return createArmy(r.name, commander, stacks, { isAttacker: !opts.defending, isHomeTerritory: !!opts.defending });
 }
 
 // Für KI-Regionen existieren keine echten Truppenstapel (nur der abstrakte
 // estimateAiStrength-Wert) — hier wird eine plausible, aber nicht exakte
 // Zusammensetzung generiert, die ungefähr dieselbe Größenordnung ergibt.
-function buildAiBattleArmy(state, aiId, weakenFactor) {
+// opts.attacking: true, wenn diese KI-Region selbst den Krieg erklärt hat
+// (§31) statt vom Spieler angegriffen zu werden — flippt isAttacker/
+// isHomeTerritory entsprechend um (der Spieler verliert dann seinen sonst
+// impliziten Heimvorteil-Nachteil beim Gegner, siehe buildPlayerBattleArmy).
+function buildAiBattleArmy(state, aiId, weakenFactor, opts) {
+  opts = opts || {};
   const region = state.regions[aiId];
   const totalPop = Object.values(region.population).reduce((s, g) => s + g.count, 0);
   const kaserneLevel = buildingLevelSum(region, "kaserne");
@@ -81,7 +90,7 @@ function buildAiBattleArmy(state, aiId, weakenFactor) {
   const persisted = region.commander;
   const commander = createCommander(persisted.name, persisted.tactics, persisted.leadership, persisted.courage, persisted.experience);
 
-  return createArmy(region.name, commander, stacks, { isAttacker: false, isHomeTerritory: true });
+  return createArmy(region.name, commander, stacks, { isAttacker: !!opts.attacking, isHomeTerritory: !opts.attacking });
 }
 
 // Aktualisiert den persistenten KI-Kommandanten nach einer ausgetragenen

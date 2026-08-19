@@ -109,6 +109,19 @@ const CONFIG = {
     soeldnerDesertionBaseChance: 0.03,
     soeldnerDesertionUnpaidChance: 0.5, // wenn die Staatskasse den Sold nicht mehr deckt
     soeldnerDesertionLowLegitimacyBonus: 0.15,
+    // §31: die KI wägt jetzt nicht nur ab (evaluateAiWarDecision in debug.js),
+    // sondern erklärt bei genug Übergewicht auch tatsächlich selbst Krieg —
+    // gleiche Schwelle (25) wie die bisherige reine Analysefunktion, damit
+    // "würde angreifen" im Debug-Panel und echtes Verhalten übereinstimmen.
+    aiWarThreshold: 25,
+    aiWarInitiativeChance: 0.35, // nicht jede günstige Gelegenheit wird sofort genutzt
+    aiWarCooldownYears: 6,       // nach einer Kriegserklärung erst mal Ruhe, unabhängig vom Ausgang
+    aiWarGraceYears: 3,          // keine KI-Kriegserklärungen in den ersten Jahren einer Partie
+    aiWarStrengthFloor: 15,      // Mindestnenner bei der Stärkevergleichs-Faktor-Berechnung, verhindert
+                                  // eine rechnerische Explosion, solange der Spieler noch gar kein Heer hat
+    aiWarMaxRelationForAggression: 20, // ab dieser Beziehung braucht es eine echte Rechtfertigung (schlechte
+                                  // Beziehung), nicht nur militärische Schwäche — reine Wirtschafts-Erststrategien
+                                  // bleiben so sicher, solange die Beziehung gepflegt wird (Geschenke etc.)
   },
   advisors: {
     hireCost: 150,
@@ -139,6 +152,17 @@ const CONFIG = {
     spyAccuracyGain: 0.35,
     spyAccuracyDecayPerYear: 0.08,
     baseIntelAccuracy: 0.25,
+    // §32: zwei weitere Intrigen-Arten neben Sabotage
+    rumorCost: 100,
+    rumorDiscoveryChance: 0.20,
+    rumorRelationPenaltyOnDiscovery: -10,
+    rumorSatisfactionDamage: 12,          // trifft Adel & Bürger der Zielregion (Hof-Klatsch)
+    extortionCost: 200,
+    extortionBaseSuccessChance: 0.3,
+    extortionIntelAccuracyBonus: 0.5,     // gute Aufklärung (Spionage) erhöht die Erfolgschance deutlich
+    extortionAmount: 350,
+    extortionRelationPenaltyAlways: -15,  // Erpressung schadet der Beziehung so oder so
+    extortionFailExtraRelationPenalty: -20,
   },
   religion: {
     startInfluence: 55,

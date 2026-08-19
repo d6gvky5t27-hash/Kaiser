@@ -218,6 +218,46 @@ function attemptSabotage(state, aiId) {
   return { ok: true, discovered: false };
 }
 
+// §32: weitere Intrigen-Arten neben Sabotage — Gerüchte (billig, sozialer
+// Schaden statt Wareneinbußen) und Erpressung (teurer, riskanter, nutzt die
+// eigene Spionage-Genauigkeit als Druckmittel)
+
+function spreadRumors(state, aiId) {
+  const cfg = CONFIG.intrigue;
+  if (state.treasury < cfg.rumorCost) return { ok: false, reason: "Nicht genug Taler, um Gerüchte in Umlauf zu bringen." };
+  state.treasury -= cfg.rumorCost;
+  const region = state.regions[aiId];
+  const discovered = rnd() < cfg.rumorDiscoveryChance;
+  region.population.adel.satisfaction = clamp(region.population.adel.satisfaction - cfg.rumorSatisfactionDamage, 0, 100);
+  region.population.buerger.satisfaction = clamp(region.population.buerger.satisfaction - cfg.rumorSatisfactionDamage, 0, 100);
+  if (discovered) {
+    state.diplomacy[aiId].relation = clamp(state.diplomacy[aiId].relation + cfg.rumorRelationPenaltyOnDiscovery, -100, 100);
+    addChronicle(state, `Gerüchte über ${region.name} wurden gestreut — die Herkunft kam ans Licht, die Beziehungen leiden.`);
+    return { ok: true, discovered: true };
+  }
+  addChronicle(state, `Unschöne Gerüchte über den Hof von ${region.name} machen die Runde.`);
+  return { ok: true, discovered: false };
+}
+
+function attemptExtortion(state, aiId) {
+  const cfg = CONFIG.intrigue;
+  if (state.treasury < cfg.extortionCost) return { ok: false, reason: "Nicht genug Taler, um die Erpressung vorzubereiten." };
+  state.treasury -= cfg.extortionCost;
+  const accuracy = (state.intel[aiId] && state.intel[aiId].accuracy) || cfg.baseIntelAccuracy;
+  const successChance = clamp(cfg.extortionBaseSuccessChance + accuracy * cfg.extortionIntelAccuracyBonus, 0.05, 0.9);
+  const dip = state.diplomacy[aiId];
+  dip.relation = clamp(dip.relation + cfg.extortionRelationPenaltyAlways, -100, 100);
+  if (rnd() < successChance) {
+    state.treasury += cfg.extortionAmount;
+    addChronicle(state, `${state.regions[aiId].name} zahlt ${cfg.extortionAmount} Taler, um pikante Geheimnisse für sich zu behalten.`);
+    return { ok: true, success: true };
+  } else {
+    dip.relation = clamp(dip.relation + cfg.extortionFailExtraRelationPenalty, -100, 100);
+    addChronicle(state, `Der Erpressungsversuch gegen ${state.regions[aiId].name} scheitert kläglich — die Beziehungen sind schwer beschädigt.`);
+    return { ok: true, success: false };
+  }
+}
+
 // ---------- Informationsunsicherheit (§41) ----------
 
 function spyOn(state, aiId) {

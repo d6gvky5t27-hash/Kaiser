@@ -1209,3 +1209,78 @@ laut Spec selbst (§101) — echtes Sprite-/Canvas-Rendering, Chiptune-Musik,
 vollständige Sprachumschaltung, externe JSON-Datendateien,
 Multiplayer/Steam/Szenarioeditor (Post-Launch).
 
+## 2026-08-19 – Schritt 31: Die KI erklärt jetzt selbst Krieg (§31) + zwei weitere Intrigen-Arten (§32)
+
+Nächster Punkt aus der Runde-3-Restliste: §31 war der am häufigsten
+wiederkehrende echte Gameplay-Blindfleck in STATUS_ANALYSE.md — die KI wägte
+über `evaluateAiWarDecision()` (debug.js) zwar Faktoren ab, "erklärte" aber
+nie wirklich Krieg. Diese Analysefunktion bekommt jetzt eine echte Wirkung.
+
+**KI-Kriegsinitiative (§31):**
+- `evaluateAiAggressionFactors()` (neu, `js/military.js`) berechnet dieselben
+  vier Faktoren wie zuvor (militärische Überlegenheit, Beziehung,
+  wahrgenommene Schwäche über Legitimität, bestehender Pakt) — die alte
+  Debug-Funktion `evaluateAiWarDecision()` ruft sie jetzt auf, statt die
+  Berechnung zu duplizieren
+- `checkAiWarInitiative()` prüft jährlich für alle 3 direkten Nachbarn: Ist
+  die Gesamtsumme über der Schwelle, würfelt Schwierigkeitsgrad
+  (`aiMistakeChance`, §48) und eine zusätzliche Zufallschance mit, ob die
+  Gelegenheit tatsächlich genutzt wird; ein Cooldown (6 Jahre) verhindert
+  Kriegserklärungs-Spam nach jedem Ausgang
+- **Wichtiger Kalibrierungsfund beim eigenen Testen:** Die erste Fassung
+  ließ in 50 von 50 automatisierten Testpartien schon innerhalb der ersten
+  15 Jahre einen KI-Krieg ausbrechen — weil ein Spieler ganz ohne Heer
+  (in den ersten Jahrzehnten einer wirtschaftsorientierten Partie völlig
+  normal) den militärischen Faktor rechnerisch explodieren ließ und dabei
+  sogar ein aktives Bündnis (Faktor -100) überstimmen konnte. Behoben durch:
+  einen Mindestnenner bei der Stärkevergleichsformel
+  (`aiWarStrengthFloor`, verhindert die Explosion nahe Null), eine
+  Ober-/Untergrenze für den militärischen Faktor selbst, und vor allem eine
+  neue harte Vorbedingung — militärische Schwäche allein reicht nicht mehr,
+  es braucht zusätzlich eine wirklich schlechte Beziehung
+  (`aiWarMaxRelationForAggression`, unter dem Schwellenwert für einen
+  Nichtangriffspakt). Nach der Korrektur: 0/50 Testpartien mit KI-Krieg
+  innerhalb von 15 Jahren bei normalem Spielverlauf, aber 28/30 bei gezielt
+  herbeigeführter militärischer Schwäche **und** schlechter Beziehung (-80) —
+  und 40/40 sichere Partien über 20 Jahre trotz militärischer Schwäche, wenn
+  die Beziehung gepflegt wird (60). Diplomatie wird dadurch spürbar zu einem
+  echten Schutzmechanismus statt nur kosmetisch zu sein.
+- **UI-Integration:** Löst die Schlacht selbst nicht auf, sondern setzt nur
+  `state.incomingAiWar` — die bestehende, bereits ausgereifte interaktive
+  Kampf-Engine übernimmt den Rest. Nach `advanceYear()` prüft der
+  "Jahr vergehen lassen"-Handler das Flag, zeigt eine Warnung und öffnet den
+  Kampfbildschirm direkt als Verteidigung. `buildPlayerBattleArmy()` und
+  `buildAiBattleArmy()` bekamen dafür einen neuen `opts`-Parameter
+  (`defending`/`attacking`), der `isAttacker`/`isHomeTerritory` korrekt
+  umdreht — der Spieler bekommt beim Verteidigen jetzt tatsächlich den
+  Miliz-Heimvorteil, den er beim Angreifen nicht hätte, und das Gelände
+  richtet sich nach der Befestigung der eigenen statt der gegnerischen
+  Region. Diplomatische Konsequenzen (Vertragsbruch, Beziehungscrash) laufen
+  weiterhin ausschließlich über `applyBattleResultToGame()` — unabhängig
+  davon, wer erklärt hat, damit es keine doppelte Bestrafung gibt.
+
+**Zwei weitere Intrigen-Arten (§32):** Gerüchte streuen (billig, schädigt
+gezielt die Zufriedenheit von Adel/Bürgertum der Zielregion statt Warenlager,
+geringeres Entdeckungsrisiko als Sabotage) und Erpressung (teurer und
+riskanter, nutzt die eigene Spionage-Genauigkeit als Druckmittel für höhere
+Erfolgschancen, schadet der Beziehung aber so oder so — anders als das
+bestehende `demandTribute`, das nur bei bereits akzeptabler Beziehung
+funktioniert).
+
+**Getestet:** `node tests/battle_test.js`, `node tests/economy_test.js`
+(19/20 vollständig ohne Abbruch, 0 Bevölkerungskollaps) und
+`node tests/ai_vs_ai_test.js` weiterhin ohne kritische Befunde. Gezielte
+Kalibrierungstests wie oben beschrieben. Browser-Smoke-Test (Playwright):
+ein erzwungenes feindseliges Schwäche-Szenario löst zuverlässig eine
+KI-Kriegserklärung mit korrektem "VERTEIDIGUNG GEGEN..."-Titel und
+korrekt geflippten Angreifer-/Verteidiger-Rollen aus, die Schlacht lässt
+sich automatisch auflösen und der Bildschirm schließt sich danach korrekt;
+beide neuen Intrigen-Buttons erscheinen im Militär-Reiter und funktionieren.
+Wie zuvor wurde zuerst in den Modul-Quelldateien entwickelt und getestet,
+danach `index.html`s Build-Skriptblock erneut byteweise aus denselben
+Dateien zusammengesetzt.
+
+**Nächste Punkte** (siehe STATUS_ANALYSE.md): Migration zwischen den eigenen
+8 Regionen (§14), verbleibende Intrigen-Arten, danach wieder die bewusst
+niedrigste Priorität laut Spec selbst (Grafik/Sound/Sprache/Post-Launch).
+

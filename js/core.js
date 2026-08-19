@@ -210,6 +210,8 @@ function newGame(options) {
       ai3: { accuracy: clamp(CONFIG.intrigue.baseIntelAccuracy + diffCfg.intelAccuracyBonus, 0.05, 1) },
     },
     pendingElection: null,
+    incomingAiWar: null, // §31: von der KI selbst ausgelöste, noch nicht ausgetragene Kriegserklärung
+    aiWarCooldown: {},
     landPrice: Math.round((CONFIG.land.priceMin + CONFIG.land.priceMax) / 2),
     electionCooldown: 0,
     victoryCondition: options.victoryCondition || "kaiser",

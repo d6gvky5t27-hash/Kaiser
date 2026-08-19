@@ -732,6 +732,19 @@ const CONFIG = {
     soeldnerDesertionBaseChance: 0.03,
     soeldnerDesertionUnpaidChance: 0.5, // wenn die Staatskasse den Sold nicht mehr deckt
     soeldnerDesertionLowLegitimacyBonus: 0.15,
+    // §31: die KI wägt jetzt nicht nur ab (evaluateAiWarDecision in debug.js),
+    // sondern erklärt bei genug Übergewicht auch tatsächlich selbst Krieg —
+    // gleiche Schwelle (25) wie die bisherige reine Analysefunktion, damit
+    // "würde angreifen" im Debug-Panel und echtes Verhalten übereinstimmen.
+    aiWarThreshold: 25,
+    aiWarInitiativeChance: 0.35, // nicht jede günstige Gelegenheit wird sofort genutzt
+    aiWarCooldownYears: 6,       // nach einer Kriegserklärung erst mal Ruhe, unabhängig vom Ausgang
+    aiWarGraceYears: 3,          // keine KI-Kriegserklärungen in den ersten Jahren einer Partie
+    aiWarStrengthFloor: 15,      // Mindestnenner bei der Stärkevergleichs-Faktor-Berechnung, verhindert
+                                  // eine rechnerische Explosion, solange der Spieler noch gar kein Heer hat
+    aiWarMaxRelationForAggression: 20, // ab dieser Beziehung braucht es eine echte Rechtfertigung (schlechte
+                                  // Beziehung), nicht nur militärische Schwäche — reine Wirtschafts-Erststrategien
+                                  // bleiben so sicher, solange die Beziehung gepflegt wird (Geschenke etc.)
   },
   advisors: {
     hireCost: 150,
@@ -762,6 +775,17 @@ const CONFIG = {
     spyAccuracyGain: 0.35,
     spyAccuracyDecayPerYear: 0.08,
     baseIntelAccuracy: 0.25,
+    // §32: zwei weitere Intrigen-Arten neben Sabotage
+    rumorCost: 100,
+    rumorDiscoveryChance: 0.20,
+    rumorRelationPenaltyOnDiscovery: -10,
+    rumorSatisfactionDamage: 12,          // trifft Adel & Bürger der Zielregion (Hof-Klatsch)
+    extortionCost: 200,
+    extortionBaseSuccessChance: 0.3,
+    extortionIntelAccuracyBonus: 0.5,     // gute Aufklärung (Spionage) erhöht die Erfolgschance deutlich
+    extortionAmount: 350,
+    extortionRelationPenaltyAlways: -15,  // Erpressung schadet der Beziehung so oder so
+    extortionFailExtraRelationPenalty: -20,
   },
   religion: {
     startInfluence: 55,
@@ -1673,6 +1697,8 @@ function newGame(options) {
       ai3: { accuracy: clamp(CONFIG.intrigue.baseIntelAccuracy + diffCfg.intelAccuracyBonus, 0.05, 1) },
     },
     pendingElection: null,
+    incomingAiWar: null, // §31: von der KI selbst ausgelöste, noch nicht ausgetragene Kriegserklärung
+    aiWarCooldown: {},
     landPrice: Math.round((CONFIG.land.priceMin + CONFIG.land.priceMax) / 2),
     electionCooldown: 0,
     victoryCondition: options.victoryCondition || "kaiser",
@@ -2732,6 +2758,46 @@ function attemptSabotage(state, aiId) {
   return { ok: true, discovered: false };
 }
 
+// §32: weitere Intrigen-Arten neben Sabotage — Gerüchte (billig, sozialer
+// Schaden statt Wareneinbußen) und Erpressung (teurer, riskanter, nutzt die
+// eigene Spionage-Genauigkeit als Druckmittel)
+
+function spreadRumors(state, aiId) {
+  const cfg = CONFIG.intrigue;
+  if (state.treasury < cfg.rumorCost) return { ok: false, reason: "Nicht genug Taler, um Gerüchte in Umlauf zu bringen." };
+  state.treasury -= cfg.rumorCost;
+  const region = state.regions[aiId];
+  const discovered = rnd() < cfg.rumorDiscoveryChance;
+  region.population.adel.satisfaction = clamp(region.population.adel.satisfaction - cfg.rumorSatisfactionDamage, 0, 100);
+  region.population.buerger.satisfaction = clamp(region.population.buerger.satisfaction - cfg.rumorSatisfactionDamage, 0, 100);
+  if (discovered) {
+    state.diplomacy[aiId].relation = clamp(state.diplomacy[aiId].relation + cfg.rumorRelationPenaltyOnDiscovery, -100, 100);
+    addChronicle(state, `Gerüchte über ${region.name} wurden gestreut — die Herkunft kam ans Licht, die Beziehungen leiden.`);
+    return { ok: true, discovered: true };
+  }
+  addChronicle(state, `Unschöne Gerüchte über den Hof von ${region.name} machen die Runde.`);
+  return { ok: true, discovered: false };
+}
+
+function attemptExtortion(state, aiId) {
+  const cfg = CONFIG.intrigue;
+  if (state.treasury < cfg.extortionCost) return { ok: false, reason: "Nicht genug Taler, um die Erpressung vorzubereiten." };
+  state.treasury -= cfg.extortionCost;
+  const accuracy = (state.intel[aiId] && state.intel[aiId].accuracy) || cfg.baseIntelAccuracy;
+  const successChance = clamp(cfg.extortionBaseSuccessChance + accuracy * cfg.extortionIntelAccuracyBonus, 0.05, 0.9);
+  const dip = state.diplomacy[aiId];
+  dip.relation = clamp(dip.relation + cfg.extortionRelationPenaltyAlways, -100, 100);
+  if (rnd() < successChance) {
+    state.treasury += cfg.extortionAmount;
+    addChronicle(state, `${state.regions[aiId].name} zahlt ${cfg.extortionAmount} Taler, um pikante Geheimnisse für sich zu behalten.`);
+    return { ok: true, success: true };
+  } else {
+    dip.relation = clamp(dip.relation + cfg.extortionFailExtraRelationPenalty, -100, 100);
+    addChronicle(state, `Der Erpressungsversuch gegen ${state.regions[aiId].name} scheitert kläglich — die Beziehungen sind schwer beschädigt.`);
+    return { ok: true, success: false };
+  }
+}
+
 // ---------- Informationsunsicherheit (§41) ----------
 
 function spyOn(state, aiId) {
@@ -2915,6 +2981,62 @@ function estimateAiStrength(region) {
   const base = totalPop * CONFIG.military.aiStrengthPopFactor + buildingLevelSum(region, "kaserne") * 15 + buildingLevelSum(region, "stadtmauer") * 10;
   const spread = CONFIG.military.aiStrengthRandomSpread;
   return base * (1 + (rnd() * 2 - 1) * spread);
+}
+
+// ---------- §31: Die KI erklärt jetzt tatsächlich selbst Krieg ----------
+// evaluateAiWarDecision() (debug.js) lieferte bisher nur eine Analyse ohne
+// Konsequenz ("würde angreifen", aber die KI griff nie wirklich an). Diese
+// Funktion nutzt dieselben Faktoren/dieselbe Schwelle (25) und gibt ihnen
+// eine echte Wirkung: Ist die Lage günstig genug, erklärt der Nachbar dem
+// Spieler tatsächlich den Krieg.
+function evaluateAiAggressionFactors(state, aiId) {
+  const region = state.regions[aiId];
+  const dip = state.diplomacy[aiId];
+  const playerStrength = armyStrength(state);
+  const aiStrength = estimateAiStrength(region);
+  // Auf einen plausiblen Rahmen begrenzt (§48-Analogie: einzelne Faktoren dürfen
+  // nicht unbegrenzt explodieren) — sonst könnte extreme militärische Schwäche
+  // des Spielers selbst ein Bündnis (paktFaktor -100) rechnerisch überstimmen,
+  // was ein Bündnis zu einem unzuverlässigen Versprechen machen würde. Der
+  // Mindestnenner (statt max(playerStrength,1)) verhindert außerdem, dass ein
+  // Spieler ganz ohne Heer — was in den ersten Jahrzehnten einer wirtschafts-
+  // orientierten Partie völlig normal ist — allein dadurch schon als maximal
+  // verlockendes Ziel erscheint.
+  const militaerFaktor = clamp(Math.round(((aiStrength - playerStrength) / Math.max(playerStrength, CONFIG.military.aiWarStrengthFloor)) * 30), -60, 90);
+  const beziehungFaktor = Math.round(-dip.relation / 4); // schlechte Beziehung begünstigt Krieg
+  const legitimitaetFaktor = Math.round((50 - state.legitimacy) / 5); // schwacher Spieler wirkt einladend
+  const paktFaktor = dip.treaties.nichtangriff ? -40 : (dip.treaties.allianz ? -100 : 0);
+  return { militaerFaktor, beziehungFaktor, legitimitaetFaktor, paktFaktor, gesamt: militaerFaktor + beziehungFaktor + legitimitaetFaktor + paktFaktor };
+}
+
+// Prüft jährlich, ob einer der 3 direkten Nachbarn dem Spieler den Krieg
+// erklärt. Löst die Schlacht selbst NICHT auf (das bleibt Sache der
+// interaktiven Kampf-Engine, die der Spieler steuert) — markiert nur
+// `state.incomingAiWar`, das die UI beim nächsten Rendern aufgreift und den
+// Kampfbildschirm öffnet. Verträge/Beziehungscrash werden erst dort über
+// applyBattleResultToGame() angewendet (einzige Quelle der Wahrheit für
+// Kriegsfolgen, egal wer erklärt hat — keine doppelte Bestrafung).
+function checkAiWarInitiative(state) {
+  const cfg = CONFIG.military;
+  if (state.gameOver || state.pendingSiege || state.incomingAiWar) return null;
+  if (state.year - 1500 < cfg.aiWarGraceYears) return null;
+  const diffCfg = CONFIG.difficulty[state.difficulty] || CONFIG.difficulty.normal;
+  if (!state.aiWarCooldown) state.aiWarCooldown = {};
+  for (const aiId in state.diplomacy) {
+    if ((state.aiWarCooldown[aiId] || 0) > 0) { state.aiWarCooldown[aiId] -= 1; continue; }
+    // Militärische Schwäche allein reicht nicht — es braucht auch eine wirklich
+    // schlechte Beziehung als Rechtfertigung (siehe aiWarMaxRelationForAggression).
+    if (state.diplomacy[aiId].relation >= cfg.aiWarMaxRelationForAggression) continue;
+    const { gesamt } = evaluateAiAggressionFactors(state, aiId);
+    if (gesamt <= cfg.aiWarThreshold) continue;
+    if (rnd() < diffCfg.aiMistakeChance) continue; // §48: Schwierigkeit wirkt auch hier über die KI-Fehlerquote
+    if (rnd() > cfg.aiWarInitiativeChance) continue; // nicht jede günstige Gelegenheit wird sofort genutzt
+    state.aiWarCooldown[aiId] = cfg.aiWarCooldownYears;
+    state.incomingAiWar = aiId;
+    addChronicle(state, `${state.regions[aiId].name} erklärt dir ohne Vorwarnung den Krieg!`);
+    return aiId;
+  }
+  return null;
 }
 
 function declareWar(state, aiId, formation) {
@@ -3102,33 +3224,26 @@ function debugCreateCharacter(state) {
 }
 
 // ---------- KI-Debugging (§70) — Entscheidungsgründe transparent machen ----------
-// Zeigt die Faktoren, die eine (hypothetische) Kriegsentscheidung der KI beeinflussen
-// würden. Die KI erklärt in v1 selbst keinen Krieg (siehe DEVELOPMENT.md), diese
-// Funktion macht aber schon jetzt sichtbar, wie eine solche Bewertung aussähe.
+// Zeigt die Faktoren, die die Kriegsentscheidung der KI beeinflussen (dieselbe
+// Berechnung wie in checkAiWarInitiative/military.js — seit §31 keine reine
+// Analyse mehr ohne Konsequenz: die KI erklärt inzwischen tatsächlich Krieg,
+// wenn `gesamt` die Schwelle überschreitet und Zufall/Schwierigkeit mitspielen).
 
 function evaluateAiWarDecision(state, aiId) {
   const region = state.regions[aiId];
-  const dip = state.diplomacy[aiId];
-  const playerStrength = armyStrength(state);
-  const aiStrength = estimateAiStrength(region);
-
-  const militaerFaktor = Math.round(((aiStrength - playerStrength) / Math.max(playerStrength, 1)) * 30);
-  const beziehungFaktor = Math.round(-dip.relation / 4); // schlechte Beziehung begünstigt Krieg
-  const legitimitaetFaktor = Math.round((50 - state.legitimacy) / 5); // schwacher Spieler wirkt einladend
-  const paktFaktor = dip.treaties.nichtangriff ? -40 : (dip.treaties.allianz ? -100 : 0);
-
-  const gesamt = militaerFaktor + beziehungFaktor + legitimitaetFaktor + paktFaktor;
-  const wuerdeAngreifen = gesamt > 25;
+  const f = evaluateAiAggressionFactors(state, aiId);
+  const relationOk = state.diplomacy[aiId].relation < CONFIG.military.aiWarMaxRelationForAggression;
+  const wuerdeAngreifen = relationOk && f.gesamt > CONFIG.military.aiWarThreshold;
 
   return {
     region: region.name,
     faktoren: [
-      { label: "Militärische Überlegenheit", wert: militaerFaktor },
-      { label: "Beziehung", wert: beziehungFaktor },
-      { label: "Wahrgenommene Schwäche (Legitimität)", wert: legitimitaetFaktor },
-      { label: "Bestehender Pakt", wert: paktFaktor },
+      { label: "Militärische Überlegenheit", wert: f.militaerFaktor },
+      { label: "Beziehung", wert: f.beziehungFaktor },
+      { label: "Wahrgenommene Schwäche (Legitimität)", wert: f.legitimitaetFaktor },
+      { label: "Bestehender Pakt", wert: f.paktFaktor },
     ],
-    gesamt,
+    gesamt: f.gesamt,
     entscheidung: wuerdeAngreifen ? "Würde angreifen" : "Angriff verworfen",
   };
 }
@@ -3225,6 +3340,7 @@ function advanceYear(state) {
   checkElectionTrigger(state);
   updateIntel(state);
   updateReligion(state, r);
+  checkAiWarInitiative(state); // §31: KI wägt nicht nur ab, sondern erklärt ggf. tatsächlich Krieg
 
   // §24 Staatsschulden: Zinsen fällig
   payDebtInterest(state);
@@ -4065,7 +4181,11 @@ function simulateBattle(armyA, armyB, terrain, weather, seed, decisionPolicy) {
 // zusammengefasst, Söldner kämpfen als Linieninfanterie, Ritter als
 // Kavallerie — die Kampf-Engine kennt keine Vasall-/Söldner-Unterscheidung
 // mehr, die bleibt eine reine Rekrutierungs-Eigenschaft des Hauptspiels.
-function buildPlayerBattleArmy(state) {
+// opts.defending: true, wenn der Spieler eine von der KI selbst ausgelöste
+// Kriegserklärung abwehrt (§31) statt selbst anzugreifen — wirkt sich auf
+// isAttacker/isHomeTerritory aus (u.a. Miliz-Heimvorteil, §Konter-System).
+function buildPlayerBattleArmy(state, opts) {
+  opts = opts || {};
   const r = state.regions.player;
   const stacks = [];
   const push = (unitType, count) => { if (count > 0) stacks.push(createUnitStack(unitType, Math.round(count))); };
@@ -4099,13 +4219,18 @@ function buildPlayerBattleArmy(state) {
   const marschallBonus = advisorEffectBonus(state, "marschall");
   if (marschallBonus) commander.leadership = clamp(commander.leadership + marschallBonus * 100, 10, 99);
 
-  return createArmy(r.name, commander, stacks, { isAttacker: true, isHomeTerritory: false });
+  return createArmy(r.name, commander, stacks, { isAttacker: !opts.defending, isHomeTerritory: !!opts.defending });
 }
 
 // Für KI-Regionen existieren keine echten Truppenstapel (nur der abstrakte
 // estimateAiStrength-Wert) — hier wird eine plausible, aber nicht exakte
 // Zusammensetzung generiert, die ungefähr dieselbe Größenordnung ergibt.
-function buildAiBattleArmy(state, aiId, weakenFactor) {
+// opts.attacking: true, wenn diese KI-Region selbst den Krieg erklärt hat
+// (§31) statt vom Spieler angegriffen zu werden — flippt isAttacker/
+// isHomeTerritory entsprechend um (der Spieler verliert dann seinen sonst
+// impliziten Heimvorteil-Nachteil beim Gegner, siehe buildPlayerBattleArmy).
+function buildAiBattleArmy(state, aiId, weakenFactor, opts) {
+  opts = opts || {};
   const region = state.regions[aiId];
   const totalPop = Object.values(region.population).reduce((s, g) => s + g.count, 0);
   const kaserneLevel = buildingLevelSum(region, "kaserne");
@@ -4137,7 +4262,7 @@ function buildAiBattleArmy(state, aiId, weakenFactor) {
   const persisted = region.commander;
   const commander = createCommander(persisted.name, persisted.tactics, persisted.leadership, persisted.courage, persisted.experience);
 
-  return createArmy(region.name, commander, stacks, { isAttacker: false, isHomeTerritory: true });
+  return createArmy(region.name, commander, stacks, { isAttacker: !!opts.attacking, isHomeTerritory: !opts.attacking });
 }
 
 // Aktualisiert den persistenten KI-Kommandanten nach einer ausgetragenen
@@ -4803,6 +4928,8 @@ function renderMilitary() {
       <button class="dipbtn" onclick="doDeclareWar('${aiId}')" ${state.pendingSiege ? 'disabled' : ''}>Krieg erklären</button>
       <button class="dipbtn" onclick="doSpy('${aiId}')">Spionieren (${CONFIG.intrigue.spyMissionCost} Taler)</button>
       <button class="dipbtn" onclick="doSabotage('${aiId}')">Sabotieren (${CONFIG.intrigue.sabotageCost} Taler, Risiko!)</button>
+      <button class="dipbtn" onclick="doRumors('${aiId}')">Gerüchte streuen (${CONFIG.intrigue.rumorCost} Taler)</button>
+      <button class="dipbtn" onclick="doExtortion('${aiId}')">Erpressen (${CONFIG.intrigue.extortionCost} Taler, Risiko!)</button>
       </div>`;
   }
   document.getElementById('warMenu').innerHTML = warHtml;
@@ -4836,6 +4963,21 @@ function doSpy(aiId) {
   render();
 }
 
+function doRumors(aiId) {
+  const result = spreadRumors(state, aiId);
+  if (!result.ok) { alert(result.reason); return; }
+  playBeep(result.discovered ? 180 : 440, 0.1);
+  render();
+}
+
+function doExtortion(aiId) {
+  if (!confirm(`Eine Erpressung gegen ${state.regions[aiId].name} schadet den Beziehungen so oder so — nur bei Erfolg lohnt sie sich. Fortfahren?`)) return;
+  const result = attemptExtortion(state, aiId);
+  if (!result.ok) { alert(result.reason); return; }
+  playBeep(result.success ? 660 : 180, 0.12);
+  render();
+}
+
 function doSabotage(aiId) {
   if (!confirm(`Eine Sabotage-Aktion gegen ${state.regions[aiId].name} ist riskant. Fortfahren?`)) return;
   const result = attemptSabotage(state, aiId);
@@ -4861,6 +5003,7 @@ function doResolveElection() {
 let btState = null;
 let btWarTargetId = null;
 let btSiegeWeakenFactor = undefined;
+let btPlayerIsDefender = false; // §31: true, wenn die KI selbst den Krieg erklärt hat
 
 function doDeclareWar(aiId) {
   if (state.pendingSiege) { alert('Es läuft bereits eine Belagerung — die muss zuerst abgeschlossen werden.'); return; }
@@ -4872,16 +5015,19 @@ function doDeclareWar(aiId) {
     render();
     return;
   }
-  openBattleSetup(aiId);
+  openBattleSetup(aiId, false);
 }
 
-function openBattleSetup(aiId) {
+function openBattleSetup(aiId, defending) {
   btWarTargetId = aiId;
+  btPlayerIsDefender = !!defending;
   const formOptions = Object.entries(BATTLE_FORMATIONS).map(([k,v]) => `<option value="${k}">${v.name}</option>`).join('');
   const tacOptions = Object.entries(TACTICS).map(([k,v]) => `<option value="${k}">${v.name}</option>`).join('');
   document.getElementById('btFormation').innerHTML = formOptions;
   document.getElementById('btTactic').innerHTML = tacOptions;
-  document.getElementById('btTitleBar').textContent = `⚔ SCHLACHT GEGEN ${state.regions[aiId].name.toUpperCase()} ⚔`;
+  document.getElementById('btTitleBar').textContent = btPlayerIsDefender
+    ? `⚔ VERTEIDIGUNG GEGEN ${state.regions[aiId].name.toUpperCase()} ⚔`
+    : `⚔ SCHLACHT GEGEN ${state.regions[aiId].name.toUpperCase()} ⚔`;
   document.getElementById('btSetup').style.display = 'block';
   document.getElementById('btBattleUi').style.display = 'none';
   document.getElementById('btReport').style.display = 'none';
@@ -4895,7 +5041,7 @@ function doSiegeAction(action) {
     if (!confirm('Sturmangriff eröffnet die volle Schlacht — der geschwächte Verteidiger kämpft mit reduzierter Stärke. Fortfahren?')) return;
     btWarTargetId = s.targetId;
     btSiegeWeakenFactor = s.defenderStrengthFactor;
-    openBattleSetup(s.targetId);
+    openBattleSetup(s.targetId, false);
   } else if (action === 'starve') {
     const result = siegeStarve(state);
     if (result.forced) alert('Die maximale Belagerungsdauer ist erreicht — beim nächsten Sturmangriff gibt es keine weitere Wahl mehr.');
@@ -4909,12 +5055,14 @@ function doSiegeAction(action) {
 }
 
 function btStartBattle() {
-  const armyA = buildPlayerBattleArmy(state);
-  const armyB = buildAiBattleArmy(state, btWarTargetId, btSiegeWeakenFactor);
+  const armyA = buildPlayerBattleArmy(state, { defending: btPlayerIsDefender });
+  const armyB = buildAiBattleArmy(state, btWarTargetId, btSiegeWeakenFactor, { attacking: btPlayerIsDefender });
   btSiegeWeakenFactor = undefined; // nur für diesen einen Sturmangriff gültig
   armyA.formation = document.getElementById('btFormation').value;
   armyA.tactic = document.getElementById('btTactic').value;
-  const terrain = determineWarTerrain(state.regions[btWarTargetId]);
+  // §31: bei einer von der KI erklärten Verteidigung entscheidet die Befestigung
+  // der Spielerregion über das Gelände, nicht die des Angreifers.
+  const terrain = determineWarTerrain(btPlayerIsDefender ? state.regions.player : state.regions[btWarTargetId]);
   const seed = Math.floor(rnd() * 0xFFFFFFFF);
 
   btState = createBattle(armyA, armyB, terrain, 'klar', seed);
@@ -5011,6 +5159,7 @@ function btShowBattleReport() {
 
 function btCloseReport() {
   document.getElementById('btOverlay').style.display = 'none';
+  btPlayerIsDefender = false; // zurücksetzen, damit die nächste Schlacht wieder als Angriff gilt, falls nicht anders gesetzt
   render();
 }
 
@@ -5402,7 +5551,16 @@ document.getElementById('btnAdvance').addEventListener('click', () => {
   if (state.gameOver) return;
   playBeep(330, 0.08);
   advanceYear(state);
-  if (state.pendingEvent) {
+  if (state.incomingAiWar) {
+    // §31: die KI hat selbst den Krieg erklärt — der Spieler muss sich jetzt
+    // dem interaktiven Kampfbildschirm als Verteidiger stellen. Ein evtl.
+    // gleichzeitig anstehendes Ereignis wird nächstes Jahr erneut geprüft.
+    const aiId = state.incomingAiWar;
+    state.incomingAiWar = null;
+    playBeep(180, 0.2);
+    alert(`⚔ ${state.regions[aiId].name} hat dir ohne Vorwarnung den Krieg erklärt! Bereite deine Verteidigung vor.`);
+    openBattleSetup(aiId, true);
+  } else if (state.pendingEvent) {
     showEvent(state.pendingEvent);
   } else {
     render();
