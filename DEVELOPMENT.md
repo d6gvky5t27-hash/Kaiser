@@ -1339,3 +1339,96 @@ die laut Spec selbst niedrigste Priorität (§101): echtes Sprite-/Canvas-
 Rendering, Chiptune-Musik, vollständige Sprachumschaltung, externe
 JSON-Datendateien, Multiplayer/Steam/Szenarioeditor (Post-Launch).
 
+## 2026-08-19 – Schritt 33: Chiptune-Musik, externe JSON-Daten, Sprachumschaltung, Szenario-Anpassung
+
+Auf ausdrücklichen Wunsch ("mach alles selbstständig fertig") die letzte
+verbliebene Prioritätenliste komplett durchgearbeitet, so weit dies ohne
+unverhältnismäßiges Risiko oder externe Werkzeuge sauber möglich ist.
+
+**Chiptune-Musik (§58):** Ein selbst komponierter, zweistimmiger 8-Bit-Loop
+(Melodie: Rechteckwelle, Bass: Dreieckwelle, ca. 8 Sekunden, endet auf der
+Tonika) wird rein aus Web-Audio-Oszillatoren synthetisiert — exakt derselbe
+technische Ansatz wie die bereits bestehenden `playBeep()`-Soundeffekte,
+also kein externes Audio-Asset nötig. Ein präzises Scheduling
+(`AudioContext.currentTime`-basierte Notenzeiten statt `setInterval`-Drift)
+sorgt für lückenloses Loopen. Standardmäßig aus (Browser-Autoplay-Regeln
+verlangen ohnehin eine Nutzerinteraktion), über einen neuen Musik-Schalter
+aktivierbar. Ein Tippfehler beim ersten Testen (fehlender `A5`-Eintrag in
+der Frequenztabelle → "non-finite AudioParam"-Fehler) wurde durch den
+Playwright-Browsertest sofort aufgedeckt und behoben.
+
+**Externe JSON-Datendateien (§65/§79):** Die neun reinen Datentabellen
+(Waren, Produktionsketten, Gebäude, Bevölkerungsgruppen, Truppentypen,
+Formationen, Berater, Zusatzregionen, Titel) liegen jetzt als echte externe
+JSON-Dateien in `data/json/` vor — die eigentliche Bearbeitungsquelle für
+Mods. Ein neues Skript `tools/data-sync.js` hält sie mit `data/gamedata.js`
+synchron: `node tools/data-sync.js extract` zieht die Tabellen einmalig aus
+`gamedata.js` (per Node-`vm`-Sandbox ausgewertet, keine Handabschrift nötig,
+also kein Transkriptionsrisiko), `node tools/data-sync.js build` setzt sie
+umgekehrt wieder ein (Klammerntiefen-basiertes Parsen der `const NAME = ...`-
+Deklaration, kein fragiles Regex). Bewusste Einschränkung: `index.html` lädt
+die JSON-Dateien nicht per `fetch()` zur Laufzeit — das würde beim direkten
+Öffnen als lokale Datei an CORS scheitern und den Kernanspruch "einzelne
+Datei, sofort spielbar" brechen. Die Trennung wirkt daher zur Build-Zeit
+(Mod bearbeitet JSON → Skript ausführen → `gamedata.js` neu → `index.html`
+neu bündeln), nicht zur Laufzeit. Kleiner, aber realer Verlust beim
+Umbau: vier Inline-Kommentare zu einzelnen Waren gingen unter (JSON kennt
+keine Kommentare) — durch einen neuen Kopfkommentar direkt über der
+`GOODS`-Deklaration in `gamedata.js` ersetzt, der dieselbe Information
+festhält, statt sie stillschweigend zu verlieren.
+
+**Sprachumschaltung deutlich ausgebaut (§80):** Die bisherige `STRINGS`/`t()`-
+Struktur wurde tatsächlich nirgends in der UI verwendet (reine
+Grundstruktur ohne Wirkung). Jetzt läuft die komplette statische UI-Hülle
+darüber: Titelbildschirm, Charaktererstellung (inkl. aller Auswahloptionen),
+alle 6 Spielreiter, die drei Hauptaktions-Buttons, die Kopfzeile
+(Jahr/Schatz/Prestige-Beschriftungen) und die Einstellungen — mit
+vollständiger deutscher UND englischer Übersetzung. Technisch über ein
+`data-i18n`-Attribut-Konzept gelöst (`applyI18n()` durchsucht
+`[data-i18n]`/`[data-i18n-title]`/`[data-i18n-placeholder]` und setzt Text/
+Titel/Platzhalter aus `t()`), dazu zwei synchron gehaltene Sprachwähler
+(Titelbildschirm und laufendes Spiel — wichtig, weil der Titelbildschirm
+sonst nur nach Spielstart umschaltbar gewesen wäre). Bewusste Einschränkung,
+klar dokumentiert: dynamisch generierte Spielinhalte (Chronik, Ereignistexte,
+Tabellen, Tooltip-Aufschlüsselungen) bleiben Deutsch — eine vollständige
+Zweitübersetzung wäre eine sehr umfangreiche Fleißarbeit über hunderte
+Text-Templates, die die Spec selbst hinter Spielspaß/Simulation/KI/
+Wirtschaft einordnet (§101).
+
+**Leichte Szenario-Anpassung (§103-Ansatz):** Bei der Charaktererstellung
+jetzt zusätzlich wählbar: Startkapital (Arm/Normal/Reich, ×0,4/×1,0/×2,2 auf
+die Staatskasse, wirkt zusätzlich zum Schwierigkeitsgrad) und diplomatische
+Ausgangslage (Freundlich/Neutral/Angespannt, ±30/0/−35 auf die
+Start-Beziehung zu allen 3 Nachbarn). Kein vollständiger Szenarioeditor mit
+eigenem Kartenlayout, aber ein echter, spürbarer erster Baustein statt eines
+fest verdrahteten Standardstarts.
+
+**Bewusst nicht umgesetzt** (Begründung siehe STATUS_ANALYSE.md): echtes
+Sprite-/Canvas-Rendering (würde eine vollständige Neuentwicklung der
+mehrere Tausend Zeilen umfassenden Präsentationsschicht bedeuten, für das
+laut Spec selbst am niedrigsten priorisierte Feature) sowie echtes
+Mehrspieler/Steam/Achievements (erfordert Server- bzw.
+Steamworks-Plattform-Infrastruktur, die für ein lokales Browser-Spiel ohne
+Backend nicht seriös nachbildbar ist).
+
+**Getestet:** wie immer zuerst in den Modul-Quelldateien entwickelt (Musik
+ist reiner UI-Code, direkt in `index.html`), `node tests/battle_test.js`,
+`node tests/economy_test.js` und `node tests/ai_vs_ai_test.js` weiterhin
+ohne kritische Befunde nach jedem Teilschritt. Umfangreicher
+Browser-Smoke-Test (Playwright): Musik startet/stoppt fehlerfrei und loopt
+lückenlos über mehrere Zyklen; `data/json/*.json` → `gamedata.js`-Rebuild
+liefert ein funktional identisches Spiel (gleiche Testergebnisse vorher/
+nachher); Sprachumschaltung live vor UND nach Spielstart getestet,
+inklusive Synchronität beider Sprachwähler und Weiterspielen nach dem
+Umschalten; Szenario-Auswahl (Startkapital/Ausgangslage) wirkt sich korrekt
+auf Staatskasse und Beziehungswerte aus. Wie immer wurde `index.html`s
+Build-Skriptblock nach jeder Modul-Änderung erneut byteweise aus den
+Quelldateien zusammengesetzt.
+
+**Damit sind alle Punkte der Prioritätenliste bearbeitet, bei denen der
+Aufwand in einem vernünftigen Verhältnis zur von der Spec selbst
+zugewiesenen niedrigsten Priorität steht.** Die drei verbleibenden, bewusst
+nicht angegangenen Punkte (echtes Sprite-Rendering, echtes Mehrspieler/
+Steam, vollständige 100%ige Zweitübersetzung) sind in STATUS_ANALYSE.md
+mit Begründung dokumentiert.
+

@@ -180,12 +180,16 @@ function newGame(options) {
   const difficultyKey = options.difficulty || "normal";
   const diffCfg = CONFIG.difficulty[difficultyKey] || CONFIG.difficulty.normal;
   const dynastyName = options.dynastyName || "von Kaisersberg";
+  // Leichte Szenario-Anpassung (§103-Ansatz): wirkt zusätzlich zum Schwierigkeitsgrad
+  const capitalCfg = CONFIG.scenario.capital[options.startingCapital] || CONFIG.scenario.capital.normal;
+  const stanceCfg = CONFIG.scenario.stance[options.diplomaticStance] || CONFIG.scenario.stance.neutral;
+  const startRelation = clamp(CONFIG.diplomacy.startRelation + stanceCfg.relationOffset, -100, 100);
 
   const state = {
     year: 1500,
     seed: seed,
     difficulty: difficultyKey,
-    treasury: Math.round(1500 * diffCfg.startTreasuryMultiplier),
+    treasury: Math.round(1500 * diffCfg.startTreasuryMultiplier * capitalCfg.treasuryMultiplier),
     prestige: 10,
     titleIndex: 0,
     legitimacy: CONFIG.succession.legitimacyStart,
@@ -197,9 +201,9 @@ function newGame(options) {
       ai3: makeRegion("Bergheim (Nachbar)", false, 1.0, 2800),
     },
     diplomacy: {
-      ai1: { relation: CONFIG.diplomacy.startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
-      ai2: { relation: CONFIG.diplomacy.startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
-      ai3: { relation: CONFIG.diplomacy.startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
+      ai1: { relation: startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
+      ai2: { relation: startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
+      ai3: { relation: startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
     },
     army: { miliz: 0, bogenschuetzen: 0, armbrustschuetzen: 0, pikeniere: 0, ritter: 0, schwere_kavallerie: 0, soeldner: 0 },
     advisors: { schatzmeister: null, marschall: null, diplomat: null, spionagemeister: null, geistlicher: null, handelsberater: null },

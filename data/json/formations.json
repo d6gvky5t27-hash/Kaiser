@@ -1,0 +1,25 @@
+{
+  "ritter_zentrum": {
+    "name": "Ritter im Zentrum, Fußvolk an den Flanken",
+    "requiresTroop": "ritter",
+    "bonus": 0.15
+  },
+  "schuetzen_vorhut": {
+    "name": "Bogen-/Armbrustschützen als Vorhut",
+    "requiresTroop": [
+      "bogenschuetzen",
+      "armbrustschuetzen"
+    ],
+    "bonus": 0.12
+  },
+  "pikenwall": {
+    "name": "Pikenwall gegen Kavallerie",
+    "requiresTroop": "pikeniere",
+    "bonus": 0.13
+  },
+  "gleichmaessig": {
+    "name": "Gleichmäßig verteilt (keine Schwerpunktbildung)",
+    "requiresTroop": null,
+    "bonus": 0
+  }
+}

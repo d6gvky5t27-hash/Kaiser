@@ -1,0 +1,53 @@
+{
+  "miliz": {
+    "name": "Bauernmiliz",
+    "cost": 50,
+    "upkeep": 2,
+    "strength": 1,
+    "source": "vasall"
+  },
+  "bogenschuetzen": {
+    "name": "Bogenschützen",
+    "cost": 90,
+    "upkeep": 3,
+    "strength": 2,
+    "source": "vasall"
+  },
+  "armbrustschuetzen": {
+    "name": "Armbrustschützen",
+    "cost": 130,
+    "upkeep": 4,
+    "strength": 2.5,
+    "source": "vasall"
+  },
+  "pikeniere": {
+    "name": "Pikeniere",
+    "cost": 110,
+    "upkeep": 4,
+    "strength": 3,
+    "source": "vasall"
+  },
+  "ritter": {
+    "name": "Ritter",
+    "cost": 400,
+    "upkeep": 12,
+    "strength": 8,
+    "source": "vasall",
+    "minAdelSatisfaction": 45
+  },
+  "schwere_kavallerie": {
+    "name": "Schwere Kavallerie",
+    "cost": 650,
+    "upkeep": 18,
+    "strength": 12,
+    "source": "vasall",
+    "minAdelSatisfaction": 55
+  },
+  "soeldner": {
+    "name": "Söldner",
+    "cost": 200,
+    "upkeep": 15,
+    "strength": 4,
+    "source": "soeldner"
+  }
+}

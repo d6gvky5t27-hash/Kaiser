@@ -1,0 +1,127 @@
+{
+  "getreide": {
+    "name": "Getreide",
+    "base": 10,
+    "category": "grundnahrung"
+  },
+  "gemuese": {
+    "name": "Gemüse",
+    "base": 7,
+    "category": "grundnahrung"
+  },
+  "fleisch": {
+    "name": "Fleisch",
+    "base": 16,
+    "category": "grundnahrung"
+  },
+  "fisch": {
+    "name": "Fisch",
+    "base": 11,
+    "category": "grundnahrung"
+  },
+  "salz": {
+    "name": "Salz",
+    "base": 20,
+    "category": "grundnahrung"
+  },
+  "holz": {
+    "name": "Holz",
+    "base": 6,
+    "category": "rohstoff"
+  },
+  "stein": {
+    "name": "Stein",
+    "base": 8,
+    "category": "rohstoff"
+  },
+  "ton": {
+    "name": "Ton",
+    "base": 7,
+    "category": "rohstoff"
+  },
+  "eisen": {
+    "name": "Eisen",
+    "base": 18,
+    "category": "rohstoff"
+  },
+  "kohle": {
+    "name": "Kohle",
+    "base": 9,
+    "category": "rohstoff"
+  },
+  "wolle": {
+    "name": "Wolle",
+    "base": 12,
+    "category": "rohstoff"
+  },
+  "leder": {
+    "name": "Leder",
+    "base": 14,
+    "category": "rohstoff"
+  },
+  "bier": {
+    "name": "Bier",
+    "base": 8,
+    "category": "verarbeitet"
+  },
+  "wein": {
+    "name": "Wein",
+    "base": 22,
+    "category": "verarbeitet"
+  },
+  "werkzeuge": {
+    "name": "Werkzeuge",
+    "base": 25,
+    "category": "verarbeitet"
+  },
+  "waffen": {
+    "name": "Waffen",
+    "base": 45,
+    "category": "verarbeitet"
+  },
+  "kleidung": {
+    "name": "Kleidung",
+    "base": 30,
+    "category": "verarbeitet"
+  },
+  "gewuerze": {
+    "name": "Gewürze",
+    "base": 60,
+    "category": "luxus"
+  },
+  "seide": {
+    "name": "Seide",
+    "base": 70,
+    "category": "luxus"
+  },
+  "papier": {
+    "name": "Papier",
+    "base": 12,
+    "category": "verarbeitet"
+  },
+  "buecher": {
+    "name": "Bücher",
+    "base": 35,
+    "category": "luxus"
+  },
+  "schmuck": {
+    "name": "Schmuck",
+    "base": 85,
+    "category": "luxus"
+  },
+  "glaswaren": {
+    "name": "Glaswaren",
+    "base": 32,
+    "category": "luxus"
+  },
+  "mehl": {
+    "name": "Mehl",
+    "base": 13,
+    "category": "verarbeitet"
+  },
+  "brot": {
+    "name": "Brot",
+    "base": 18,
+    "category": "verarbeitet"
+  }
+}

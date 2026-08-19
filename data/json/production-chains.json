@@ -1,0 +1,163 @@
+[
+  {
+    "input": null,
+    "output": "getreide",
+    "ratioPerWorker": 1,
+    "building": null,
+    "workerGroup": "bauern"
+  },
+  {
+    "input": null,
+    "output": "gemuese",
+    "ratioPerWorker": 0.5,
+    "building": "gemuesegarten",
+    "workerGroup": "landarbeiter"
+  },
+  {
+    "input": null,
+    "output": "fleisch",
+    "ratioPerWorker": 0.35,
+    "building": "viehweide",
+    "workerGroup": "landarbeiter"
+  },
+  {
+    "input": null,
+    "output": "wolle",
+    "ratioPerWorker": 0.4,
+    "building": "viehweide",
+    "workerGroup": "landarbeiter"
+  },
+  {
+    "input": null,
+    "output": "fisch",
+    "ratioPerWorker": 0.4,
+    "building": "fischerteich",
+    "workerGroup": "landarbeiter"
+  },
+  {
+    "input": null,
+    "output": "wein",
+    "ratioPerWorker": 0.3,
+    "building": "weingut",
+    "workerGroup": "landarbeiter"
+  },
+  {
+    "input": null,
+    "output": "holz",
+    "ratioPerWorker": 0.6,
+    "building": "saegewerk",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": null,
+    "output": "stein",
+    "ratioPerWorker": 0.4,
+    "building": "steinbruch",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": null,
+    "output": "ton",
+    "ratioPerWorker": 0.4,
+    "building": "tongrube",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": null,
+    "output": "eisen",
+    "ratioPerWorker": 0.3,
+    "building": "schmiede",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": null,
+    "output": "kohle",
+    "ratioPerWorker": 0.35,
+    "building": "kohlebergwerk",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": null,
+    "output": "leder",
+    "ratioPerWorker": 0.3,
+    "building": "gerberei",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": null,
+    "output": "salz",
+    "ratioPerWorker": 0.25,
+    "building": "salzsiederei",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "getreide",
+    "output": "bier",
+    "ratioPerWorker": 0.4,
+    "building": "brauerei",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "eisen",
+    "output": "werkzeuge",
+    "ratioPerWorker": 0.3,
+    "building": "schmiede",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "eisen",
+    "output": "waffen",
+    "ratioPerWorker": 0.2,
+    "building": "waffenschmiede",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "wolle",
+    "output": "kleidung",
+    "ratioPerWorker": 0.3,
+    "building": "weberei",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "holz",
+    "output": "papier",
+    "ratioPerWorker": 0.4,
+    "building": "papiermuehle",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "papier",
+    "output": "buecher",
+    "ratioPerWorker": 0.15,
+    "building": "buchbinderei",
+    "workerGroup": "geistliche"
+  },
+  {
+    "input": "eisen",
+    "output": "schmuck",
+    "ratioPerWorker": 0.1,
+    "building": "goldschmiede",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "stein",
+    "output": "glaswaren",
+    "ratioPerWorker": 0.2,
+    "building": "glasblaeserei",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "getreide",
+    "output": "mehl",
+    "ratioPerWorker": 0.5,
+    "building": "kornmuehle",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "mehl",
+    "output": "brot",
+    "ratioPerWorker": 0.35,
+    "building": "baeckerei",
+    "workerGroup": "handwerker"
+  }
+]

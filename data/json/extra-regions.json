@@ -1,0 +1,26 @@
+[
+  {
+    "id": "ai4",
+    "name": "Bayern",
+    "fertility": 1.05,
+    "pop": 2900
+  },
+  {
+    "id": "ai5",
+    "name": "Sachsen",
+    "fertility": 0.95,
+    "pop": 2700
+  },
+  {
+    "id": "ai6",
+    "name": "Böhmen",
+    "fertility": 1.05,
+    "pop": 2850
+  },
+  {
+    "id": "ai7",
+    "name": "Schwaben",
+    "fertility": 0.95,
+    "pop": 2750
+  }
+]

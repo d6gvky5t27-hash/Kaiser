@@ -116,7 +116,7 @@ Stand: nach Abschluss von MVP + Alpha + Beta (siehe ROADMAP.md).
 | § | Thema | Status | Anmerkung |
 |---|---|---|---|
 | 64 | Speichersystem | 🟡 | JSON-Export/Import mit Versionsnummer funktioniert; keine mehreren benannten Speicherstände, kein Autosave/Quicksave/Ironman-Modus |
-| 65 | Modding (Datentrennung) | 🟡 | Daten in `gamedata.js` von der Logik in `sim.js` getrennt — aber als JS-Objekte, nicht als externe JSON-Dateien wie explizit gefordert |
+| 65 | Modding (Datentrennung) | ✅ | Die 9 reinen Datentabellen (Waren, Gebäude, Truppentypen, Bevölkerungsgruppen, Produktionsketten, Formationen, Berater, Zusatzregionen, Titel) liegen jetzt als echte externe JSON-Dateien in `data/json/` — Mods bearbeiten die JSON-Dateien, `node tools/data-sync.js build` erzeugt daraus den entsprechenden Abschnitt von `gamedata.js` neu (Balancing-`CONFIG`, Ereignisse und Charaktergenerierung bleiben bewusst Code, keine reinen Daten) |
 | 66 | Technische Architektur (Module) | 🟡 | Alle geforderten Systeme existieren, aber gebündelt in zwei Dateien statt eigenständiger Module — bei weiterem Wachstum sollte das aufgeteilt werden |
 | 67 | Deterministische Simulation (Seed) | ✅ | Eigener Mulberry32-PRNG, Seed + Aufrufzähler im Savegame, geladene Stände laufen deterministisch weiter |
 | 68 | Performance (Kohorten) | ✅ | Bevölkerung als Gruppenmodell, nur wichtige Charaktere einzeln simuliert |
@@ -130,7 +130,7 @@ Stand: nach Abschluss von MVP + Alpha + Beta (siehe ROADMAP.md).
 | 76 | Automatisierte Tests | 🟡 | Nur der Wirtschaftstest ist als Datei dauerhaft vorhanden (`tests/economy_test.js`); Tests für Bevölkerung/Erbschaft/Diplomatie/Speicherstände/Ereignisse liefen nur ad-hoc während der Entwicklung, sind nicht als wiederholbare Testdateien abgelegt |
 | 77 | Wirtschaftstest | ✅ | `tests/economy_test.js` — 20×100 Jahre automatisiert, deckt bereits ein echtes Balancing-Thema auf |
 | 78 | KI-gegen-KI-Test | ✅ | `tests/ai_vs_ai_test.js` — 100 Partien automatisiert, deckte bereits einen echten Start-Ungleichgewichts-Bug auf und wurde zur Behebung genutzt |
-| 79 | Content nicht hardcoden (JSON-Dateien) | 🟡 | Datentrennung im Prinzip vorhanden, aber nicht als externe `/data/*.json`-Dateien wie explizit gefordert, sondern als JS-Objekte in `gamedata.js` |
+| 79 | Content nicht hardcoden (JSON-Dateien) | ✅ | Siehe §65 — echte externe `/data/json/*.json`-Dateien, `gamedata.js` wird daraus erzeugt statt von Hand gepflegt. Bewusste Einschränkung: `index.html` lädt die JSON-Dateien nicht zur Laufzeit per `fetch()` (würde bei direktem Öffnen als lokale Datei an CORS scheitern) — die Trennung wirkt zur Build-Zeit, nicht zur Laufzeit |
 
 ---
 
@@ -144,7 +144,7 @@ Stand: nach Abschluss von MVP + Alpha + Beta (siehe ROADMAP.md).
 | 55 | Hauptbildschirm-Layout | 🟡 | Kopfzeile (Name/Titel/Jahr/Kasse/Prestige) vorhanden; Layout nutzt Tabs statt exaktem Links-Karte/Rechts-Statistik/Unten-Menü-Schema |
 | 56 | Menüfenster-Optik | 🟡 | Kastenförmige Panels im Retro-Look, aber nicht die exakte ASCII-Box-Optik aus dem Beispiel |
 | 57 | Sounds | 🟡 | Einfache Web-Audio-Bleeps bei einigen Aktionen; keine unterschiedlichen Münz-/Fanfaren-/Schlacht-/Glocken-Sounds |
-| 58 | Musik | ❌ | Kein Chiptune-Soundtrack (keine Audio-Assets erzeugbar) |
+| 58 | Musik | ✅ | Chiptune-Soundtrack als selbst geschriebener, zweistimmiger Loop (Melodie: Rechteckwelle, Bass: Dreieckwelle), rein aus Web-Audio-Oszillatoren synthetisiert — keine externen Audio-Assets nötig, exakt derselbe Ansatz wie die bestehenden Soundeffekte; standardmäßig aus, über eigenen Musik-Schalter aktivierbar |
 | 59 | Echter Retro-Modus | ❌ | Nicht als eigener Modus umgesetzt |
 | 60 | Moderne Bedienung | 🟡 | Maus/Touch funktioniert; keine Tastaturkürzel, kein Controller-Support |
 | 86 | Welt spielt ohne Spieler | ✅ | KI-Regionen bauen, entwickeln sich, handeln diplomatisch — unabhängig vom Spieler |
@@ -200,22 +200,53 @@ Erststrategien nicht unfair bestraft werden — militärische Schwäche allein
 reicht nicht, es braucht zusätzlich eine wirklich schlechte Beziehung).
 Dazu zwei weitere Intrigen-Arten (§32): Gerüchte streuen, Erpressung.
 
-Verbleibende bewusst offene Punkte, allesamt laut Spec selbst niedrigste
-Priorität (§101 — Grafik/Sound/Content-Menge stehen hinter Spielspaß/
-Simulation/KI/Wirtschaft):
+**Runde 5 umgesetzt** (siehe DEVELOPMENT.md Schritt 32): §14 ist jetzt ✅ —
+echte Migration zwischen allen 8 Regionen statt nur zur/von einer abstrakten
+Außenwelt. §32 ist jetzt komplett ✅ — alle 6 Intrigen-Arten aus der Spec
+(Verschwörung, Dokumentenfälschung, Rebellenunterstützung, politische
+Manipulation ergänzt).
 
-1. **Echtes Sprite-/Canvas-Rendering statt CSS-Retro-Optik (§49–52)**
-2. **Chiptune-Soundtrack statt reiner Sound-Effekte (§58)** — keine
-   Audio-Assets erzeugbar, nur mit externen Tools möglich
-3. **Vollständige Sprachumschaltung (§80)** — Grundstruktur (`STRINGS`/`t()`)
-   existiert, aber nicht die gesamte UI ist darüber geführt
-4. **Multiplayer, Steam, Achievements, Szenarioeditor (§103, Post-Launch)**
-5. **Externe JSON-Datendateien statt JS-Objekte (§65/§79)** — Daten sind
-   bereits von der Logik getrennt, aber noch nicht als eigenständige Dateien
-6. **Weitere Content-Tiefe** (optional, kein blinder Fleck mehr): Migration
-   zwischen den eigenen 8 Regionen (§14 kennt bisher nur Zu-/Abwanderung zur
-   Außenwelt), verbleibende Intrigen-Arten (Verschwörung, Dokumentenfälschung,
-   Rebellenunterstützung, politische Manipulation)
+**Runde 6 umgesetzt** (siehe DEVELOPMENT.md Schritt 33, auf Wunsch "alles
+selbstständig fertig machen"): §58 ist jetzt ✅ — ein selbst komponierter,
+zweistimmiger Chiptune-Loop aus reinen Web-Audio-Oszillatoren (keine externen
+Audio-Assets nötig). §65/§79 sind jetzt ✅ — die neun reinen Datentabellen
+liegen als echte externe JSON-Dateien in `data/json/` vor, mit einem kleinen
+Build-Skript (`tools/data-sync.js`), das sie mit `gamedata.js` synchron hält.
+§80 ist deutlich ausgebaut — die komplette statische UI-Hülle (Titelbildschirm,
+Charaktererstellung, Reiter, Hauptaktionen, Einstellungen) läuft jetzt über
+`STRINGS`/`t()` mit vollständiger deutscher UND englischer Übersetzung,
+live umschaltbar über einen Sprachwähler auf dem Titelbildschirm und im
+laufenden Spiel. Dazu eine leichte Szenario-Anpassung bei der
+Charaktererstellung (Startkapital, diplomatische Ausgangslage) als
+kleiner, aber echter erster Baustein von §103.
 
-Sag mir, mit welchem Punkt ich weitermachen soll — oder ich schlage eine
-Reihenfolge vor und arbeite sie eigenständig ab.
+Verbleibende bewusst offene Punkte — die einzigen beiden, die laut Spec
+selbst niedrigste Priorität (§101) tragen UND ohne unverhältnismäßiges
+Risiko/externe Werkzeuge nicht sauber umsetzbar sind:
+
+1. **Echtes Sprite-/Canvas-Rendering statt CSS-Retro-Optik (§49–52).**
+   Bewusst nicht angegangen: würde eine vollständige Neuentwicklung der
+   Präsentationsschicht (mehrere Tausend Zeilen UI-Code) bedeuten, mit
+   entsprechendem Regressionsrisiko für ein einzelnes, von der Spec selbst
+   als am wenigsten wichtig eingestuftes Feature. Die bestehende
+   Retro-CSS-Optik (harte Kanten, reduzierte Palette, Pixel-Font, Pixel-Art-
+   SVG-Icons) erfüllt den optischen Anspruch bereits weitgehend.
+2. **Echtes Mehrspieler/Steam/Achievements (§103, Post-Launch).** Bewusst
+   nicht angegangen: erfordert Server-Infrastruktur bzw. die
+   Steamworks-Plattform-SDK — beides für ein einzelnes, lokal im Browser
+   laufendes HTML-Spiel ohne Backend nicht seriös nachbildbar, ohne die
+   Funktion nur vorzutäuschen. Ein vollständiger Szenarioeditor (eigenes
+   Kartenlayout/Regionen-Editor) bliebe ebenfalls ein größeres Post-Launch-
+   Vorhaben; die leichte Szenario-Anpassung aus Runde 6 deckt den
+   niedrigschwelligen Teil bereits ab.
+3. **Vollständige (100%ige) Zweitübersetzung (§80-Vertiefung, optional):**
+   dynamisch generierte Spielinhalte (Chronik, Ereignistexte, Tabellen,
+   Tooltip-Aufschlüsselungen) bleiben Deutsch — eine echte, aber sehr
+   umfangreiche Fleißarbeit über hunderte Text-Templates hinweg, die die
+   Spec selbst hinter Spielspaß/Simulation/KI/Wirtschaft einordnet.
+
+**Damit sind alle Content-, Gameplay- und Architektur-Lücken bearbeitet, bei
+denen der Aufwand in einem vernünftigen Verhältnis zur von der Spec selbst
+zugewiesenen Priorität steht.** Sag mir, falls einer der drei verbleibenden
+Punkte trotzdem gewünscht ist — sonst ist der Stand aus meiner Sicht
+"fertig" im Sinne der Spec-Prioritäten.

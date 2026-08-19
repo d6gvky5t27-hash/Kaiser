@@ -310,16 +310,16 @@
 <body>
 
 <div id="introScreen" onclick="skipIntro()">
-  <p style="animation-delay:0.2s;">Anno 1500.</p>
-  <p style="animation-delay:1.6s;">Eine junge Dynastie erhebt sich in einem unruhigen Reich —</p>
-  <p style="animation-delay:3.0s;">zwischen Kornkammern, Kanzleien und Kriegsherren.</p>
+  <p style="animation-delay:0.2s;" data-i18n="intro_line1">Anno 1500.</p>
+  <p style="animation-delay:1.6s;" data-i18n="intro_line2">Eine junge Dynastie erhebt sich in einem unruhigen Reich —</p>
+  <p style="animation-delay:3.0s;" data-i18n="intro_line3">zwischen Kornkammern, Kanzleien und Kriegsherren.</p>
   <p style="animation-delay:4.4s;" id="introFinalLine"><b style="color:var(--gold); letter-spacing:2px;">KAISERREICH</b></p>
-  <div class="introSkip">(klicken zum Überspringen)</div>
+  <div class="introSkip" data-i18n="intro_skip">(klicken zum Überspringen)</div>
 </div>
 
 <div id="titleScreen" style="display:none;">
-  <h1>KAISERREICH</h1>
-  <h2>AUFSTIEG EINER DYNASTIE</h2>
+  <h1 data-i18n="title_h1">KAISERREICH</h1>
+  <h2 data-i18n="title_h2">AUFSTIEG EINER DYNASTIE</h2>
   <div class="cityArt" onclick="crownClicked()" title="">
     <svg viewBox="0 0 40 30" width="140" height="105">
       <polygon points="4,28 4,14 10,20 20,8 30,20 36,14 36,28" fill="#b8963e"/>
@@ -333,49 +333,68 @@
       <rect x="27" y="20" width="3" height="3" fill="#1f4b3f"/>
     </svg>
   </div>
-  <button class="titleMenuBtn" onclick="showCharCreation()">NEUES SPIEL</button>
-  <button class="titleMenuBtn" onclick="document.getElementById('titleLoadFile').click()">SPIEL LADEN</button>
+  <button class="titleMenuBtn" onclick="showCharCreation()" data-i18n="title_new_game">NEUES SPIEL</button>
+  <button class="titleMenuBtn" onclick="document.getElementById('titleLoadFile').click()" data-i18n="title_load_game">SPIEL LADEN</button>
   <input type="file" id="titleLoadFile" accept="application/json" style="display:none;">
-  <button class="titleMenuBtn" disabled title="In dieser Version nicht verfügbar">MEHRSPIELER</button>
-  <button class="titleMenuBtn" disabled title="Erst nach dem ersten Spielende verfügbar">CHRONIK</button>
-  <button class="titleMenuBtn" onclick="alert('CRT-Filter und Sound lassen sich im Spiel selbst unten rechts umschalten.')">OPTIONEN</button>
+  <button class="titleMenuBtn" disabled data-i18n="title_multiplayer" data-i18n-title="title_multiplayer_hint">MEHRSPIELER</button>
+  <button class="titleMenuBtn" disabled data-i18n="title_chronicle" data-i18n-title="title_chronicle_hint">CHRONIK</button>
+  <button class="titleMenuBtn" onclick="alert(t('title_options_alert'))" data-i18n="title_options">OPTIONEN</button>
+  <div style="margin-top:var(--sp-3);">
+    <label style="font-size:var(--fs-body); color:#d8cba8;"><span data-i18n="settings_lang">Sprache</span>
+      <select id="langSelectTitle"><option value="de">Deutsch</option><option value="en">English</option></select>
+    </label>
+  </div>
 </div>
 
 <div id="charCreation" style="display:none;">
-  <h2>HERRSCHER ERSTELLEN</h2>
-  <div class="formRow"><label>Name</label><input type="text" id="cc-name" placeholder="z. B. Friedrich"></div>
-  <div class="formRow"><label>Geschlecht</label>
-    <select id="cc-gender"><option value="m">männlich</option><option value="f">weiblich</option></select>
+  <h2 data-i18n="cc_title">HERRSCHER ERSTELLEN</h2>
+  <div class="formRow"><label data-i18n="cc_name">Name</label><input type="text" id="cc-name" data-i18n-placeholder="cc_name_placeholder" placeholder="z. B. Friedrich"></div>
+  <div class="formRow"><label data-i18n="cc_gender">Geschlecht</label>
+    <select id="cc-gender"><option value="m" data-i18n="cc_gender_m">männlich</option><option value="f" data-i18n="cc_gender_f">weiblich</option></select>
   </div>
-  <div class="formRow"><label>Dynastiename</label><input type="text" id="cc-dynasty" placeholder="z. B. von Kaisersberg" value="von Kaisersberg"></div>
-  <div class="formRow"><label>Startregion</label>
-    <select id="cc-region"><option value="player">Deine Provinz (einzige verfügbare Region in dieser Version)</option></select>
+  <div class="formRow"><label data-i18n="cc_dynasty">Dynastiename</label><input type="text" id="cc-dynasty" data-i18n-placeholder="cc_dynasty_placeholder" placeholder="z. B. von Kaisersberg" value="von Kaisersberg"></div>
+  <div class="formRow"><label data-i18n="cc_region">Startregion</label>
+    <select id="cc-region"><option value="player" data-i18n="cc_region_only">Deine Provinz (einzige verfügbare Region in dieser Version)</option></select>
   </div>
-  <div class="formRow"><label>Schwierigkeitsgrad</label>
+  <div class="formRow"><label data-i18n="cc_difficulty">Schwierigkeitsgrad</label>
     <select id="cc-difficulty">
-      <option value="leicht">Leicht — KI macht mehr Fehler</option>
-      <option value="normal" selected>Normal — ausgewogene KI</option>
-      <option value="schwer">Schwer — KI plant zielstrebiger</option>
-      <option value="experte">Experte — weniger Informationen, kaum KI-Fehler</option>
+      <option value="leicht" data-i18n="cc_diff_easy">Leicht — KI macht mehr Fehler</option>
+      <option value="normal" selected data-i18n="cc_diff_normal">Normal — ausgewogene KI</option>
+      <option value="schwer" data-i18n="cc_diff_hard">Schwer — KI plant zielstrebiger</option>
+      <option value="experte" data-i18n="cc_diff_expert">Experte — weniger Informationen, kaum KI-Fehler</option>
     </select>
   </div>
-  <div class="formRow"><label>Zielsetzung (§47)</label>
+  <div class="formRow"><label data-i18n="cc_victory">Zielsetzung (§47)</label>
     <select id="cc-victory">
-      <option value="kaiser" selected>Kaiser werden (klassisch, per Kaiserwahl)</option>
-      <option value="reichtum">Reichste Dynastie (80.000 Taler, 5 Jahre halten)</option>
-      <option value="handelsmacht">Größte Handelsmacht (Lagerwert 15.000, 5 Jahre halten)</option>
-      <option value="militaer">Militärische Dominanz (alle 3 Nachbarn besiegen)</option>
-      <option value="endlos">Endlosmodus (kein Sieg-Ziel)</option>
+      <option value="kaiser" selected data-i18n="cc_victory_kaiser">Kaiser werden (klassisch, per Kaiserwahl)</option>
+      <option value="reichtum" data-i18n="cc_victory_wealth">Reichste Dynastie (80.000 Taler, 5 Jahre halten)</option>
+      <option value="handelsmacht" data-i18n="cc_victory_trade">Größte Handelsmacht (Lagerwert 15.000, 5 Jahre halten)</option>
+      <option value="militaer" data-i18n="cc_victory_military">Militärische Dominanz (alle 3 Nachbarn besiegen)</option>
+      <option value="endlos" data-i18n="cc_victory_endless">Endlosmodus (kein Sieg-Ziel)</option>
+    </select>
+  </div>
+  <div class="formRow"><label data-i18n="cc_capital">Startkapital</label>
+    <select id="cc-capital">
+      <option value="arm" data-i18n="cc_capital_arm">Arm — Herausforderung von Anfang an</option>
+      <option value="normal" selected data-i18n="cc_capital_normal">Normal</option>
+      <option value="reich" data-i18n="cc_capital_reich">Reich — komfortabler Start</option>
+    </select>
+  </div>
+  <div class="formRow"><label data-i18n="cc_stance">Diplomatische Ausgangslage</label>
+    <select id="cc-stance">
+      <option value="freundlich" data-i18n="cc_stance_freundlich">Freundlich — Nachbarn wohlgesonnen</option>
+      <option value="neutral" selected data-i18n="cc_stance_neutral">Neutral</option>
+      <option value="angespannt" data-i18n="cc_stance_angespannt">Angespannt — Nachbarn misstrauisch</option>
     </select>
   </div>
   <div class="formRow" style="align-items:flex-start;">
-    <label>Persönlichkeitsschwerpunkte<br><span style="font-size:var(--fs-body);">(genau 2 wählen)</span></label>
+    <label><span data-i18n="cc_traits">Persönlichkeitsschwerpunkte</span><br><span style="font-size:var(--fs-body);" data-i18n="cc_traits_hint">(genau 2 wählen)</span></label>
     <div id="cc-traits"></div>
   </div>
   <div style="text-align:center; margin-top:var(--sp-5);">
-    <button class="titleMenuBtn" style="display:inline-block; width:auto;" onclick="startNewGameFromForm()">SPIEL BEGINNEN</button>
-    <button class="titleMenuBtn" style="display:inline-block; width:auto;" onclick="startNewGameRandom()">ZUFÄLLIGER HERRSCHER</button>
-    <button class="titleMenuBtn" style="display:inline-block; width:auto;" onclick="showTitleScreen()">ZURÜCK</button>
+    <button class="titleMenuBtn" style="display:inline-block; width:auto;" onclick="startNewGameFromForm()" data-i18n="cc_start">SPIEL BEGINNEN</button>
+    <button class="titleMenuBtn" style="display:inline-block; width:auto;" onclick="startNewGameRandom()" data-i18n="cc_random">ZUFÄLLIGER HERRSCHER</button>
+    <button class="titleMenuBtn" style="display:inline-block; width:auto;" onclick="showTitleScreen()" data-i18n="cc_back">ZURÜCK</button>
   </div>
 </div>
 
@@ -388,12 +407,12 @@
   </div>
 
   <div id="pagetabs">
-    <button id="tabProvinz" class="pagetab active">🏰 PROVINZ</button>
-    <button id="tabHof" class="pagetab">📚 BERATER &amp; FORSCHUNG</button>
-    <button id="tabWirtschaft" class="pagetab">💰 WIRTSCHAFT</button>
-    <button id="tabDiplomatie" class="pagetab">🤝 DIPLOMATIE</button>
-    <button id="tabKarte" class="pagetab">🗺 KARTE &amp; GEBÄUDE</button>
-    <button id="tabMilitaer" class="pagetab">⚔ MILITÄR</button>
+    <button id="tabProvinz" class="pagetab active" data-i18n="tab_provinz">🏰 PROVINZ</button>
+    <button id="tabHof" class="pagetab" data-i18n="tab_hof">📚 BERATER &amp; FORSCHUNG</button>
+    <button id="tabWirtschaft" class="pagetab" data-i18n="tab_wirtschaft">💰 WIRTSCHAFT</button>
+    <button id="tabDiplomatie" class="pagetab" data-i18n="tab_diplomatie">🤝 DIPLOMATIE</button>
+    <button id="tabKarte" class="pagetab" data-i18n="tab_karte">🗺 KARTE &amp; GEBÄUDE</button>
+    <button id="tabMilitaer" class="pagetab" data-i18n="tab_militaer">⚔ MILITÄR</button>
   </div>
 
   <div id="electionBanner">
@@ -505,16 +524,18 @@
   </div>
 
   <div id="menubar">
-    <button id="btnAdvance">▶ JAHR VERGEHEN LASSEN</button>
-    <button id="btnSave">💾 SPEICHERN</button>
-    <button id="btnLoad">📂 LADEN</button>
+    <button id="btnAdvance" data-i18n="btn_advance">▶ JAHR VERGEHEN LASSEN</button>
+    <button id="btnSave" data-i18n="btn_save">💾 SPEICHERN</button>
+    <button id="btnLoad" data-i18n="btn_load">📂 LADEN</button>
     <input type="file" id="loadFile" accept="application/json" style="display:none;">
     <span id="titleProgress" style="align-self:center; margin-left:var(--sp-3); font-size:var(--fs-body); color:#d8cba8;"></span>
     <span style="flex:1;"></span>
     <div class="settingsRow">
-      <label><input type="checkbox" id="crtToggle"> CRT-Filter</label>
-      <label><input type="checkbox" id="soundToggle" checked> Sound</label>
-      <label><input type="checkbox" id="debugToggle"> 🛠 Debug</label>
+      <label><input type="checkbox" id="crtToggle"> <span data-i18n="settings_crt">CRT-Filter</span></label>
+      <label><input type="checkbox" id="soundToggle" checked> <span data-i18n="settings_sound">Sound</span></label>
+      <label><input type="checkbox" id="musicToggle"> <span data-i18n="settings_music">🎵 Musik</span></label>
+      <label><span data-i18n="settings_lang">Sprache</span> <select id="langSelect"><option value="de">Deutsch</option><option value="en">English</option></select></label>
+      <label><input type="checkbox" id="debugToggle"> <span data-i18n="settings_debug">🛠 Debug</span></label>
     </div>
   </div>
 
@@ -827,6 +848,22 @@ const CONFIG = {
     schwer:   { aiMistakeChance: 0.05, aiBuildChanceMultiplier: 1.25, intelAccuracyBonus: -0.05, startTreasuryMultiplier: 0.85 },
     experte:  { aiMistakeChance: 0.0,  aiBuildChanceMultiplier: 1.5,  intelAccuracyBonus: -0.15, startTreasuryMultiplier: 0.7 },
   },
+  // Leichte Szenario-Anpassung bei der Charaktererstellung (§103-Ansatz: kein
+  // vollständiger Szenarioeditor mit eigenem Kartenlayout, aber echte,
+  // spürbare Ausgangsbedingungen statt nur eines fixen Standardstarts) —
+  // wirkt zusätzlich zum Schwierigkeitsgrad, nicht anstelle davon.
+  scenario: {
+    capital: {
+      arm:    { treasuryMultiplier: 0.4 },
+      normal: { treasuryMultiplier: 1.0 },
+      reich:  { treasuryMultiplier: 2.2 },
+    },
+    stance: {
+      freundlich: { relationOffset: 30 },
+      neutral:    { relationOffset: 0 },
+      angespannt: { relationOffset: -35 },
+    },
+  },
   // §25: Stadtentwicklung — Stufen von Weiler bis Kaiserstadt, abhängig von
   // Bevölkerung, Wohlstand und Infrastruktur (nicht nur einem einzelnen Wert)
   settlement: {
@@ -983,116 +1020,769 @@ const CONFIG = {
   },
 };
 
+// §65/§79: die reinen Datentabellen (GOODS bis TITLES weiter unten) werden ab
+// hier aus data/json/*.json erzeugt (Quelle der Wahrheit fürs Modden) — siehe
+// tools/data-sync.js. Einzelheiten, die als JSON keine Inline-Kommentare
+// tragen können: gewuerze & seide sind bewusst reine Importluxusgüter ohne
+// heimische Produktionskette; buecher (Holz->Papier->Buecher) und mehl/brot
+// (Getreide->Mehl->Brot) sind die beiden zweistufigen Produktionsketten.
 const GOODS = {
-  getreide:  { name: "Getreide",  base: 10, category: "grundnahrung" },
-  gemuese:   { name: "Gemüse",    base: 7,  category: "grundnahrung" },
-  fleisch:   { name: "Fleisch",   base: 16, category: "grundnahrung" },
-  fisch:     { name: "Fisch",     base: 11, category: "grundnahrung" },
-  salz:      { name: "Salz",      base: 20, category: "grundnahrung" },
-  holz:      { name: "Holz",      base: 6,  category: "rohstoff" },
-  stein:     { name: "Stein",     base: 8,  category: "rohstoff" },
-  ton:       { name: "Ton",       base: 7,  category: "rohstoff" },
-  eisen:     { name: "Eisen",     base: 18, category: "rohstoff" },
-  kohle:     { name: "Kohle",     base: 9,  category: "rohstoff" },
-  wolle:     { name: "Wolle",     base: 12, category: "rohstoff" },
-  leder:     { name: "Leder",     base: 14, category: "rohstoff" },
-  bier:      { name: "Bier",      base: 8,  category: "verarbeitet" },
-  wein:      { name: "Wein",      base: 22, category: "verarbeitet" },
-  werkzeuge: { name: "Werkzeuge", base: 25, category: "verarbeitet" },
-  waffen:    { name: "Waffen",    base: 45, category: "verarbeitet" },
-  kleidung:  { name: "Kleidung",  base: 30, category: "verarbeitet" },
-  gewuerze:  { name: "Gewürze",   base: 60, category: "luxus" }, // bewusst ohne heimische Produktionskette — reines Importluxusgut
-  seide:     { name: "Seide",     base: 70, category: "luxus" }, // bewusst ohne heimische Produktionskette — reines Importluxusgut
-  papier:    { name: "Papier",    base: 12, category: "verarbeitet" },
-  buecher:   { name: "Bücher",    base: 35, category: "luxus" }, // zweistufige Kette: Holz -> Papier -> Bücher
-  schmuck:   { name: "Schmuck",   base: 85, category: "luxus" },
-  glaswaren: { name: "Glaswaren", base: 32, category: "luxus" },
-  mehl:      { name: "Mehl",      base: 13, category: "verarbeitet" }, // zweistufige Kette: Getreide -> Mehl -> Brot
-  brot:      { name: "Brot",      base: 18, category: "verarbeitet" },
+  "getreide": {
+    "name": "Getreide",
+    "base": 10,
+    "category": "grundnahrung"
+  },
+  "gemuese": {
+    "name": "Gemüse",
+    "base": 7,
+    "category": "grundnahrung"
+  },
+  "fleisch": {
+    "name": "Fleisch",
+    "base": 16,
+    "category": "grundnahrung"
+  },
+  "fisch": {
+    "name": "Fisch",
+    "base": 11,
+    "category": "grundnahrung"
+  },
+  "salz": {
+    "name": "Salz",
+    "base": 20,
+    "category": "grundnahrung"
+  },
+  "holz": {
+    "name": "Holz",
+    "base": 6,
+    "category": "rohstoff"
+  },
+  "stein": {
+    "name": "Stein",
+    "base": 8,
+    "category": "rohstoff"
+  },
+  "ton": {
+    "name": "Ton",
+    "base": 7,
+    "category": "rohstoff"
+  },
+  "eisen": {
+    "name": "Eisen",
+    "base": 18,
+    "category": "rohstoff"
+  },
+  "kohle": {
+    "name": "Kohle",
+    "base": 9,
+    "category": "rohstoff"
+  },
+  "wolle": {
+    "name": "Wolle",
+    "base": 12,
+    "category": "rohstoff"
+  },
+  "leder": {
+    "name": "Leder",
+    "base": 14,
+    "category": "rohstoff"
+  },
+  "bier": {
+    "name": "Bier",
+    "base": 8,
+    "category": "verarbeitet"
+  },
+  "wein": {
+    "name": "Wein",
+    "base": 22,
+    "category": "verarbeitet"
+  },
+  "werkzeuge": {
+    "name": "Werkzeuge",
+    "base": 25,
+    "category": "verarbeitet"
+  },
+  "waffen": {
+    "name": "Waffen",
+    "base": 45,
+    "category": "verarbeitet"
+  },
+  "kleidung": {
+    "name": "Kleidung",
+    "base": 30,
+    "category": "verarbeitet"
+  },
+  "gewuerze": {
+    "name": "Gewürze",
+    "base": 60,
+    "category": "luxus"
+  },
+  "seide": {
+    "name": "Seide",
+    "base": 70,
+    "category": "luxus"
+  },
+  "papier": {
+    "name": "Papier",
+    "base": 12,
+    "category": "verarbeitet"
+  },
+  "buecher": {
+    "name": "Bücher",
+    "base": 35,
+    "category": "luxus"
+  },
+  "schmuck": {
+    "name": "Schmuck",
+    "base": 85,
+    "category": "luxus"
+  },
+  "glaswaren": {
+    "name": "Glaswaren",
+    "base": 32,
+    "category": "luxus"
+  },
+  "mehl": {
+    "name": "Mehl",
+    "base": 13,
+    "category": "verarbeitet"
+  },
+  "brot": {
+    "name": "Brot",
+    "base": 18,
+    "category": "verarbeitet"
+  }
 };
 
 // Produktionsketten: Input-Ware -> Output-Ware, Verhältnis, benötigtes Gebäude,
 // Bevölkerungsgruppe, die die Arbeitskraft stellt (workerGroup)
 const PRODUCTION_CHAINS = [
-  { input: null,      output: "getreide",  ratioPerWorker: 1.0, building: null,           workerGroup: "bauern" },
-  { input: null,      output: "gemuese",   ratioPerWorker: 0.5, building: "gemuesegarten", workerGroup: "landarbeiter" },
-  { input: null,      output: "fleisch",   ratioPerWorker: 0.35, building: "viehweide",    workerGroup: "landarbeiter" },
-  { input: null,      output: "wolle",     ratioPerWorker: 0.4, building: "viehweide",     workerGroup: "landarbeiter" },
-  { input: null,      output: "fisch",     ratioPerWorker: 0.4, building: "fischerteich",  workerGroup: "landarbeiter" },
-  { input: null,      output: "wein",      ratioPerWorker: 0.3, building: "weingut",       workerGroup: "landarbeiter" },
-  { input: null,      output: "holz",      ratioPerWorker: 0.6, building: "saegewerk",     workerGroup: "handwerker" },
-  { input: null,      output: "stein",     ratioPerWorker: 0.4, building: "steinbruch",    workerGroup: "handwerker" },
-  { input: null,      output: "ton",       ratioPerWorker: 0.4, building: "tongrube",      workerGroup: "handwerker" },
-  { input: null,      output: "eisen",     ratioPerWorker: 0.3, building: "schmiede",      workerGroup: "handwerker" },
-  { input: null,      output: "kohle",     ratioPerWorker: 0.35, building: "kohlebergwerk", workerGroup: "handwerker" },
-  { input: null,      output: "leder",     ratioPerWorker: 0.3, building: "gerberei",      workerGroup: "handwerker" },
-  { input: null,      output: "salz",      ratioPerWorker: 0.25, building: "salzsiederei", workerGroup: "handwerker" },
-  { input: "getreide", output: "bier",     ratioPerWorker: 0.4, building: "brauerei",      workerGroup: "handwerker" },
-  { input: "eisen",    output: "werkzeuge", ratioPerWorker: 0.3, building: "schmiede",     workerGroup: "handwerker" },
-  { input: "eisen",    output: "waffen",   ratioPerWorker: 0.2, building: "waffenschmiede", workerGroup: "handwerker" },
-  { input: "wolle",    output: "kleidung", ratioPerWorker: 0.3, building: "weberei",       workerGroup: "handwerker" },
-  { input: "holz",     output: "papier",   ratioPerWorker: 0.4,  building: "papiermuehle", workerGroup: "handwerker" },
-  { input: "papier",   output: "buecher",  ratioPerWorker: 0.15, building: "buchbinderei", workerGroup: "geistliche" },
-  { input: "eisen",    output: "schmuck",  ratioPerWorker: 0.1,  building: "goldschmiede", workerGroup: "handwerker" },
-  { input: "stein",    output: "glaswaren", ratioPerWorker: 0.2,  building: "glasblaeserei", workerGroup: "handwerker" },
-  // Zweite echte zweistufige Kette (§17, siehe DEVELOPMENT.md-Vorschlag "Mehl->Brot als
-  // weitere zweistufige Kette"): eigene Gebäude statt der bestehenden Mühle (die bleibt
-  // unverändert ein reiner Getreide-Ertragsbooster), damit bestehende Spielstände ohne
-  // die neuen Gebäude von der neuen Kette unberührt bleiben.
-  { input: "getreide", output: "mehl",     ratioPerWorker: 0.5, building: "kornmuehle",   workerGroup: "handwerker" },
-  { input: "mehl",     output: "brot",     ratioPerWorker: 0.35, building: "baeckerei",    workerGroup: "handwerker" },
+  {
+    "input": null,
+    "output": "getreide",
+    "ratioPerWorker": 1,
+    "building": null,
+    "workerGroup": "bauern"
+  },
+  {
+    "input": null,
+    "output": "gemuese",
+    "ratioPerWorker": 0.5,
+    "building": "gemuesegarten",
+    "workerGroup": "landarbeiter"
+  },
+  {
+    "input": null,
+    "output": "fleisch",
+    "ratioPerWorker": 0.35,
+    "building": "viehweide",
+    "workerGroup": "landarbeiter"
+  },
+  {
+    "input": null,
+    "output": "wolle",
+    "ratioPerWorker": 0.4,
+    "building": "viehweide",
+    "workerGroup": "landarbeiter"
+  },
+  {
+    "input": null,
+    "output": "fisch",
+    "ratioPerWorker": 0.4,
+    "building": "fischerteich",
+    "workerGroup": "landarbeiter"
+  },
+  {
+    "input": null,
+    "output": "wein",
+    "ratioPerWorker": 0.3,
+    "building": "weingut",
+    "workerGroup": "landarbeiter"
+  },
+  {
+    "input": null,
+    "output": "holz",
+    "ratioPerWorker": 0.6,
+    "building": "saegewerk",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": null,
+    "output": "stein",
+    "ratioPerWorker": 0.4,
+    "building": "steinbruch",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": null,
+    "output": "ton",
+    "ratioPerWorker": 0.4,
+    "building": "tongrube",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": null,
+    "output": "eisen",
+    "ratioPerWorker": 0.3,
+    "building": "schmiede",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": null,
+    "output": "kohle",
+    "ratioPerWorker": 0.35,
+    "building": "kohlebergwerk",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": null,
+    "output": "leder",
+    "ratioPerWorker": 0.3,
+    "building": "gerberei",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": null,
+    "output": "salz",
+    "ratioPerWorker": 0.25,
+    "building": "salzsiederei",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "getreide",
+    "output": "bier",
+    "ratioPerWorker": 0.4,
+    "building": "brauerei",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "eisen",
+    "output": "werkzeuge",
+    "ratioPerWorker": 0.3,
+    "building": "schmiede",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "eisen",
+    "output": "waffen",
+    "ratioPerWorker": 0.2,
+    "building": "waffenschmiede",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "wolle",
+    "output": "kleidung",
+    "ratioPerWorker": 0.3,
+    "building": "weberei",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "holz",
+    "output": "papier",
+    "ratioPerWorker": 0.4,
+    "building": "papiermuehle",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "papier",
+    "output": "buecher",
+    "ratioPerWorker": 0.15,
+    "building": "buchbinderei",
+    "workerGroup": "geistliche"
+  },
+  {
+    "input": "eisen",
+    "output": "schmuck",
+    "ratioPerWorker": 0.1,
+    "building": "goldschmiede",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "stein",
+    "output": "glaswaren",
+    "ratioPerWorker": 0.2,
+    "building": "glasblaeserei",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "getreide",
+    "output": "mehl",
+    "ratioPerWorker": 0.5,
+    "building": "kornmuehle",
+    "workerGroup": "handwerker"
+  },
+  {
+    "input": "mehl",
+    "output": "brot",
+    "ratioPerWorker": 0.35,
+    "building": "baeckerei",
+    "workerGroup": "handwerker"
+  }
 ];
 
 // materialCost (§26: Bauwerke aus echten mittelalterlichen Rohstoffen — Holz, Stein,
 // Ton, Eisen — statt nur Geld; verknüpft Wirtschaft und Bautätigkeit spürbar, §3)
 const BUILDINGS = {
-  bauernhof:     { name: "Bauernhof",        icon: "BH",  cost: 200,  effect: "getreide_boost", value: 0.15, materialCost: { holz: 20 } },
-  gemuesegarten: { name: "Gemüsegarten",     icon: "GG",  cost: 150,  effect: "enables",        value: "gemuese", materialCost: { holz: 10 } },
-  viehweide:     { name: "Viehweide",        icon: "VW",  cost: 180,  effect: "enables",        value: "fleisch", materialCost: { holz: 15 } },
-  fischerteich:  { name: "Fischerteich",     icon: "FT",  cost: 170,  effect: "enables",        value: "fisch",   materialCost: { holz: 12 } },
-  weingut:       { name: "Weingut",          icon: "WG",  cost: 220,  effect: "enables",        value: "wein",    materialCost: { holz: 15 } },
-  kornspeicher:  { name: "Getreidespeicher", icon: "KS",  cost: 150,  effect: "storage_boost",  value: 200,  materialCost: { holz: 30 } },
-  markt:         { name: "Markt",            icon: "MA",  cost: 300,  effect: "trade_boost",    value: 0.10, materialCost: { holz: 15 } },
-  muehle:        { name: "Mühle",            icon: "MÜ",  cost: 250,  effect: "getreide_boost", value: 0.20, materialCost: { holz: 25, stein: 10 } },
-  saegewerk:     { name: "Sägewerk",         icon: "SW",  cost: 220,  effect: "enables",        value: "holz", materialCost: { holz: 15 } },
-  steinbruch:    { name: "Steinbruch",       icon: "ST",  cost: 240,  effect: "enables",        value: "stein", materialCost: { holz: 10 } },
-  tongrube:      { name: "Tongrube",         icon: "TO",  cost: 200,  effect: "enables",        value: "ton",   materialCost: { holz: 8 } },
-  kohlebergwerk: { name: "Kohlebergwerk",    icon: "KB",  cost: 300,  effect: "enables",        value: "kohle", materialCost: { holz: 20, stein: 15 } },
-  gerberei:      { name: "Gerberei",         icon: "GB",  cost: 260,  effect: "enables",        value: "leder", materialCost: { holz: 15 } },
-  salzsiederei:  { name: "Salzsiederei",     icon: "SS",  cost: 260,  effect: "enables",        value: "salz",  materialCost: { holz: 10, ton: 10 } },
-  schmiede:      { name: "Schmiede",         icon: "SM",  cost: 400,  effect: "enables",        value: "eisen", materialCost: { stein: 20, eisen: 5 } },
-  waffenschmiede:{ name: "Waffenschmiede",   icon: "WS",  cost: 420,  effect: "enables",        value: "waffen", materialCost: { stein: 20, eisen: 10 } },
-  weberei:       { name: "Weberei",          icon: "WB",  cost: 240,  effect: "enables",        value: "kleidung", materialCost: { holz: 15 } },
-  brauerei:      { name: "Brauerei",         icon: "BR",  cost: 280,  effect: "enables",        value: "bier",  materialCost: { holz: 20, ton: 10 } },
-  rathaus:       { name: "Rathaus",          icon: "RH",  cost: 500,  effect: "admin_boost",    value: 0.10, materialCost: { stein: 30, holz: 10 } },
-  kaserne:       { name: "Kaserne",          icon: "KA",  cost: 350,  effect: "military",       value: 1,     materialCost: { holz: 25, stein: 10 } },
-  stadtmauer:    { name: "Stadtmauer",       icon: "SM2", cost: 600,  effect: "defense",        value: 1,     materialCost: { stein: 50 } },
-  kirche:        { name: "Kirche",           icon: "KR",  cost: 350,  effect: "religion_boost", value: 5,     materialCost: { stein: 25, holz: 10 } },
-  kloster:       { name: "Kloster",          icon: "KO",  cost: 300,  effect: "religion_boost", value: 8,     materialCost: { stein: 20 } },
-  universitaet:  { name: "Universität",      icon: "UN",  cost: 600,  effect: "research",       value: 10,    materialCost: { stein: 30, holz: 20 } },
-  palast:        { name: "Palast",           icon: "PA",  cost: 800,  effect: "prestige_boost", value: 2,     materialCost: { stein: 60, holz: 20 } },
-  kathedrale:    { name: "Kathedrale",       icon: "KT",  cost: 1200, effect: "prestige_boost", value: 4,     materialCost: { stein: 90, holz: 30 } },
-  papiermuehle:  { name: "Papiermühle",      icon: "PM",  cost: 280,  effect: "enables",        value: "papier",    materialCost: { holz: 20, stein: 10 } },
-  buchbinderei:  { name: "Buchbinderei",     icon: "BB",  cost: 320,  effect: "enables",        value: "buecher",   materialCost: { holz: 15, stein: 5 } },
-  goldschmiede:  { name: "Goldschmiede",     icon: "GS",  cost: 400,  effect: "enables",        value: "schmuck",   materialCost: { stein: 15, holz: 10 } },
-  glasblaeserei: { name: "Glasbläserei",     icon: "GB",  cost: 350,  effect: "enables",        value: "glaswaren", materialCost: { stein: 20, holz: 15 } },
-  kornmuehle:    { name: "Kornmühle",        icon: "KM",  cost: 240,  effect: "enables",        value: "mehl",      materialCost: { holz: 15, stein: 5 } },
-  baeckerei:     { name: "Bäckerei",         icon: "BK",  cost: 260,  effect: "enables",        value: "brot",      materialCost: { holz: 20, stein: 10 } },
+  "bauernhof": {
+    "name": "Bauernhof",
+    "icon": "BH",
+    "cost": 200,
+    "effect": "getreide_boost",
+    "value": 0.15,
+    "materialCost": {
+      "holz": 20
+    }
+  },
+  "gemuesegarten": {
+    "name": "Gemüsegarten",
+    "icon": "GG",
+    "cost": 150,
+    "effect": "enables",
+    "value": "gemuese",
+    "materialCost": {
+      "holz": 10
+    }
+  },
+  "viehweide": {
+    "name": "Viehweide",
+    "icon": "VW",
+    "cost": 180,
+    "effect": "enables",
+    "value": "fleisch",
+    "materialCost": {
+      "holz": 15
+    }
+  },
+  "fischerteich": {
+    "name": "Fischerteich",
+    "icon": "FT",
+    "cost": 170,
+    "effect": "enables",
+    "value": "fisch",
+    "materialCost": {
+      "holz": 12
+    }
+  },
+  "weingut": {
+    "name": "Weingut",
+    "icon": "WG",
+    "cost": 220,
+    "effect": "enables",
+    "value": "wein",
+    "materialCost": {
+      "holz": 15
+    }
+  },
+  "kornspeicher": {
+    "name": "Getreidespeicher",
+    "icon": "KS",
+    "cost": 150,
+    "effect": "storage_boost",
+    "value": 200,
+    "materialCost": {
+      "holz": 30
+    }
+  },
+  "markt": {
+    "name": "Markt",
+    "icon": "MA",
+    "cost": 300,
+    "effect": "trade_boost",
+    "value": 0.1,
+    "materialCost": {
+      "holz": 15
+    }
+  },
+  "muehle": {
+    "name": "Mühle",
+    "icon": "MÜ",
+    "cost": 250,
+    "effect": "getreide_boost",
+    "value": 0.2,
+    "materialCost": {
+      "holz": 25,
+      "stein": 10
+    }
+  },
+  "saegewerk": {
+    "name": "Sägewerk",
+    "icon": "SW",
+    "cost": 220,
+    "effect": "enables",
+    "value": "holz",
+    "materialCost": {
+      "holz": 15
+    }
+  },
+  "steinbruch": {
+    "name": "Steinbruch",
+    "icon": "ST",
+    "cost": 240,
+    "effect": "enables",
+    "value": "stein",
+    "materialCost": {
+      "holz": 10
+    }
+  },
+  "tongrube": {
+    "name": "Tongrube",
+    "icon": "TO",
+    "cost": 200,
+    "effect": "enables",
+    "value": "ton",
+    "materialCost": {
+      "holz": 8
+    }
+  },
+  "kohlebergwerk": {
+    "name": "Kohlebergwerk",
+    "icon": "KB",
+    "cost": 300,
+    "effect": "enables",
+    "value": "kohle",
+    "materialCost": {
+      "holz": 20,
+      "stein": 15
+    }
+  },
+  "gerberei": {
+    "name": "Gerberei",
+    "icon": "GB",
+    "cost": 260,
+    "effect": "enables",
+    "value": "leder",
+    "materialCost": {
+      "holz": 15
+    }
+  },
+  "salzsiederei": {
+    "name": "Salzsiederei",
+    "icon": "SS",
+    "cost": 260,
+    "effect": "enables",
+    "value": "salz",
+    "materialCost": {
+      "holz": 10,
+      "ton": 10
+    }
+  },
+  "schmiede": {
+    "name": "Schmiede",
+    "icon": "SM",
+    "cost": 400,
+    "effect": "enables",
+    "value": "eisen",
+    "materialCost": {
+      "stein": 20,
+      "eisen": 5
+    }
+  },
+  "waffenschmiede": {
+    "name": "Waffenschmiede",
+    "icon": "WS",
+    "cost": 420,
+    "effect": "enables",
+    "value": "waffen",
+    "materialCost": {
+      "stein": 20,
+      "eisen": 10
+    }
+  },
+  "weberei": {
+    "name": "Weberei",
+    "icon": "WB",
+    "cost": 240,
+    "effect": "enables",
+    "value": "kleidung",
+    "materialCost": {
+      "holz": 15
+    }
+  },
+  "brauerei": {
+    "name": "Brauerei",
+    "icon": "BR",
+    "cost": 280,
+    "effect": "enables",
+    "value": "bier",
+    "materialCost": {
+      "holz": 20,
+      "ton": 10
+    }
+  },
+  "rathaus": {
+    "name": "Rathaus",
+    "icon": "RH",
+    "cost": 500,
+    "effect": "admin_boost",
+    "value": 0.1,
+    "materialCost": {
+      "stein": 30,
+      "holz": 10
+    }
+  },
+  "kaserne": {
+    "name": "Kaserne",
+    "icon": "KA",
+    "cost": 350,
+    "effect": "military",
+    "value": 1,
+    "materialCost": {
+      "holz": 25,
+      "stein": 10
+    }
+  },
+  "stadtmauer": {
+    "name": "Stadtmauer",
+    "icon": "SM2",
+    "cost": 600,
+    "effect": "defense",
+    "value": 1,
+    "materialCost": {
+      "stein": 50
+    }
+  },
+  "kirche": {
+    "name": "Kirche",
+    "icon": "KR",
+    "cost": 350,
+    "effect": "religion_boost",
+    "value": 5,
+    "materialCost": {
+      "stein": 25,
+      "holz": 10
+    }
+  },
+  "kloster": {
+    "name": "Kloster",
+    "icon": "KO",
+    "cost": 300,
+    "effect": "religion_boost",
+    "value": 8,
+    "materialCost": {
+      "stein": 20
+    }
+  },
+  "universitaet": {
+    "name": "Universität",
+    "icon": "UN",
+    "cost": 600,
+    "effect": "research",
+    "value": 10,
+    "materialCost": {
+      "stein": 30,
+      "holz": 20
+    }
+  },
+  "palast": {
+    "name": "Palast",
+    "icon": "PA",
+    "cost": 800,
+    "effect": "prestige_boost",
+    "value": 2,
+    "materialCost": {
+      "stein": 60,
+      "holz": 20
+    }
+  },
+  "kathedrale": {
+    "name": "Kathedrale",
+    "icon": "KT",
+    "cost": 1200,
+    "effect": "prestige_boost",
+    "value": 4,
+    "materialCost": {
+      "stein": 90,
+      "holz": 30
+    }
+  },
+  "papiermuehle": {
+    "name": "Papiermühle",
+    "icon": "PM",
+    "cost": 280,
+    "effect": "enables",
+    "value": "papier",
+    "materialCost": {
+      "holz": 20,
+      "stein": 10
+    }
+  },
+  "buchbinderei": {
+    "name": "Buchbinderei",
+    "icon": "BB",
+    "cost": 320,
+    "effect": "enables",
+    "value": "buecher",
+    "materialCost": {
+      "holz": 15,
+      "stein": 5
+    }
+  },
+  "goldschmiede": {
+    "name": "Goldschmiede",
+    "icon": "GS",
+    "cost": 400,
+    "effect": "enables",
+    "value": "schmuck",
+    "materialCost": {
+      "stein": 15,
+      "holz": 10
+    }
+  },
+  "glasblaeserei": {
+    "name": "Glasbläserei",
+    "icon": "GB",
+    "cost": 350,
+    "effect": "enables",
+    "value": "glaswaren",
+    "materialCost": {
+      "stein": 20,
+      "holz": 15
+    }
+  },
+  "kornmuehle": {
+    "name": "Kornmühle",
+    "icon": "KM",
+    "cost": 240,
+    "effect": "enables",
+    "value": "mehl",
+    "materialCost": {
+      "holz": 15,
+      "stein": 5
+    }
+  },
+  "baeckerei": {
+    "name": "Bäckerei",
+    "icon": "BK",
+    "cost": 260,
+    "effect": "enables",
+    "value": "brot",
+    "materialCost": {
+      "holz": 20,
+      "stein": 10
+    }
+  }
 };
 
 // Bedarf pro Kopf und Gruppe (relative Gewichtung für Preisbildung); §13: mindestens
 // 10 Bevölkerungsgruppen
 const POP_GROUPS = {
-  bauern:       { name: "Bauern",       needs: { getreide: 1.0 }, weight: 1.0, share: 0.40 },
-  landarbeiter: { name: "Landarbeiter", needs: { getreide: 1.0, gemuese: 0.3 }, weight: 1.0, share: 0.08 },
-  handwerker:   { name: "Handwerker",   needs: { getreide: 1.0, bier: 0.3, leder: 0.05, kleidung: 0.1, brot: 0.1 }, weight: 1.1, share: 0.12 },
-  buerger:      { name: "Bürger",       needs: { getreide: 1.0, bier: 0.3, fleisch: 0.2, kleidung: 0.15, salz: 0.1, buecher: 0.02, glaswaren: 0.03, brot: 0.15 }, weight: 1.4, share: 0.08 },
-  haendler:     { name: "Händler",      needs: { getreide: 1.0, bier: 0.4, werkzeuge: 0.1, leder: 0.05, wein: 0.1, papier: 0.05, glaswaren: 0.02, brot: 0.1 }, weight: 1.3, share: 0.07 },
-  adel:         { name: "Adel",         needs: { getreide: 1.2, bier: 0.5, werkzeuge: 0.2, leder: 0.15, wein: 0.3, gewuerze: 0.05, kleidung: 0.2, waffen: 0.02, schmuck: 0.03, seide: 0.03, buecher: 0.02, brot: 0.1 }, weight: 2.0, share: 0.04 },
-  geistliche:   { name: "Geistliche",   needs: { getreide: 0.9, wein: 0.1, buecher: 0.05, papier: 0.05, brot: 0.1 }, weight: 1.2, share: 0.03 },
-  soldaten:     { name: "Soldaten",     needs: { getreide: 1.1, fleisch: 0.2, waffen: 0.05, brot: 0.1 }, weight: 1.2, share: 0.03 },
-  tageloehner:  { name: "Tagelöhner",   needs: { getreide: 0.85 }, weight: 0.6, share: 0.08 },
-  arme:         { name: "Arme",         needs: { getreide: 0.8 }, weight: 0.5, share: 0.07 },
+  "bauern": {
+    "name": "Bauern",
+    "needs": {
+      "getreide": 1
+    },
+    "weight": 1,
+    "share": 0.4
+  },
+  "landarbeiter": {
+    "name": "Landarbeiter",
+    "needs": {
+      "getreide": 1,
+      "gemuese": 0.3
+    },
+    "weight": 1,
+    "share": 0.08
+  },
+  "handwerker": {
+    "name": "Handwerker",
+    "needs": {
+      "getreide": 1,
+      "bier": 0.3,
+      "leder": 0.05,
+      "kleidung": 0.1,
+      "brot": 0.1
+    },
+    "weight": 1.1,
+    "share": 0.12
+  },
+  "buerger": {
+    "name": "Bürger",
+    "needs": {
+      "getreide": 1,
+      "bier": 0.3,
+      "fleisch": 0.2,
+      "kleidung": 0.15,
+      "salz": 0.1,
+      "buecher": 0.02,
+      "glaswaren": 0.03,
+      "brot": 0.15
+    },
+    "weight": 1.4,
+    "share": 0.08
+  },
+  "haendler": {
+    "name": "Händler",
+    "needs": {
+      "getreide": 1,
+      "bier": 0.4,
+      "werkzeuge": 0.1,
+      "leder": 0.05,
+      "wein": 0.1,
+      "papier": 0.05,
+      "glaswaren": 0.02,
+      "brot": 0.1
+    },
+    "weight": 1.3,
+    "share": 0.07
+  },
+  "adel": {
+    "name": "Adel",
+    "needs": {
+      "getreide": 1.2,
+      "bier": 0.5,
+      "werkzeuge": 0.2,
+      "leder": 0.15,
+      "wein": 0.3,
+      "gewuerze": 0.05,
+      "kleidung": 0.2,
+      "waffen": 0.02,
+      "schmuck": 0.03,
+      "seide": 0.03,
+      "buecher": 0.02,
+      "brot": 0.1
+    },
+    "weight": 2,
+    "share": 0.04
+  },
+  "geistliche": {
+    "name": "Geistliche",
+    "needs": {
+      "getreide": 0.9,
+      "wein": 0.1,
+      "buecher": 0.05,
+      "papier": 0.05,
+      "brot": 0.1
+    },
+    "weight": 1.2,
+    "share": 0.03
+  },
+  "soldaten": {
+    "name": "Soldaten",
+    "needs": {
+      "getreide": 1.1,
+      "fleisch": 0.2,
+      "waffen": 0.05,
+      "brot": 0.1
+    },
+    "weight": 1.2,
+    "share": 0.03
+  },
+  "tageloehner": {
+    "name": "Tagelöhner",
+    "needs": {
+      "getreide": 0.85
+    },
+    "weight": 0.6,
+    "share": 0.08
+  },
+  "arme": {
+    "name": "Arme",
+    "needs": {
+      "getreide": 0.8
+    },
+    "weight": 0.5,
+    "share": 0.07
+  }
 };
 
 // ---------- Militär (§33/§34) — geprägt von Vasallenheeren & Söldnern, keine
@@ -1100,32 +1790,119 @@ const POP_GROUPS = {
 // Söldner sind jederzeit gegen Gold verfügbar, aber unzuverlässig (Fahnenflucht
 // bei ausbleibendem Sold oder wackliger Herrschaft).
 const TROOP_TYPES = {
-  miliz:             { name: "Bauernmiliz",       cost: 50,  upkeep: 2,  strength: 1,   source: "vasall" },
-  bogenschuetzen:    { name: "Bogenschützen",     cost: 90,  upkeep: 3,  strength: 2,   source: "vasall" },
-  armbrustschuetzen: { name: "Armbrustschützen",  cost: 130, upkeep: 4,  strength: 2.5, source: "vasall" },
-  pikeniere:         { name: "Pikeniere",         cost: 110, upkeep: 4,  strength: 3,   source: "vasall" },
-  ritter:            { name: "Ritter",            cost: 400, upkeep: 12, strength: 8,   source: "vasall", minAdelSatisfaction: 45 },
-  schwere_kavallerie:{ name: "Schwere Kavallerie",cost: 650, upkeep: 18, strength: 12,  source: "vasall", minAdelSatisfaction: 55 },
-  soeldner:          { name: "Söldner",           cost: 200, upkeep: 15, strength: 4,   source: "soeldner" },
+  "miliz": {
+    "name": "Bauernmiliz",
+    "cost": 50,
+    "upkeep": 2,
+    "strength": 1,
+    "source": "vasall"
+  },
+  "bogenschuetzen": {
+    "name": "Bogenschützen",
+    "cost": 90,
+    "upkeep": 3,
+    "strength": 2,
+    "source": "vasall"
+  },
+  "armbrustschuetzen": {
+    "name": "Armbrustschützen",
+    "cost": 130,
+    "upkeep": 4,
+    "strength": 2.5,
+    "source": "vasall"
+  },
+  "pikeniere": {
+    "name": "Pikeniere",
+    "cost": 110,
+    "upkeep": 4,
+    "strength": 3,
+    "source": "vasall"
+  },
+  "ritter": {
+    "name": "Ritter",
+    "cost": 400,
+    "upkeep": 12,
+    "strength": 8,
+    "source": "vasall",
+    "minAdelSatisfaction": 45
+  },
+  "schwere_kavallerie": {
+    "name": "Schwere Kavallerie",
+    "cost": 650,
+    "upkeep": 18,
+    "strength": 12,
+    "source": "vasall",
+    "minAdelSatisfaction": 55
+  },
+  "soeldner": {
+    "name": "Söldner",
+    "cost": 200,
+    "upkeep": 15,
+    "strength": 4,
+    "source": "soeldner"
+  }
 };
 
 // Schlachtformationen (§35): keine echte taktische Simulation, aber eine
 // spürbare, nachvollziehbare Vorentscheidung mit Vor-/Nachteilen
 const FORMATIONS = {
-  ritter_zentrum:    { name: "Ritter im Zentrum, Fußvolk an den Flanken", requiresTroop: "ritter", bonus: 0.15 },
-  schuetzen_vorhut:  { name: "Bogen-/Armbrustschützen als Vorhut",        requiresTroop: ["bogenschuetzen","armbrustschuetzen"], bonus: 0.12 },
-  pikenwall:         { name: "Pikenwall gegen Kavallerie",                requiresTroop: "pikeniere", bonus: 0.13 },
-  gleichmaessig:     { name: "Gleichmäßig verteilt (keine Schwerpunktbildung)", requiresTroop: null, bonus: 0 },
+  "ritter_zentrum": {
+    "name": "Ritter im Zentrum, Fußvolk an den Flanken",
+    "requiresTroop": "ritter",
+    "bonus": 0.15
+  },
+  "schuetzen_vorhut": {
+    "name": "Bogen-/Armbrustschützen als Vorhut",
+    "requiresTroop": [
+      "bogenschuetzen",
+      "armbrustschuetzen"
+    ],
+    "bonus": 0.12
+  },
+  "pikenwall": {
+    "name": "Pikenwall gegen Kavallerie",
+    "requiresTroop": "pikeniere",
+    "bonus": 0.13
+  },
+  "gleichmaessig": {
+    "name": "Gleichmäßig verteilt (keine Schwerpunktbildung)",
+    "requiresTroop": null,
+    "bonus": 0
+  }
 };
 
 // ---------- Berater (§42) ----------
 const ADVISOR_ROLES = {
-  schatzmeister:   { name: "Schatzmeister",    statKey: "verwaltung", desc: "Erhöht die Steuereinnahmen." },
-  marschall:       { name: "Marschall",        statKey: "militaer",   desc: "Stärkt die Armee." },
-  diplomat:        { name: "Diplomat",         statKey: "diplomatie", desc: "Verbessert diplomatische Erfolge." },
-  spionagemeister: { name: "Spionagemeister",  statKey: "intelligenz", desc: "Grundlage für künftige Aufklärung (Beta)." },
-  geistlicher:     { name: "Geistlicher",      statKey: "charisma",   desc: "Hebt die Zufriedenheit leicht." },
-  handelsberater:  { name: "Handelsberater",   statKey: "handel",     desc: "Steigert die Produktion." },
+  "schatzmeister": {
+    "name": "Schatzmeister",
+    "statKey": "verwaltung",
+    "desc": "Erhöht die Steuereinnahmen."
+  },
+  "marschall": {
+    "name": "Marschall",
+    "statKey": "militaer",
+    "desc": "Stärkt die Armee."
+  },
+  "diplomat": {
+    "name": "Diplomat",
+    "statKey": "diplomatie",
+    "desc": "Verbessert diplomatische Erfolge."
+  },
+  "spionagemeister": {
+    "name": "Spionagemeister",
+    "statKey": "intelligenz",
+    "desc": "Grundlage für künftige Aufklärung (Beta)."
+  },
+  "geistlicher": {
+    "name": "Geistlicher",
+    "statKey": "charisma",
+    "desc": "Hebt die Zufriedenheit leicht."
+  },
+  "handelsberater": {
+    "name": "Handelsberater",
+    "statKey": "handel",
+    "desc": "Steigert die Produktion."
+  }
 };
 
 // ---------- Zusätzliche Regionen für ein größeres Mitteleuropa-Bild (§6) ----------
@@ -1133,23 +1910,91 @@ const ADVISOR_ROLES = {
 // ai4-ai7 erweitern die simulierte Welt (Handel, Chronik-Ereignisse, eigenständige
 // Entwicklung gemäß §86), sind aber (noch) nicht Ziel direkter Diplomatie/Kriege.
 const EXTRA_REGIONS = [
-  { id: "ai4", name: "Bayern",   fertility: 1.05, pop: 2900 },
-  { id: "ai5", name: "Sachsen",  fertility: 0.95, pop: 2700 },
-  { id: "ai6", name: "Böhmen",   fertility: 1.05, pop: 2850 },
-  { id: "ai7", name: "Schwaben", fertility: 0.95, pop: 2750 },
+  {
+    "id": "ai4",
+    "name": "Bayern",
+    "fertility": 1.05,
+    "pop": 2900
+  },
+  {
+    "id": "ai5",
+    "name": "Sachsen",
+    "fertility": 0.95,
+    "pop": 2700
+  },
+  {
+    "id": "ai6",
+    "name": "Böhmen",
+    "fertility": 1.05,
+    "pop": 2850
+  },
+  {
+    "id": "ai7",
+    "name": "Schwaben",
+    "fertility": 0.95,
+    "pop": 2750
+  }
 ];
 
 // ---------- Localization-Grundstruktur (§80) ----------
 // Aktuell nur Deutsch befüllt; Architektur ist für weitere Sprachen vorbereitet.
 // Noch nicht die gesamte UI ist über STRINGS geführt (siehe DEVELOPMENT.md).
+// §80: die statische UI-"Hülle" (Titelbildschirm, Charaktererstellung, Reiter,
+// Hauptaktionen, Einstellungen) läuft vollständig über STRINGS/t() und ist in
+// Deutsch UND Englisch komplett übersetzt — umschaltbar über den Sprachwähler
+// im Optionen-Bereich. Bewusste Einschränkung (siehe DEVELOPMENT.md): die
+// dynamisch generierten Inhalte der Spielreiter selbst (Chronik-Texte,
+// Ereignistexte, Tabelleninhalte, Tooltip-Aufschlüsselungen) bleiben Deutsch —
+// das wäre eine vollständige Zweitübersetzung von hunderten Text-Templates
+// und laut Spec selbst (§101) niedrigste Priorität.
 const STRINGS = {
   de: {
+    title_h1: "KAISERREICH", title_h2: "AUFSTIEG EINER DYNASTIE",
+    title_new_game: "NEUES SPIEL", title_load_game: "SPIEL LADEN",
+    title_multiplayer: "MEHRSPIELER", title_chronicle: "CHRONIK", title_options: "OPTIONEN",
+    title_multiplayer_hint: "In dieser Version nicht verfügbar",
+    title_chronicle_hint: "Erst nach dem ersten Spielende verfügbar",
+    title_options_alert: "CRT-Filter, Sound, Musik und Sprache lassen sich im Spiel selbst unten rechts umschalten.",
+    intro_line1: "Anno 1500.",
+    intro_line2: "Eine junge Dynastie erhebt sich in einem unruhigen Reich —",
+    intro_line3: "zwischen Kornkammern, Kanzleien und Kriegsherren.",
+    intro_skip: "(klicken zum Überspringen)",
+    cc_title: "HERRSCHER ERSTELLEN",
+    cc_name: "Name", cc_name_placeholder: "z. B. Friedrich",
+    cc_gender: "Geschlecht", cc_gender_m: "männlich", cc_gender_f: "weiblich",
+    cc_dynasty: "Dynastiename", cc_dynasty_placeholder: "z. B. von Kaisersberg",
+    cc_region: "Startregion", cc_region_only: "Deine Provinz (einzige verfügbare Region in dieser Version)",
+    cc_difficulty: "Schwierigkeitsgrad",
+    cc_diff_easy: "Leicht — KI macht mehr Fehler", cc_diff_normal: "Normal — ausgewogene KI",
+    cc_diff_hard: "Schwer — KI plant zielstrebiger", cc_diff_expert: "Experte — weniger Informationen, kaum KI-Fehler",
+    cc_victory: "Zielsetzung (§47)",
+    cc_victory_kaiser: "Kaiser werden (klassisch, per Kaiserwahl)",
+    cc_victory_wealth: "Reichste Dynastie (80.000 Taler, 5 Jahre halten)",
+    cc_victory_trade: "Größte Handelsmacht (Lagerwert 15.000, 5 Jahre halten)",
+    cc_victory_military: "Militärische Dominanz (alle 3 Nachbarn besiegen)",
+    cc_victory_endless: "Endlosmodus (kein Sieg-Ziel)",
+    cc_capital: "Startkapital",
+    cc_capital_arm: "Arm — Herausforderung von Anfang an",
+    cc_capital_normal: "Normal",
+    cc_capital_reich: "Reich — komfortabler Start",
+    cc_stance: "Diplomatische Ausgangslage",
+    cc_stance_freundlich: "Freundlich — Nachbarn wohlgesonnen",
+    cc_stance_neutral: "Neutral",
+    cc_stance_angespannt: "Angespannt — Nachbarn misstrauisch",
+    cc_traits: "Persönlichkeitsschwerpunkte", cc_traits_hint: "(genau 2 wählen)",
+    cc_start: "SPIEL BEGINNEN", cc_random: "ZUFÄLLIGER HERRSCHER", cc_back: "ZURÜCK",
     tab_provinz: "🏰 PROVINZ",
+    tab_hof: "📚 BERATER & FORSCHUNG",
+    tab_wirtschaft: "💰 WIRTSCHAFT",
+    tab_diplomatie: "🤝 DIPLOMATIE",
     tab_karte: "🗺 KARTE & GEBÄUDE",
     tab_militaer: "⚔ MILITÄR",
     btn_advance: "▶ JAHR VERGEHEN LASSEN",
     btn_save: "💾 SPEICHERN",
     btn_load: "📂 LADEN",
+    tb_year: "Jahr", tb_treasury: "Schatz", tb_treasury_unit: "Taler", tb_prestige: "Prestige",
+    settings_crt: "CRT-Filter", settings_sound: "Sound", settings_music: "🎵 Musik", settings_debug: "🛠 Debug",
+    settings_lang: "Sprache",
     panel_hof: "HOF",
     panel_berater: "BERATER",
     panel_provinz: "DEINE PROVINZ",
@@ -1160,21 +2005,138 @@ const STRINGS = {
     panel_kriegserklaerung: "KRIEGSERKLÄRUNG",
     panel_kaiserwahl: "KAISERWAHL",
   },
+  en: {
+    title_h1: "KAISERREICH", title_h2: "RISE OF A DYNASTY",
+    title_new_game: "NEW GAME", title_load_game: "LOAD GAME",
+    title_multiplayer: "MULTIPLAYER", title_chronicle: "CHRONICLE", title_options: "OPTIONS",
+    title_multiplayer_hint: "Not available in this version",
+    title_chronicle_hint: "Only available after your first game ends",
+    title_options_alert: "CRT filter, sound, music and language can be toggled in-game, bottom right.",
+    intro_line1: "Anno 1500.",
+    intro_line2: "A young dynasty rises in an unquiet realm —",
+    intro_line3: "between granaries, chancelleries, and warlords.",
+    intro_skip: "(click to skip)",
+    cc_title: "CREATE YOUR RULER",
+    cc_name: "Name", cc_name_placeholder: "e.g. Frederick",
+    cc_gender: "Gender", cc_gender_m: "male", cc_gender_f: "female",
+    cc_dynasty: "Dynasty name", cc_dynasty_placeholder: "e.g. of Kaisersberg",
+    cc_region: "Starting region", cc_region_only: "Your province (only region available in this version)",
+    cc_difficulty: "Difficulty",
+    cc_diff_easy: "Easy — the AI makes more mistakes", cc_diff_normal: "Normal — balanced AI",
+    cc_diff_hard: "Hard — the AI plans more purposefully", cc_diff_expert: "Expert — less information, few AI mistakes",
+    cc_victory: "Victory goal (§47)",
+    cc_victory_kaiser: "Become Emperor (classic, via imperial election)",
+    cc_victory_wealth: "Wealthiest dynasty (80,000 gold, hold for 5 years)",
+    cc_victory_trade: "Greatest trading power (15,000 warehouse value, hold for 5 years)",
+    cc_victory_military: "Military dominance (defeat all 3 neighbors)",
+    cc_victory_endless: "Endless mode (no victory goal)",
+    cc_capital: "Starting capital",
+    cc_capital_arm: "Poor — a challenge from the start",
+    cc_capital_normal: "Normal",
+    cc_capital_reich: "Rich — a comfortable start",
+    cc_stance: "Diplomatic starting position",
+    cc_stance_freundlich: "Friendly — neighbors well-disposed",
+    cc_stance_neutral: "Neutral",
+    cc_stance_angespannt: "Tense — neighbors suspicious",
+    cc_traits: "Personality traits", cc_traits_hint: "(pick exactly 2)",
+    cc_start: "START GAME", cc_random: "RANDOM RULER", cc_back: "BACK",
+    tab_provinz: "🏰 PROVINCE",
+    tab_hof: "📚 ADVISORS & RESEARCH",
+    tab_wirtschaft: "💰 ECONOMY",
+    tab_diplomatie: "🤝 DIPLOMACY",
+    tab_karte: "🗺 MAP & BUILDINGS",
+    tab_militaer: "⚔ MILITARY",
+    btn_advance: "▶ ADVANCE YEAR",
+    btn_save: "💾 SAVE",
+    btn_load: "📂 LOAD",
+    tb_year: "Year", tb_treasury: "Treasury", tb_treasury_unit: "gold", tb_prestige: "Prestige",
+    settings_crt: "CRT filter", settings_sound: "Sound", settings_music: "🎵 Music", settings_debug: "🛠 Debug",
+    settings_lang: "Language",
+    panel_hof: "COURT",
+    panel_berater: "ADVISORS",
+    panel_provinz: "YOUR PROVINCE",
+    panel_maerkte: "MARKET PRICES & STOCKPILES",
+    panel_diplomatie: "DIPLOMACY",
+    panel_chronik: "IMPERIAL CHRONICLE",
+    panel_armee: "ARMY",
+    panel_kriegserklaerung: "DECLARATION OF WAR",
+    panel_kaiserwahl: "IMPERIAL ELECTION",
+  },
 };
 let currentLocale = "de";
 function t(key) { return (STRINGS[currentLocale] && STRINGS[currentLocale][key]) || key; }
 
 const TITLES = [
-  { id: "freiherr",  name: "Freiherr",  reqPop: 0,     reqWealth: 0,     reqPrestige: 0 },
-  { id: "baron",     name: "Baron",     reqPop: 3000,  reqWealth: 1000,  reqPrestige: 20 },
-  { id: "graf",      name: "Graf",      reqPop: 6000,  reqWealth: 3000,  reqPrestige: 50 },
-  { id: "landgraf",  name: "Landgraf",  reqPop: 10000, reqWealth: 6000,  reqPrestige: 90 },
-  { id: "markgraf",  name: "Markgraf",  reqPop: 15000, reqWealth: 10000, reqPrestige: 140 },
-  { id: "fuerst",    name: "Fürst",     reqPop: 22000, reqWealth: 16000, reqPrestige: 200 },
-  { id: "herzog",    name: "Herzog",    reqPop: 32000, reqWealth: 25000, reqPrestige: 280 },
-  { id: "kurfuerst", name: "Kurfürst",  reqPop: 45000, reqWealth: 40000, reqPrestige: 380 },
-  { id: "koenig",    name: "König",     reqPop: 65000, reqWealth: 60000, reqPrestige: 500 },
-  { id: "kaiser",    name: "Kaiser",    reqPop: 90000, reqWealth: 90000, reqPrestige: 650 },
+  {
+    "id": "freiherr",
+    "name": "Freiherr",
+    "reqPop": 0,
+    "reqWealth": 0,
+    "reqPrestige": 0
+  },
+  {
+    "id": "baron",
+    "name": "Baron",
+    "reqPop": 3000,
+    "reqWealth": 1000,
+    "reqPrestige": 20
+  },
+  {
+    "id": "graf",
+    "name": "Graf",
+    "reqPop": 6000,
+    "reqWealth": 3000,
+    "reqPrestige": 50
+  },
+  {
+    "id": "landgraf",
+    "name": "Landgraf",
+    "reqPop": 10000,
+    "reqWealth": 6000,
+    "reqPrestige": 90
+  },
+  {
+    "id": "markgraf",
+    "name": "Markgraf",
+    "reqPop": 15000,
+    "reqWealth": 10000,
+    "reqPrestige": 140
+  },
+  {
+    "id": "fuerst",
+    "name": "Fürst",
+    "reqPop": 22000,
+    "reqWealth": 16000,
+    "reqPrestige": 200
+  },
+  {
+    "id": "herzog",
+    "name": "Herzog",
+    "reqPop": 32000,
+    "reqWealth": 25000,
+    "reqPrestige": 280
+  },
+  {
+    "id": "kurfuerst",
+    "name": "Kurfürst",
+    "reqPop": 45000,
+    "reqWealth": 40000,
+    "reqPrestige": 380
+  },
+  {
+    "id": "koenig",
+    "name": "König",
+    "reqPop": 65000,
+    "reqWealth": 60000,
+    "reqPrestige": 500
+  },
+  {
+    "id": "kaiser",
+    "name": "Kaiser",
+    "reqPop": 90000,
+    "reqWealth": 90000,
+    "reqPrestige": 650
+  }
 ];
 
 // Event-System: TRIGGER/BEDINGUNGEN/TEXT/ENTSCHEIDUNGEN/KONSEQUENZEN (§38)
@@ -1688,12 +2650,16 @@ function newGame(options) {
   const difficultyKey = options.difficulty || "normal";
   const diffCfg = CONFIG.difficulty[difficultyKey] || CONFIG.difficulty.normal;
   const dynastyName = options.dynastyName || "von Kaisersberg";
+  // Leichte Szenario-Anpassung (§103-Ansatz): wirkt zusätzlich zum Schwierigkeitsgrad
+  const capitalCfg = CONFIG.scenario.capital[options.startingCapital] || CONFIG.scenario.capital.normal;
+  const stanceCfg = CONFIG.scenario.stance[options.diplomaticStance] || CONFIG.scenario.stance.neutral;
+  const startRelation = clamp(CONFIG.diplomacy.startRelation + stanceCfg.relationOffset, -100, 100);
 
   const state = {
     year: 1500,
     seed: seed,
     difficulty: difficultyKey,
-    treasury: Math.round(1500 * diffCfg.startTreasuryMultiplier),
+    treasury: Math.round(1500 * diffCfg.startTreasuryMultiplier * capitalCfg.treasuryMultiplier),
     prestige: 10,
     titleIndex: 0,
     legitimacy: CONFIG.succession.legitimacyStart,
@@ -1705,9 +2671,9 @@ function newGame(options) {
       ai3: makeRegion("Bergheim (Nachbar)", false, 1.0, 2800),
     },
     diplomacy: {
-      ai1: { relation: CONFIG.diplomacy.startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
-      ai2: { relation: CONFIG.diplomacy.startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
-      ai3: { relation: CONFIG.diplomacy.startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
+      ai1: { relation: startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
+      ai2: { relation: startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
+      ai3: { relation: startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } },
     },
     army: { miliz: 0, bogenschuetzen: 0, armbrustschuetzen: 0, pikeniere: 0, ritter: 0, schwere_kavallerie: 0, soeldner: 0 },
     advisors: { schatzmeister: null, marschall: null, diplomat: null, spionagemeister: null, geistlicher: null, handelsberater: null },
@@ -4660,12 +5626,16 @@ function startNewGameFromForm() {
   const dynastyName = document.getElementById('cc-dynasty').value.trim() || "von Kaisersberg";
   const difficulty = document.getElementById('cc-difficulty').value;
   const victoryCondition = document.getElementById('cc-victory').value;
+  const startingCapital = document.getElementById('cc-capital').value;
+  const diplomaticStance = document.getElementById('cc-stance').value;
   launchGame({
     rulerName: name || undefined,
     gender,
     dynastyName,
     difficulty,
     victoryCondition,
+    startingCapital,
+    diplomaticStance,
     chosenTraits: selectedTraits.length === 2 ? selectedTraits : undefined,
   });
 }
@@ -4673,7 +5643,9 @@ function startNewGameFromForm() {
 function startNewGameRandom() {
   const difficulty = document.getElementById('cc-difficulty') ? document.getElementById('cc-difficulty').value : 'normal';
   const victoryCondition = document.getElementById('cc-victory') ? document.getElementById('cc-victory').value : 'kaiser';
-  launchGame({ difficulty, victoryCondition });
+  const startingCapital = document.getElementById('cc-capital') ? document.getElementById('cc-capital').value : 'normal';
+  const diplomaticStance = document.getElementById('cc-stance') ? document.getElementById('cc-stance').value : 'neutral';
+  launchGame({ difficulty, victoryCondition, startingCapital, diplomaticStance });
 }
 
 document.getElementById('titleLoadFile').addEventListener('change', (e) => {
@@ -4718,12 +5690,109 @@ function playBeep(freq, duration) {
   } catch (e) { /* Web Audio evtl. nicht verfügbar — Sound ist rein optional */ }
 }
 
+// ---------- Chiptune-Musik (§58) — kein externes Audio-Asset nötig: ein
+// zweistimmiges, sich wiederholendes 8-Bit-Motiv wird rein aus Oszillatoren
+// synthetisiert (Melodie: Rechteckwelle, Bass: Dreieckwelle), exakt im
+// selben Web-Audio-Ansatz wie die bestehenden playBeep()-Soundeffekte.
+// Bewusst standardmäßig aus (Browser-Autoplay-Regeln erfordern ohnehin eine
+// Nutzerinteraktion, und niemand soll von Musik überrascht werden).
+const MUSIC_BPM = 108;
+const MUSIC_NOTE_FREQ = {
+  C3:130.81, D3:146.83, E3:164.81, F3:174.61, G3:196.00, A3:220.00, B3:246.94,
+  C4:261.63, D4:293.66, E4:329.63, F4:349.23, G4:392.00, A4:440.00, B4:493.88,
+  C5:523.25, D5:587.33, E5:659.25, F5:698.46, G5:783.99, A5:880.00,
+};
+// [Note, Dauer in Vierteln] — kleines, feierliches Dur-Motiv, endet auf der Tonika
+const MUSIC_MELODY = [
+  ['C5',1],['E5',1],['G5',1],['E5',1],
+  ['F5',1],['A5',1],['G5',1],['F5',1],
+  ['E5',1],['D5',1],['C5',1],['D5',1],
+  ['E5',2],['C5',2],
+];
+const MUSIC_BASS = [
+  ['C3',2],['G3',2],
+  ['F3',2],['C3',2],
+  ['G3',2],['D3',2],
+  ['G3',2],['C3',2],
+];
+let musicEnabled = false;
+let musicTimer = null;
+
+function playMusicNote(freq, when, dur, type, vol) {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, when);
+  gain.gain.linearRampToValueAtTime(vol, when + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(when);
+  osc.stop(when + dur + 0.03);
+}
+
+function scheduleMusicLoop(startTime) {
+  if (!musicEnabled) return;
+  const beatDur = 60 / MUSIC_BPM;
+  let t = startTime;
+  for (const [note, beats] of MUSIC_MELODY) {
+    const dur = beats * beatDur;
+    playMusicNote(MUSIC_NOTE_FREQ[note], t, dur * 0.85, 'square', 0.05);
+    t += dur;
+  }
+  let tb = startTime;
+  for (const [note, beats] of MUSIC_BASS) {
+    const dur = beats * beatDur;
+    playMusicNote(MUSIC_NOTE_FREQ[note], tb, dur * 0.9, 'triangle', 0.06);
+    tb += dur;
+  }
+  const loopDur = MUSIC_MELODY.reduce((s, [, b]) => s + b, 0) * beatDur;
+  musicTimer = setTimeout(() => scheduleMusicLoop(startTime + loopDur), Math.max(50, (loopDur - 0.3) * 1000));
+}
+
+function startMusic() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  scheduleMusicLoop(audioCtx.currentTime + 0.1);
+}
+function stopMusic() {
+  if (musicTimer) { clearTimeout(musicTimer); musicTimer = null; }
+}
+
 document.getElementById('crtToggle').addEventListener('change', (e) => {
   document.getElementById('frame').classList.toggle('crt', e.target.checked);
 });
 document.getElementById('soundToggle').addEventListener('change', (e) => {
   soundEnabled = e.target.checked;
 });
+document.getElementById('musicToggle').addEventListener('change', (e) => {
+  musicEnabled = e.target.checked;
+  if (musicEnabled) startMusic(); else stopMusic();
+});
+
+// ---------- Sprachumschaltung (§80) — aktualisiert die gesamte statische
+// UI-Hülle (Titelbildschirm, Charaktererstellung, Reiter, Hauptaktionen,
+// Einstellungen); dynamisch generierte Spielinhalte bleiben bewusst Deutsch
+// (siehe DEVELOPMENT.md/STATUS_ANALYSE.md — vollständige Zweitübersetzung
+// aller Templates ist laut Spec selbst niedrigste Priorität, §101). ----------
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.getAttribute('data-i18n-title')); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.getAttribute('data-i18n-placeholder')); });
+  document.documentElement.lang = currentLocale;
+  document.getElementById('langSelect').value = currentLocale;
+  document.getElementById('langSelectTitle').value = currentLocale;
+  // die Kopfzeile (Jahr/Schatz/Prestige) wird von render() erzeugt, nicht von
+  // applyI18n() selbst — nach einem laufenden Spielstart also render() erneut anstoßen
+  if (typeof state !== 'undefined' && state) render();
+}
+function setLocale(lang) {
+  currentLocale = lang;
+  applyI18n();
+}
+document.getElementById('langSelect').addEventListener('change', (e) => setLocale(e.target.value));
+document.getElementById('langSelectTitle').addEventListener('change', (e) => setLocale(e.target.value));
 document.getElementById('debugToggle').addEventListener('change', (e) => {
   document.getElementById('debugPanel').style.display = e.target.checked ? 'block' : 'none';
   if (e.target.checked) populateDebugEventSelect();
@@ -4785,10 +5854,10 @@ function render() {
   const nextTitle = TITLES[state.titleIndex+1];
 
   document.getElementById('tb-title').textContent = `${currentTitle.name} von ${r.name}`;
-  document.getElementById('tb-year').textContent = `Jahr ${state.year}`;
-  document.getElementById('tb-treasury').textContent = `Schatz ${Math.round(state.treasury)} Taler`;
+  document.getElementById('tb-year').textContent = `${t('tb_year')} ${state.year}`;
+  document.getElementById('tb-treasury').textContent = `${t('tb_treasury')} ${Math.round(state.treasury)} ${t('tb_treasury_unit')}`;
   document.getElementById('tb-treasury').setAttribute('data-tip', `Einnahmen u.a. aus Steuern (Satz ${Math.round(r.taxRate*100)}%)\nAusgaben: Armee-Unterhalt, Berater-Gehälter, Gebäude`);
-  document.getElementById('tb-prestige').textContent = `Prestige ${Math.round(state.prestige)}`;
+  document.getElementById('tb-prestige').textContent = `${t('tb_prestige')} ${Math.round(state.prestige)}`;
   document.getElementById('tb-prestige').setAttribute('data-tip', `Steigt durch: Kriegssiege, Bündnisse, Ereignisse\nSinkt durch: Niederlagen, gebrochene Pakte, Erbfolgestreit\nLegitimität: ${Math.round(state.legitimacy)}/100`);
 
   // Hof / Herrscher
@@ -5812,6 +6881,7 @@ document.getElementById('loadFile').addEventListener('change', (e) => {
   reader.readAsText(file);
 });
 
+applyI18n();
 showIntroScreen();
 </script>
 </body>

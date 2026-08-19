@@ -1,0 +1,119 @@
+{
+  "bauern": {
+    "name": "Bauern",
+    "needs": {
+      "getreide": 1
+    },
+    "weight": 1,
+    "share": 0.4
+  },
+  "landarbeiter": {
+    "name": "Landarbeiter",
+    "needs": {
+      "getreide": 1,
+      "gemuese": 0.3
+    },
+    "weight": 1,
+    "share": 0.08
+  },
+  "handwerker": {
+    "name": "Handwerker",
+    "needs": {
+      "getreide": 1,
+      "bier": 0.3,
+      "leder": 0.05,
+      "kleidung": 0.1,
+      "brot": 0.1
+    },
+    "weight": 1.1,
+    "share": 0.12
+  },
+  "buerger": {
+    "name": "Bürger",
+    "needs": {
+      "getreide": 1,
+      "bier": 0.3,
+      "fleisch": 0.2,
+      "kleidung": 0.15,
+      "salz": 0.1,
+      "buecher": 0.02,
+      "glaswaren": 0.03,
+      "brot": 0.15
+    },
+    "weight": 1.4,
+    "share": 0.08
+  },
+  "haendler": {
+    "name": "Händler",
+    "needs": {
+      "getreide": 1,
+      "bier": 0.4,
+      "werkzeuge": 0.1,
+      "leder": 0.05,
+      "wein": 0.1,
+      "papier": 0.05,
+      "glaswaren": 0.02,
+      "brot": 0.1
+    },
+    "weight": 1.3,
+    "share": 0.07
+  },
+  "adel": {
+    "name": "Adel",
+    "needs": {
+      "getreide": 1.2,
+      "bier": 0.5,
+      "werkzeuge": 0.2,
+      "leder": 0.15,
+      "wein": 0.3,
+      "gewuerze": 0.05,
+      "kleidung": 0.2,
+      "waffen": 0.02,
+      "schmuck": 0.03,
+      "seide": 0.03,
+      "buecher": 0.02,
+      "brot": 0.1
+    },
+    "weight": 2,
+    "share": 0.04
+  },
+  "geistliche": {
+    "name": "Geistliche",
+    "needs": {
+      "getreide": 0.9,
+      "wein": 0.1,
+      "buecher": 0.05,
+      "papier": 0.05,
+      "brot": 0.1
+    },
+    "weight": 1.2,
+    "share": 0.03
+  },
+  "soldaten": {
+    "name": "Soldaten",
+    "needs": {
+      "getreide": 1.1,
+      "fleisch": 0.2,
+      "waffen": 0.05,
+      "brot": 0.1
+    },
+    "weight": 1.2,
+    "share": 0.03
+  },
+  "tageloehner": {
+    "name": "Tagelöhner",
+    "needs": {
+      "getreide": 0.85
+    },
+    "weight": 0.6,
+    "share": 0.08
+  },
+  "arme": {
+    "name": "Arme",
+    "needs": {
+      "getreide": 0.8
+    },
+    "weight": 0.5,
+    "share": 0.07
+  }
+}

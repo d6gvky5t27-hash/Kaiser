@@ -1,0 +1,72 @@
+[
+  {
+    "id": "freiherr",
+    "name": "Freiherr",
+    "reqPop": 0,
+    "reqWealth": 0,
+    "reqPrestige": 0
+  },
+  {
+    "id": "baron",
+    "name": "Baron",
+    "reqPop": 3000,
+    "reqWealth": 1000,
+    "reqPrestige": 20
+  },
+  {
+    "id": "graf",
+    "name": "Graf",
+    "reqPop": 6000,
+    "reqWealth": 3000,
+    "reqPrestige": 50
+  },
+  {
+    "id": "landgraf",
+    "name": "Landgraf",
+    "reqPop": 10000,
+    "reqWealth": 6000,
+    "reqPrestige": 90
+  },
+  {
+    "id": "markgraf",
+    "name": "Markgraf",
+    "reqPop": 15000,
+    "reqWealth": 10000,
+    "reqPrestige": 140
+  },
+  {
+    "id": "fuerst",
+    "name": "Fürst",
+    "reqPop": 22000,
+    "reqWealth": 16000,
+    "reqPrestige": 200
+  },
+  {
+    "id": "herzog",
+    "name": "Herzog",
+    "reqPop": 32000,
+    "reqWealth": 25000,
+    "reqPrestige": 280
+  },
+  {
+    "id": "kurfuerst",
+    "name": "Kurfürst",
+    "reqPop": 45000,
+    "reqWealth": 40000,
+    "reqPrestige": 380
+  },
+  {
+    "id": "koenig",
+    "name": "König",
+    "reqPop": 65000,
+    "reqWealth": 60000,
+    "reqPrestige": 500
+  },
+  {
+    "id": "kaiser",
+    "name": "Kaiser",
+    "reqPop": 90000,
+    "reqWealth": 90000,
+    "reqPrestige": 650
+  }
+]

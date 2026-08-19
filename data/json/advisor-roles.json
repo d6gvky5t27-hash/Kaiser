@@ -1,0 +1,32 @@
+{
+  "schatzmeister": {
+    "name": "Schatzmeister",
+    "statKey": "verwaltung",
+    "desc": "Erhöht die Steuereinnahmen."
+  },
+  "marschall": {
+    "name": "Marschall",
+    "statKey": "militaer",
+    "desc": "Stärkt die Armee."
+  },
+  "diplomat": {
+    "name": "Diplomat",
+    "statKey": "diplomatie",
+    "desc": "Verbessert diplomatische Erfolge."
+  },
+  "spionagemeister": {
+    "name": "Spionagemeister",
+    "statKey": "intelligenz",
+    "desc": "Grundlage für künftige Aufklärung (Beta)."
+  },
+  "geistlicher": {
+    "name": "Geistlicher",
+    "statKey": "charisma",
+    "desc": "Hebt die Zufriedenheit leicht."
+  },
+  "handelsberater": {
+    "name": "Handelsberater",
+    "statKey": "handel",
+    "desc": "Steigert die Produktion."
+  }
+}

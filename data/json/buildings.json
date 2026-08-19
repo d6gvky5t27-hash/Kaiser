@@ -1,0 +1,340 @@
+{
+  "bauernhof": {
+    "name": "Bauernhof",
+    "icon": "BH",
+    "cost": 200,
+    "effect": "getreide_boost",
+    "value": 0.15,
+    "materialCost": {
+      "holz": 20
+    }
+  },
+  "gemuesegarten": {
+    "name": "Gemüsegarten",
+    "icon": "GG",
+    "cost": 150,
+    "effect": "enables",
+    "value": "gemuese",
+    "materialCost": {
+      "holz": 10
+    }
+  },
+  "viehweide": {
+    "name": "Viehweide",
+    "icon": "VW",
+    "cost": 180,
+    "effect": "enables",
+    "value": "fleisch",
+    "materialCost": {
+      "holz": 15
+    }
+  },
+  "fischerteich": {
+    "name": "Fischerteich",
+    "icon": "FT",
+    "cost": 170,
+    "effect": "enables",
+    "value": "fisch",
+    "materialCost": {
+      "holz": 12
+    }
+  },
+  "weingut": {
+    "name": "Weingut",
+    "icon": "WG",
+    "cost": 220,
+    "effect": "enables",
+    "value": "wein",
+    "materialCost": {
+      "holz": 15
+    }
+  },
+  "kornspeicher": {
+    "name": "Getreidespeicher",
+    "icon": "KS",
+    "cost": 150,
+    "effect": "storage_boost",
+    "value": 200,
+    "materialCost": {
+      "holz": 30
+    }
+  },
+  "markt": {
+    "name": "Markt",
+    "icon": "MA",
+    "cost": 300,
+    "effect": "trade_boost",
+    "value": 0.1,
+    "materialCost": {
+      "holz": 15
+    }
+  },
+  "muehle": {
+    "name": "Mühle",
+    "icon": "MÜ",
+    "cost": 250,
+    "effect": "getreide_boost",
+    "value": 0.2,
+    "materialCost": {
+      "holz": 25,
+      "stein": 10
+    }
+  },
+  "saegewerk": {
+    "name": "Sägewerk",
+    "icon": "SW",
+    "cost": 220,
+    "effect": "enables",
+    "value": "holz",
+    "materialCost": {
+      "holz": 15
+    }
+  },
+  "steinbruch": {
+    "name": "Steinbruch",
+    "icon": "ST",
+    "cost": 240,
+    "effect": "enables",
+    "value": "stein",
+    "materialCost": {
+      "holz": 10
+    }
+  },
+  "tongrube": {
+    "name": "Tongrube",
+    "icon": "TO",
+    "cost": 200,
+    "effect": "enables",
+    "value": "ton",
+    "materialCost": {
+      "holz": 8
+    }
+  },
+  "kohlebergwerk": {
+    "name": "Kohlebergwerk",
+    "icon": "KB",
+    "cost": 300,
+    "effect": "enables",
+    "value": "kohle",
+    "materialCost": {
+      "holz": 20,
+      "stein": 15
+    }
+  },
+  "gerberei": {
+    "name": "Gerberei",
+    "icon": "GB",
+    "cost": 260,
+    "effect": "enables",
+    "value": "leder",
+    "materialCost": {
+      "holz": 15
+    }
+  },
+  "salzsiederei": {
+    "name": "Salzsiederei",
+    "icon": "SS",
+    "cost": 260,
+    "effect": "enables",
+    "value": "salz",
+    "materialCost": {
+      "holz": 10,
+      "ton": 10
+    }
+  },
+  "schmiede": {
+    "name": "Schmiede",
+    "icon": "SM",
+    "cost": 400,
+    "effect": "enables",
+    "value": "eisen",
+    "materialCost": {
+      "stein": 20,
+      "eisen": 5
+    }
+  },
+  "waffenschmiede": {
+    "name": "Waffenschmiede",
+    "icon": "WS",
+    "cost": 420,
+    "effect": "enables",
+    "value": "waffen",
+    "materialCost": {
+      "stein": 20,
+      "eisen": 10
+    }
+  },
+  "weberei": {
+    "name": "Weberei",
+    "icon": "WB",
+    "cost": 240,
+    "effect": "enables",
+    "value": "kleidung",
+    "materialCost": {
+      "holz": 15
+    }
+  },
+  "brauerei": {
+    "name": "Brauerei",
+    "icon": "BR",
+    "cost": 280,
+    "effect": "enables",
+    "value": "bier",
+    "materialCost": {
+      "holz": 20,
+      "ton": 10
+    }
+  },
+  "rathaus": {
+    "name": "Rathaus",
+    "icon": "RH",
+    "cost": 500,
+    "effect": "admin_boost",
+    "value": 0.1,
+    "materialCost": {
+      "stein": 30,
+      "holz": 10
+    }
+  },
+  "kaserne": {
+    "name": "Kaserne",
+    "icon": "KA",
+    "cost": 350,
+    "effect": "military",
+    "value": 1,
+    "materialCost": {
+      "holz": 25,
+      "stein": 10
+    }
+  },
+  "stadtmauer": {
+    "name": "Stadtmauer",
+    "icon": "SM2",
+    "cost": 600,
+    "effect": "defense",
+    "value": 1,
+    "materialCost": {
+      "stein": 50
+    }
+  },
+  "kirche": {
+    "name": "Kirche",
+    "icon": "KR",
+    "cost": 350,
+    "effect": "religion_boost",
+    "value": 5,
+    "materialCost": {
+      "stein": 25,
+      "holz": 10
+    }
+  },
+  "kloster": {
+    "name": "Kloster",
+    "icon": "KO",
+    "cost": 300,
+    "effect": "religion_boost",
+    "value": 8,
+    "materialCost": {
+      "stein": 20
+    }
+  },
+  "universitaet": {
+    "name": "Universität",
+    "icon": "UN",
+    "cost": 600,
+    "effect": "research",
+    "value": 10,
+    "materialCost": {
+      "stein": 30,
+      "holz": 20
+    }
+  },
+  "palast": {
+    "name": "Palast",
+    "icon": "PA",
+    "cost": 800,
+    "effect": "prestige_boost",
+    "value": 2,
+    "materialCost": {
+      "stein": 60,
+      "holz": 20
+    }
+  },
+  "kathedrale": {
+    "name": "Kathedrale",
+    "icon": "KT",
+    "cost": 1200,
+    "effect": "prestige_boost",
+    "value": 4,
+    "materialCost": {
+      "stein": 90,
+      "holz": 30
+    }
+  },
+  "papiermuehle": {
+    "name": "Papiermühle",
+    "icon": "PM",
+    "cost": 280,
+    "effect": "enables",
+    "value": "papier",
+    "materialCost": {
+      "holz": 20,
+      "stein": 10
+    }
+  },
+  "buchbinderei": {
+    "name": "Buchbinderei",
+    "icon": "BB",
+    "cost": 320,
+    "effect": "enables",
+    "value": "buecher",
+    "materialCost": {
+      "holz": 15,
+      "stein": 5
+    }
+  },
+  "goldschmiede": {
+    "name": "Goldschmiede",
+    "icon": "GS",
+    "cost": 400,
+    "effect": "enables",
+    "value": "schmuck",
+    "materialCost": {
+      "stein": 15,
+      "holz": 10
+    }
+  },
+  "glasblaeserei": {
+    "name": "Glasbläserei",
+    "icon": "GB",
+    "cost": 350,
+    "effect": "enables",
+    "value": "glaswaren",
+    "materialCost": {
+      "stein": 20,
+      "holz": 15
+    }
+  },
+  "kornmuehle": {
+    "name": "Kornmühle",
+    "icon": "KM",
+    "cost": 240,
+    "effect": "enables",
+    "value": "mehl",
+    "materialCost": {
+      "holz": 15,
+      "stein": 5
+    }
+  },
+  "baeckerei": {
+    "name": "Bäckerei",
+    "icon": "BK",
+    "cost": 260,
+    "effect": "enables",
+    "value": "brot",
+    "materialCost": {
+      "holz": 20,
+      "stein": 10
+    }
+  }
+}
