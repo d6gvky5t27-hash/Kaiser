@@ -258,6 +258,97 @@ function attemptExtortion(state, aiId) {
   }
 }
 
+// §32: die restlichen vier Intrigen-Arten — Verschwörung (selten, teuer,
+// aber verheerend bei Erfolg), Dokumentenfälschung (untermauert die eigene
+// Legitimität, nicht gegen eine Region gerichtet), Rebellenunterstützung
+// (härtester Eingriff neben Sabotage, fast kriegsähnliches Risiko bei
+// Aufdeckung) und politische Manipulation (schwächer, aber mit langfristiger
+// Wirkung — lähmt die Bautätigkeit der Zielregion für mehrere Jahre).
+
+function attemptConspiracy(state, aiId) {
+  const cfg = CONFIG.intrigue;
+  if (state.treasury < cfg.conspiracyCost) return { ok: false, reason: "Nicht genug Taler für eine Verschwörung." };
+  state.treasury -= cfg.conspiracyCost;
+  const region = state.regions[aiId];
+  if (rnd() < cfg.conspiracySuccessChance) {
+    if (region.buildings.length > 0) {
+      const idx = Math.floor(rnd() * region.buildings.length);
+      const target = region.buildings[idx];
+      const b = BUILDINGS[target.type];
+      if (target.level > 1) {
+        target.level -= 1;
+        addChronicle(state, `Eine angezettelte Verschwörung stürzt ${region.name} ins Chaos — ${b.name} wird bei den Unruhen beschädigt (Stufe ${target.level}).`);
+      } else {
+        region.buildings.splice(idx, 1);
+        addChronicle(state, `Eine angezettelte Verschwörung stürzt ${region.name} ins Chaos — ${b.name} wird in den Unruhen niedergebrannt.`);
+      }
+    } else {
+      addChronicle(state, `Die Verschwörung gegen ${region.name} verpufft wirkungslos — es gibt dort nichts zu zerstören.`);
+    }
+    return { ok: true, success: true };
+  } else {
+    const dip = state.diplomacy[aiId];
+    dip.relation = clamp(dip.relation + cfg.conspiracyDiscoveryRelationPenalty, -100, 100);
+    state.prestige = Math.max(0, state.prestige - cfg.conspiracyDiscoveryPrestigePenalty);
+    addChronicle(state, `Die Verschwörung gegen ${region.name} wird aufgedeckt — ein handfester Skandal beschädigt deinen Ruf.`);
+    return { ok: true, success: false };
+  }
+}
+
+function forgeDocuments(state) {
+  const cfg = CONFIG.intrigue;
+  if (state.treasury < cfg.forgeryCost) return { ok: false, reason: "Nicht genug Taler, um Urkunden fälschen zu lassen." };
+  state.treasury -= cfg.forgeryCost;
+  if (rnd() < cfg.forgerySuccessChance) {
+    state.legitimacy = clamp(state.legitimacy + cfg.forgeryLegitimacyGain, 0, 100);
+    addChronicle(state, `Gefälschte Urkunden untermauern deinen Herrschaftsanspruch — die Legitimität steigt.`);
+    return { ok: true, success: true };
+  } else {
+    state.legitimacy = Math.max(0, state.legitimacy - cfg.forgeryFailLegitimacyLoss);
+    state.prestige = Math.max(0, state.prestige - cfg.forgeryFailPrestigeLoss);
+    addChronicle(state, `Die gefälschten Urkunden werden als Fälschung entlarvt — ein peinlicher Rückschlag für deine Legitimität.`);
+    return { ok: true, success: false };
+  }
+}
+
+function supportRebels(state, aiId) {
+  const cfg = CONFIG.intrigue;
+  if (state.treasury < cfg.rebelSupportCost) return { ok: false, reason: "Nicht genug Taler, um Aufständische zu finanzieren." };
+  state.treasury -= cfg.rebelSupportCost;
+  const region = state.regions[aiId];
+  region.population.arme.satisfaction = clamp(region.population.arme.satisfaction - cfg.rebelSupportSatisfactionDamage, 0, 100);
+  region.population.tageloehner.satisfaction = clamp(region.population.tageloehner.satisfaction - cfg.rebelSupportSatisfactionDamage, 0, 100);
+  region.population.arme.count = Math.max(0, Math.round(region.population.arme.count * (1 - cfg.rebelSupportPopLossShare)));
+  region.population.tageloehner.count = Math.max(0, Math.round(region.population.tageloehner.count * (1 - cfg.rebelSupportPopLossShare)));
+  const discovered = rnd() < cfg.rebelSupportDiscoveryChance;
+  if (discovered) {
+    state.diplomacy[aiId].relation = clamp(state.diplomacy[aiId].relation + cfg.rebelSupportDiscoveryRelationPenalty, -100, 100);
+    addChronicle(state, `Die Unterstützung von Aufständischen in ${region.name} wird aufgedeckt — die Beziehungen sind fast auf dem Stand eines Kriegsgrunds.`);
+    return { ok: true, discovered: true };
+  }
+  addChronicle(state, `Heimlich finanzierte Unruhestifter sorgen in ${region.name} für Aufruhr unter den Ärmsten.`);
+  return { ok: true, discovered: false };
+}
+
+function attemptPoliticalManipulation(state, aiId) {
+  const cfg = CONFIG.intrigue;
+  if (state.treasury < cfg.manipulationCost) return { ok: false, reason: "Nicht genug Taler für politische Manipulation." };
+  state.treasury -= cfg.manipulationCost;
+  const region = state.regions[aiId];
+  for (const pid in region.population) {
+    region.population[pid].satisfaction = clamp(region.population[pid].satisfaction - cfg.manipulationSatisfactionDamage, 0, 100);
+  }
+  region._manipulationYears = Math.max(region._manipulationYears || 0, cfg.manipulationDisruptionYears);
+  const discovered = rnd() < cfg.manipulationDiscoveryChance;
+  if (discovered) {
+    state.diplomacy[aiId].relation = clamp(state.diplomacy[aiId].relation + cfg.manipulationDiscoveryRelationPenalty, -100, 100);
+    addChronicle(state, `Politische Ränke gegen ${region.name} werden aufgedeckt — die Beziehungen leiden.`);
+    return { ok: true, discovered: true };
+  }
+  addChronicle(state, `Politische Manipulation stürzt den Hof von ${region.name} für Jahre in Verwaltungschaos.`);
+  return { ok: true, discovered: false };
+}
+
 // ---------- Informationsunsicherheit (§41) ----------
 
 function spyOn(state, aiId) {

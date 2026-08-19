@@ -30,7 +30,7 @@ function advanceYear(state) {
     consumeAndUpdateSatisfaction(r, prices);
     applyExtraGrainDistribution(state, r); // §Original: freiwillige Kornverteilung
     updatePopulation(r);
-    applyMigration(state, r); // §14
+    if (r._manipulationYears > 0) r._manipulationYears -= 1; // §32 politische Manipulation klingt ab
     if (!r.isPlayer) aiRegionDevelops(r, state);
 
     // §25: Stadtentwicklung — Stufenaufstieg prüfen, Zufriedenheitsbonus höherer Stufen
@@ -46,6 +46,7 @@ function advanceYear(state) {
   applyGovernanceStyle(state, state.regions.player); // §Original-Justizregler
 
   runInterregionalTrade(state);
+  applyInterRegionalMigration(state); // §14: Wanderung zwischen den 8 Regionen statt nur zur/von der Außenwelt
   updateDiplomacy(state);
   const taxIncome = collectTaxes(state);
   payArmyUpkeep(state);

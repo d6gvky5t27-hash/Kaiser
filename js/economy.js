@@ -190,6 +190,8 @@ function aiRegionDevelops(region, state) {
   const diffCfg = CONFIG.difficulty[state.difficulty] || CONFIG.difficulty.normal;
   // §48: Schwierigkeit über KI-Fehlerquote/Bautempo, nicht über versteckte Ressourcenboni
   if (rnd() < diffCfg.aiMistakeChance) return; // KI verpasst diese Gelegenheit (Fehlentscheidung)
+  // §32 politische Manipulation: eine lahmgelegte Verwaltung baut deutlich seltener
+  if (region._manipulationYears > 0 && rnd() < 0.5) return;
   // "Wohlstands"-Näherung: Lagerbestände UND Bevölkerungsgröße fließen ein, damit
   // wachsende Regionen auch bei schwankenden Kornvorräten weiter ausbauen (§86)
   const totalPop = Object.values(region.population).reduce((s,g)=>s+g.count,0);

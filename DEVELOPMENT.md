@@ -1284,3 +1284,58 @@ Dateien zusammengesetzt.
 8 Regionen (§14), verbleibende Intrigen-Arten, danach wieder die bewusst
 niedrigste Priorität laut Spec selbst (Grafik/Sound/Sprache/Post-Launch).
 
+## 2026-08-19 – Schritt 32: Migration zwischen Regionen (§14) + restliche Intrigen-Arten (§32)
+
+Auf Wunsch ("mach alles selbstständig fertig") die verbleibenden Punkte der
+letzten Restliste komplett abgearbeitet.
+
+**Migration zwischen den 8 Regionen (§14):** Die bisherige `applyMigration()`
+lief pro Region unabhängig und ließ Bevölkerung einfach zur/von einer
+abstrakten "Außenwelt" verschwinden/erscheinen — nie tatsächlich zwischen den
+8 simulierten Regionen. Neu: `applyInterRegionalMigration()` (nach demselben
+Muster wie das bestehende `runInterregionalTrade()` einmal pro Jahr über alle
+Regionen hinweg statt pro Region einzeln) sammelt die Auswanderer aus
+unzufriedenen Regionen in einem gemeinsamen Pool und verteilt einen Anteil
+davon (`interRegionalShare`, 60 %) proportional zur Attraktivität auf die
+zufriedeneren Regionen — der Rest bleibt bewusst weiterhin Wanderung zur/von
+der Außenwelt, damit das System nicht künstlich perfekt geschlossen wirkt.
+Verifiziert: eine erzwungen unzufriedene Spielerregion neben einer
+erzwungen hochzufriedenen Nachbarregion zeigt spürbaren Bevölkerungsfluss
+in die richtige Richtung; 20×100-Jahre-Wirtschaftstest und
+100×100-Jahre-KI-Testsuite weiterhin stabil ohne kritische Befunde.
+
+**Restliche vier Intrigen-Arten (§32):**
+- **Verschwörung** — teuer, seltener Erfolg, aber bei Erfolg wird ein
+  zufälliges Gebäude der Zielregion beschädigt (Ausbaustufe -1) oder bei
+  Stufe 1 komplett niedergebrannt; bei Aufdeckung ein handfester Skandal
+  (harter Beziehungs- UND Prestigeverlust für den Spieler selbst)
+- **Dokumentenfälschung** — einzige nicht gegen eine Region gerichtete
+  Intrige: stärkt bei Erfolg die eigene Legitimität, schadet ihr bei
+  Auffliegen der Fälschung stärker, als der Erfolg gebracht hätte (echtes
+  Risiko/Chance-Verhältnis)
+- **Rebellenunterstützung** — der härteste gezielte Eingriff neben Sabotage:
+  finanziert Unruhestifter, trifft Arme/Tagelöhner der Zielregion hart
+  (Zufriedenheit UND ein kleiner dauerhafter Bevölkerungsverlust durch
+  Unruhen), bei Aufdeckung ein Beziehungscrash fast auf Kriegsniveau
+- **Politische Manipulation** — schwächer als die anderen drei, dafür mit
+  mehrjähriger Wirkung statt eines einmaligen Schlags: leichte
+  Zufriedenheitsdämpfung über die gesamte Bevölkerung plus mehrere Jahre
+  gelähmte Verwaltung (`aiRegionDevelops()` baut währenddessen deutlich
+  seltener) — die einzige der sechs Intrigen mit einem echten Nachwirkungs-
+  Timer statt sofortiger Einmalwirkung
+
+**Getestet:** alle vier Funktionen einzeln verifiziert (inkl. Erfolgs- und
+Fehlschlagfällen, Gebäudezerstörung, Bautätigkeits-Unterdrückung über
+mehrere simulierte Jahre), `node tests/battle_test.js`,
+`node tests/economy_test.js` und `node tests/ai_vs_ai_test.js` weiterhin
+ohne kritische Befunde, Browser-Smoke-Test (Playwright) bestätigt alle
+sechs Intrigen-Buttons im Militär-Reiter und ihre Funktionsfähigkeit ohne
+JavaScript-Fehler. Wie immer zuerst in den Modul-Quelldateien entwickelt,
+danach `index.html`s Build-Skriptblock erneut byteweise zusammengesetzt.
+
+**Damit sind alle in der letzten Restliste genannten Content-/Gameplay-Punkte
+abgearbeitet.** Verbleibend, wie in STATUS_ANALYSE.md dokumentiert, nur noch
+die laut Spec selbst niedrigste Priorität (§101): echtes Sprite-/Canvas-
+Rendering, Chiptune-Musik, vollständige Sprachumschaltung, externe
+JSON-Datendateien, Multiplayer/Steam/Szenarioeditor (Post-Launch).
+

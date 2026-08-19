@@ -163,6 +163,26 @@ const CONFIG = {
     extortionAmount: 350,
     extortionRelationPenaltyAlways: -15,  // Erpressung schadet der Beziehung so oder so
     extortionFailExtraRelationPenalty: -20,
+    // §32: die restlichen vier Intrigen-Arten aus der Spec
+    conspiracyCost: 500,
+    conspiracySuccessChance: 0.4,
+    conspiracyDiscoveryRelationPenalty: -35,
+    conspiracyDiscoveryPrestigePenalty: 15, // bei Aufdeckung wird der Spieler selbst bloßgestellt
+    forgeryCost: 300,
+    forgerySuccessChance: 0.55,
+    forgeryLegitimacyGain: 8,
+    forgeryFailLegitimacyLoss: 12,
+    forgeryFailPrestigeLoss: 10,
+    rebelSupportCost: 350,
+    rebelSupportDiscoveryChance: 0.45,
+    rebelSupportSatisfactionDamage: 22,      // trifft gezielt Arme & Tagelöhner (Aufwiegelung)
+    rebelSupportPopLossShare: 0.03,          // kleiner, dauerhafter Bevölkerungsverlust durch Unruhen
+    rebelSupportDiscoveryRelationPenalty: -45, // fast kriegsähnliche Konsequenz bei Aufdeckung
+    manipulationCost: 200,
+    manipulationSatisfactionDamage: 6,       // trifft alle Bevölkerungsgruppen leicht (Verwaltungschaos)
+    manipulationDisruptionYears: 4,          // Jahre, in denen die Region seltener baut (aiRegionDevelops)
+    manipulationDiscoveryChance: 0.25,
+    manipulationDiscoveryRelationPenalty: -15,
   },
   religion: {
     startInfluence: 55,
@@ -273,6 +293,7 @@ const CONFIG = {
   // §14 Migration: Zufriedenheit lockt Zuwanderer an bzw. vertreibt Bevölkerung
   migration: {
     factor: 0.0004, // (Zufriedenheit-50) * factor * Bevölkerung = Netto-Wanderungssaldo/Jahr
+    interRegionalShare: 0.6, // Anteil der Auswanderer, der tatsächlich in eine attraktivere Nachbarregion zieht (§14) statt zur Außenwelt
   },
   // §28: Technologiesystem — Forschungspunkte aus Universität + Gelehrten-nahen
   // Gruppen, investierbar in 5 Kategorien mit spürbarem, aber moderatem Bonus

@@ -137,19 +137,63 @@ function handleSuccession(state) {
 
 // ---------- Diplomatie (§29/§30) ----------
 
-function applyMigration(state, r) {
-  const totalPop = Object.values(r.population).reduce((s,g)=>s+g.count,0);
-  if (totalPop <= 0) return;
-  const satFactor = (r.satisfactionAvg - 50) * CONFIG.migration.factor;
-  const bonusFactor = r._migrationBonus || 0;
-  const netRate = satFactor + bonusFactor;
-  r._migrationBonus = 0;
-  if (Math.abs(netRate) < 0.0001) return;
-  for (const pid in r.population) {
-    const grp = r.population[pid];
-    const share = totalPop > 0 ? grp.count / totalPop : 0;
-    const migrants = Math.round(totalPop * netRate * share);
-    grp.count = Math.max(0, grp.count + migrants);
+// §14: Migration zwischen den 8 simulierten Regionen statt nur einer
+// abstrakten Zu-/Abwanderung zur "Außenwelt". Wer eine unzufriedene Region
+// verlässt, landet mehrheitlich (`interRegionalShare`) tatsächlich in einer
+// der zufriedeneren Nachbarregionen — proportional zu deren Attraktivität
+// (positive Netto-Wanderungsrate) — statt einfach zu verschwinden. Der Rest
+// bleibt weiterhin Wanderung zur/von der Außenwelt (kein künstlich perfekt
+// geschlossenes System). Läuft einmal pro Jahr über alle Regionen hinweg,
+// nach demselben Muster wie runInterregionalTrade() in economy.js.
+function applyInterRegionalMigration(state) {
+  const cfg = CONFIG.migration;
+  const regionIds = Object.keys(state.regions);
+  const netRates = {};
+  const totalPops = {};
+  for (const id of regionIds) {
+    const r = state.regions[id];
+    totalPops[id] = Object.values(r.population).reduce((s, g) => s + g.count, 0);
+    const satFactor = (r.satisfactionAvg - 50) * cfg.factor;
+    const bonusFactor = r._migrationBonus || 0;
+    r._migrationBonus = 0;
+    netRates[id] = satFactor + bonusFactor;
+  }
+
+  // Auswanderer: die Gesamtmenge, die eine Region verlässt, bleibt wie im
+  // bisherigen Modell berechnet — neu ist nur, dass ein Teil davon gezielt
+  // in eine der attraktiveren Regionen fließt statt komplett zu verschwinden.
+  let pool = 0;
+  const netMigrants = {};
+  for (const id of regionIds) {
+    if (netRates[id] >= 0) continue;
+    const leaving = Math.round(totalPops[id] * -netRates[id]);
+    netMigrants[id] = -leaving;
+    pool += leaving * cfg.interRegionalShare;
+  }
+
+  let totalPositiveNetRate = 0;
+  for (const id of regionIds) if (netRates[id] > 0) totalPositiveNetRate += netRates[id];
+
+  for (const id of regionIds) {
+    if (netRates[id] <= 0) continue;
+    const share = totalPositiveNetRate > 0 ? netRates[id] / totalPositiveNetRate : 0;
+    const fromPool = Math.round(pool * share);
+    // Der übrige Zuzug kommt weiterhin "von außen" hinzu — der interRegionalShare-
+    // Anteil ist ja bereits über den Pool gedeckt, daher hier nur der Rest.
+    const fromOutside = Math.round(totalPops[id] * netRates[id] * (1 - cfg.interRegionalShare));
+    netMigrants[id] = fromPool + fromOutside;
+  }
+
+  for (const id of regionIds) {
+    const migrants = netMigrants[id];
+    if (!migrants) continue;
+    const r = state.regions[id];
+    const totalPop = totalPops[id];
+    for (const pid in r.population) {
+      const grp = r.population[pid];
+      const share = totalPop > 0 ? grp.count / totalPop : 0;
+      grp.count = Math.max(0, grp.count + Math.round(migrants * share));
+    }
   }
 }
 

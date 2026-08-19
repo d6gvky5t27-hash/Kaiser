@@ -786,6 +786,26 @@ const CONFIG = {
     extortionAmount: 350,
     extortionRelationPenaltyAlways: -15,  // Erpressung schadet der Beziehung so oder so
     extortionFailExtraRelationPenalty: -20,
+    // §32: die restlichen vier Intrigen-Arten aus der Spec
+    conspiracyCost: 500,
+    conspiracySuccessChance: 0.4,
+    conspiracyDiscoveryRelationPenalty: -35,
+    conspiracyDiscoveryPrestigePenalty: 15, // bei Aufdeckung wird der Spieler selbst bloßgestellt
+    forgeryCost: 300,
+    forgerySuccessChance: 0.55,
+    forgeryLegitimacyGain: 8,
+    forgeryFailLegitimacyLoss: 12,
+    forgeryFailPrestigeLoss: 10,
+    rebelSupportCost: 350,
+    rebelSupportDiscoveryChance: 0.45,
+    rebelSupportSatisfactionDamage: 22,      // trifft gezielt Arme & Tagelöhner (Aufwiegelung)
+    rebelSupportPopLossShare: 0.03,          // kleiner, dauerhafter Bevölkerungsverlust durch Unruhen
+    rebelSupportDiscoveryRelationPenalty: -45, // fast kriegsähnliche Konsequenz bei Aufdeckung
+    manipulationCost: 200,
+    manipulationSatisfactionDamage: 6,       // trifft alle Bevölkerungsgruppen leicht (Verwaltungschaos)
+    manipulationDisruptionYears: 4,          // Jahre, in denen die Region seltener baut (aiRegionDevelops)
+    manipulationDiscoveryChance: 0.25,
+    manipulationDiscoveryRelationPenalty: -15,
   },
   religion: {
     startInfluence: 55,
@@ -896,6 +916,7 @@ const CONFIG = {
   // §14 Migration: Zufriedenheit lockt Zuwanderer an bzw. vertreibt Bevölkerung
   migration: {
     factor: 0.0004, // (Zufriedenheit-50) * factor * Bevölkerung = Netto-Wanderungssaldo/Jahr
+    interRegionalShare: 0.6, // Anteil der Auswanderer, der tatsächlich in eine attraktivere Nachbarregion zieht (§14) statt zur Außenwelt
   },
   // §28: Technologiesystem — Forschungspunkte aus Universität + Gelehrten-nahen
   // Gruppen, investierbar in 5 Kategorien mit spürbarem, aber moderatem Bonus
@@ -1960,6 +1981,8 @@ function aiRegionDevelops(region, state) {
   const diffCfg = CONFIG.difficulty[state.difficulty] || CONFIG.difficulty.normal;
   // §48: Schwierigkeit über KI-Fehlerquote/Bautempo, nicht über versteckte Ressourcenboni
   if (rnd() < diffCfg.aiMistakeChance) return; // KI verpasst diese Gelegenheit (Fehlentscheidung)
+  // §32 politische Manipulation: eine lahmgelegte Verwaltung baut deutlich seltener
+  if (region._manipulationYears > 0 && rnd() < 0.5) return;
   // "Wohlstands"-Näherung: Lagerbestände UND Bevölkerungsgröße fließen ein, damit
   // wachsende Regionen auch bei schwankenden Kornvorräten weiter ausbauen (§86)
   const totalPop = Object.values(region.population).reduce((s,g)=>s+g.count,0);
@@ -2365,19 +2388,63 @@ function handleSuccession(state) {
 
 // ---------- Diplomatie (§29/§30) ----------
 
-function applyMigration(state, r) {
-  const totalPop = Object.values(r.population).reduce((s,g)=>s+g.count,0);
-  if (totalPop <= 0) return;
-  const satFactor = (r.satisfactionAvg - 50) * CONFIG.migration.factor;
-  const bonusFactor = r._migrationBonus || 0;
-  const netRate = satFactor + bonusFactor;
-  r._migrationBonus = 0;
-  if (Math.abs(netRate) < 0.0001) return;
-  for (const pid in r.population) {
-    const grp = r.population[pid];
-    const share = totalPop > 0 ? grp.count / totalPop : 0;
-    const migrants = Math.round(totalPop * netRate * share);
-    grp.count = Math.max(0, grp.count + migrants);
+// §14: Migration zwischen den 8 simulierten Regionen statt nur einer
+// abstrakten Zu-/Abwanderung zur "Außenwelt". Wer eine unzufriedene Region
+// verlässt, landet mehrheitlich (`interRegionalShare`) tatsächlich in einer
+// der zufriedeneren Nachbarregionen — proportional zu deren Attraktivität
+// (positive Netto-Wanderungsrate) — statt einfach zu verschwinden. Der Rest
+// bleibt weiterhin Wanderung zur/von der Außenwelt (kein künstlich perfekt
+// geschlossenes System). Läuft einmal pro Jahr über alle Regionen hinweg,
+// nach demselben Muster wie runInterregionalTrade() in economy.js.
+function applyInterRegionalMigration(state) {
+  const cfg = CONFIG.migration;
+  const regionIds = Object.keys(state.regions);
+  const netRates = {};
+  const totalPops = {};
+  for (const id of regionIds) {
+    const r = state.regions[id];
+    totalPops[id] = Object.values(r.population).reduce((s, g) => s + g.count, 0);
+    const satFactor = (r.satisfactionAvg - 50) * cfg.factor;
+    const bonusFactor = r._migrationBonus || 0;
+    r._migrationBonus = 0;
+    netRates[id] = satFactor + bonusFactor;
+  }
+
+  // Auswanderer: die Gesamtmenge, die eine Region verlässt, bleibt wie im
+  // bisherigen Modell berechnet — neu ist nur, dass ein Teil davon gezielt
+  // in eine der attraktiveren Regionen fließt statt komplett zu verschwinden.
+  let pool = 0;
+  const netMigrants = {};
+  for (const id of regionIds) {
+    if (netRates[id] >= 0) continue;
+    const leaving = Math.round(totalPops[id] * -netRates[id]);
+    netMigrants[id] = -leaving;
+    pool += leaving * cfg.interRegionalShare;
+  }
+
+  let totalPositiveNetRate = 0;
+  for (const id of regionIds) if (netRates[id] > 0) totalPositiveNetRate += netRates[id];
+
+  for (const id of regionIds) {
+    if (netRates[id] <= 0) continue;
+    const share = totalPositiveNetRate > 0 ? netRates[id] / totalPositiveNetRate : 0;
+    const fromPool = Math.round(pool * share);
+    // Der übrige Zuzug kommt weiterhin "von außen" hinzu — der interRegionalShare-
+    // Anteil ist ja bereits über den Pool gedeckt, daher hier nur der Rest.
+    const fromOutside = Math.round(totalPops[id] * netRates[id] * (1 - cfg.interRegionalShare));
+    netMigrants[id] = fromPool + fromOutside;
+  }
+
+  for (const id of regionIds) {
+    const migrants = netMigrants[id];
+    if (!migrants) continue;
+    const r = state.regions[id];
+    const totalPop = totalPops[id];
+    for (const pid in r.population) {
+      const grp = r.population[pid];
+      const share = totalPop > 0 ? grp.count / totalPop : 0;
+      grp.count = Math.max(0, grp.count + Math.round(migrants * share));
+    }
   }
 }
 
@@ -2796,6 +2863,97 @@ function attemptExtortion(state, aiId) {
     addChronicle(state, `Der Erpressungsversuch gegen ${state.regions[aiId].name} scheitert kläglich — die Beziehungen sind schwer beschädigt.`);
     return { ok: true, success: false };
   }
+}
+
+// §32: die restlichen vier Intrigen-Arten — Verschwörung (selten, teuer,
+// aber verheerend bei Erfolg), Dokumentenfälschung (untermauert die eigene
+// Legitimität, nicht gegen eine Region gerichtet), Rebellenunterstützung
+// (härtester Eingriff neben Sabotage, fast kriegsähnliches Risiko bei
+// Aufdeckung) und politische Manipulation (schwächer, aber mit langfristiger
+// Wirkung — lähmt die Bautätigkeit der Zielregion für mehrere Jahre).
+
+function attemptConspiracy(state, aiId) {
+  const cfg = CONFIG.intrigue;
+  if (state.treasury < cfg.conspiracyCost) return { ok: false, reason: "Nicht genug Taler für eine Verschwörung." };
+  state.treasury -= cfg.conspiracyCost;
+  const region = state.regions[aiId];
+  if (rnd() < cfg.conspiracySuccessChance) {
+    if (region.buildings.length > 0) {
+      const idx = Math.floor(rnd() * region.buildings.length);
+      const target = region.buildings[idx];
+      const b = BUILDINGS[target.type];
+      if (target.level > 1) {
+        target.level -= 1;
+        addChronicle(state, `Eine angezettelte Verschwörung stürzt ${region.name} ins Chaos — ${b.name} wird bei den Unruhen beschädigt (Stufe ${target.level}).`);
+      } else {
+        region.buildings.splice(idx, 1);
+        addChronicle(state, `Eine angezettelte Verschwörung stürzt ${region.name} ins Chaos — ${b.name} wird in den Unruhen niedergebrannt.`);
+      }
+    } else {
+      addChronicle(state, `Die Verschwörung gegen ${region.name} verpufft wirkungslos — es gibt dort nichts zu zerstören.`);
+    }
+    return { ok: true, success: true };
+  } else {
+    const dip = state.diplomacy[aiId];
+    dip.relation = clamp(dip.relation + cfg.conspiracyDiscoveryRelationPenalty, -100, 100);
+    state.prestige = Math.max(0, state.prestige - cfg.conspiracyDiscoveryPrestigePenalty);
+    addChronicle(state, `Die Verschwörung gegen ${region.name} wird aufgedeckt — ein handfester Skandal beschädigt deinen Ruf.`);
+    return { ok: true, success: false };
+  }
+}
+
+function forgeDocuments(state) {
+  const cfg = CONFIG.intrigue;
+  if (state.treasury < cfg.forgeryCost) return { ok: false, reason: "Nicht genug Taler, um Urkunden fälschen zu lassen." };
+  state.treasury -= cfg.forgeryCost;
+  if (rnd() < cfg.forgerySuccessChance) {
+    state.legitimacy = clamp(state.legitimacy + cfg.forgeryLegitimacyGain, 0, 100);
+    addChronicle(state, `Gefälschte Urkunden untermauern deinen Herrschaftsanspruch — die Legitimität steigt.`);
+    return { ok: true, success: true };
+  } else {
+    state.legitimacy = Math.max(0, state.legitimacy - cfg.forgeryFailLegitimacyLoss);
+    state.prestige = Math.max(0, state.prestige - cfg.forgeryFailPrestigeLoss);
+    addChronicle(state, `Die gefälschten Urkunden werden als Fälschung entlarvt — ein peinlicher Rückschlag für deine Legitimität.`);
+    return { ok: true, success: false };
+  }
+}
+
+function supportRebels(state, aiId) {
+  const cfg = CONFIG.intrigue;
+  if (state.treasury < cfg.rebelSupportCost) return { ok: false, reason: "Nicht genug Taler, um Aufständische zu finanzieren." };
+  state.treasury -= cfg.rebelSupportCost;
+  const region = state.regions[aiId];
+  region.population.arme.satisfaction = clamp(region.population.arme.satisfaction - cfg.rebelSupportSatisfactionDamage, 0, 100);
+  region.population.tageloehner.satisfaction = clamp(region.population.tageloehner.satisfaction - cfg.rebelSupportSatisfactionDamage, 0, 100);
+  region.population.arme.count = Math.max(0, Math.round(region.population.arme.count * (1 - cfg.rebelSupportPopLossShare)));
+  region.population.tageloehner.count = Math.max(0, Math.round(region.population.tageloehner.count * (1 - cfg.rebelSupportPopLossShare)));
+  const discovered = rnd() < cfg.rebelSupportDiscoveryChance;
+  if (discovered) {
+    state.diplomacy[aiId].relation = clamp(state.diplomacy[aiId].relation + cfg.rebelSupportDiscoveryRelationPenalty, -100, 100);
+    addChronicle(state, `Die Unterstützung von Aufständischen in ${region.name} wird aufgedeckt — die Beziehungen sind fast auf dem Stand eines Kriegsgrunds.`);
+    return { ok: true, discovered: true };
+  }
+  addChronicle(state, `Heimlich finanzierte Unruhestifter sorgen in ${region.name} für Aufruhr unter den Ärmsten.`);
+  return { ok: true, discovered: false };
+}
+
+function attemptPoliticalManipulation(state, aiId) {
+  const cfg = CONFIG.intrigue;
+  if (state.treasury < cfg.manipulationCost) return { ok: false, reason: "Nicht genug Taler für politische Manipulation." };
+  state.treasury -= cfg.manipulationCost;
+  const region = state.regions[aiId];
+  for (const pid in region.population) {
+    region.population[pid].satisfaction = clamp(region.population[pid].satisfaction - cfg.manipulationSatisfactionDamage, 0, 100);
+  }
+  region._manipulationYears = Math.max(region._manipulationYears || 0, cfg.manipulationDisruptionYears);
+  const discovered = rnd() < cfg.manipulationDiscoveryChance;
+  if (discovered) {
+    state.diplomacy[aiId].relation = clamp(state.diplomacy[aiId].relation + cfg.manipulationDiscoveryRelationPenalty, -100, 100);
+    addChronicle(state, `Politische Ränke gegen ${region.name} werden aufgedeckt — die Beziehungen leiden.`);
+    return { ok: true, discovered: true };
+  }
+  addChronicle(state, `Politische Manipulation stürzt den Hof von ${region.name} für Jahre in Verwaltungschaos.`);
+  return { ok: true, discovered: false };
 }
 
 // ---------- Informationsunsicherheit (§41) ----------
@@ -3282,7 +3440,7 @@ function advanceYear(state) {
     consumeAndUpdateSatisfaction(r, prices);
     applyExtraGrainDistribution(state, r); // §Original: freiwillige Kornverteilung
     updatePopulation(r);
-    applyMigration(state, r); // §14
+    if (r._manipulationYears > 0) r._manipulationYears -= 1; // §32 politische Manipulation klingt ab
     if (!r.isPlayer) aiRegionDevelops(r, state);
 
     // §25: Stadtentwicklung — Stufenaufstieg prüfen, Zufriedenheitsbonus höherer Stufen
@@ -3298,6 +3456,7 @@ function advanceYear(state) {
   applyGovernanceStyle(state, state.regions.player); // §Original-Justizregler
 
   runInterregionalTrade(state);
+  applyInterRegionalMigration(state); // §14: Wanderung zwischen den 8 Regionen statt nur zur/von der Außenwelt
   updateDiplomacy(state);
   const taxIncome = collectTaxes(state);
   payArmyUpkeep(state);
@@ -4930,8 +5089,14 @@ function renderMilitary() {
       <button class="dipbtn" onclick="doSabotage('${aiId}')">Sabotieren (${CONFIG.intrigue.sabotageCost} Taler, Risiko!)</button>
       <button class="dipbtn" onclick="doRumors('${aiId}')">Gerüchte streuen (${CONFIG.intrigue.rumorCost} Taler)</button>
       <button class="dipbtn" onclick="doExtortion('${aiId}')">Erpressen (${CONFIG.intrigue.extortionCost} Taler, Risiko!)</button>
+      <button class="dipbtn" onclick="doConspiracy('${aiId}')">Verschwörung anzetteln (${CONFIG.intrigue.conspiracyCost} Taler, hohes Risiko!)</button>
+      <button class="dipbtn" onclick="doRebelSupport('${aiId}')">Aufständische unterstützen (${CONFIG.intrigue.rebelSupportCost} Taler, hohes Risiko!)</button>
+      <button class="dipbtn" onclick="doManipulation('${aiId}')">Politisch manipulieren (${CONFIG.intrigue.manipulationCost} Taler)</button>
       </div>`;
   }
+  warHtml += `<div class="diploBlock"><b>Eigener Hof</b><br>
+    <button class="dipbtn" onclick="doForgery()">Urkunden fälschen (${CONFIG.intrigue.forgeryCost} Taler, stärkt/riskiert Legitimität)</button>
+    </div>`;
   document.getElementById('warMenu').innerHTML = warHtml;
 
   // §36: Belagerung im Gange
@@ -4973,6 +5138,36 @@ function doRumors(aiId) {
 function doExtortion(aiId) {
   if (!confirm(`Eine Erpressung gegen ${state.regions[aiId].name} schadet den Beziehungen so oder so — nur bei Erfolg lohnt sie sich. Fortfahren?`)) return;
   const result = attemptExtortion(state, aiId);
+  if (!result.ok) { alert(result.reason); return; }
+  playBeep(result.success ? 660 : 180, 0.12);
+  render();
+}
+
+function doConspiracy(aiId) {
+  if (!confirm(`Eine Verschwörung gegen ${state.regions[aiId].name} ist teuer und riskant — bei Aufdeckung droht ein handfester Skandal. Fortfahren?`)) return;
+  const result = attemptConspiracy(state, aiId);
+  if (!result.ok) { alert(result.reason); return; }
+  playBeep(result.success ? 660 : 140, 0.15);
+  render();
+}
+
+function doRebelSupport(aiId) {
+  if (!confirm(`Aufständische in ${state.regions[aiId].name} zu unterstützen ist fast so riskant wie eine Kriegserklärung, sollte es auffliegen. Fortfahren?`)) return;
+  const result = supportRebels(state, aiId);
+  if (!result.ok) { alert(result.reason); return; }
+  playBeep(result.discovered ? 140 : 500, 0.12);
+  render();
+}
+
+function doManipulation(aiId) {
+  const result = attemptPoliticalManipulation(state, aiId);
+  if (!result.ok) { alert(result.reason); return; }
+  playBeep(result.discovered ? 220 : 500, 0.1);
+  render();
+}
+
+function doForgery() {
+  const result = forgeDocuments(state);
   if (!result.ok) { alert(result.reason); return; }
   playBeep(result.success ? 660 : 180, 0.12);
   render();
