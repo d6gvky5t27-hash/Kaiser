@@ -247,6 +247,19 @@
     padding: var(--sp-3); margin-bottom: var(--sp-3); font-size: var(--fs-body);
   }
   #electionBanner button { margin-top: var(--sp-2); }
+  /* Titel-Aufstieg (§101-Feedback): kurze, nicht-blockierende Feier-Einblendung,
+     damit Fortschritt (Baron, Graf, ...) sicht- und hörbar wird statt nur als
+     Chronik-Zeile unterzugehen. */
+  #titleUpBanner {
+    position: fixed; top: 16%; left: 50%; transform: translate(-50%, -16px);
+    background: var(--gold); color: #1c1c1c; border: 3px solid #0a0c11;
+    padding: var(--sp-4) var(--sp-5); box-shadow: 4px 4px 0 #0a0c11;
+    font-size: var(--fs-lg); text-align: center; z-index: 500; letter-spacing: 1px;
+    opacity: 0; pointer-events: none; transition: opacity 0.5s ease, transform 0.5s ease;
+    max-width: 80%;
+  }
+  #titleUpBanner.show { opacity: 1; transform: translate(-50%, 0); }
+  #titleUpBanner .sub { font-size: var(--fs-body); margin-top: var(--sp-2); color: #3a2f10; letter-spacing: 0; }
   #eventModal {
     position: fixed; inset: 0; background: rgba(0,0,0,0.75);
     display: none; align-items: center; justify-content: center;
@@ -398,6 +411,8 @@
   </div>
 </div>
 
+<div id="titleUpBanner"></div>
+
 <div id="frame" style="display:none;">
   <div id="topbar">
     <span id="tb-title">–</span>
@@ -443,6 +458,7 @@
         <input type="range" id="grainSlider" min="0" max="100" value="0">
         <span id="grainVal">0%</span>
       </div>
+      <div id="grainInfo" style="font-size:var(--fs-body); margin:var(--sp-1) 0 var(--sp-3) 0;"></div>
 
       <h2 class="title">DEINE PROVINZ</h2>
       <div id="settlementInfo" style="font-size:var(--fs-body); margin-bottom:var(--sp-2);"></div>
@@ -681,6 +697,16 @@ const CONFIG = {
     taxSatisfactionPenalty: 40,    // Zufriedenheitsverlust bei taxRate=1.0
     satisfactionBaseline: 50,      // Homöostase-Zielwert
     homeostasisStrength: 0.2,      // wie stark Zufriedenheit zur Mitte zurückgezogen wird
+    // Direkter Korn-Effekt auf Geburten-/Sterberate (zusätzlich zum bereits
+    // bestehenden, zufriedenheitsvermittelten Effekt — Getreide ist über
+    // POP_GROUPS.needs.getreide bereits Teil der Zufriedenheitsformel, dieser
+    // Bonus/Malus macht den Zusammenhang aber direkt sicht- und spürbar).
+    // grainRatio = verfügbares Getreide / Grundbedarf, siehe computeGrainBalance().
+    // Bewusst moderat kalibriert, um keinen zweiten Bevölkerungskollaps-Pfad
+    // neben dem bereits bestehenden satisfaction-basierten zu öffnen.
+    grainBirthBonusMax: 0.006,  // zusätzliche Geburtenrate bei grainRatio >= 2.0 (doppelter Bedarf gedeckt)
+    grainFamineThreshold: 0.15, // unterhalb dieses Verhältnisses gilt es als echte Hungersnot
+    grainDeathBonusMax: 0.03,  // zusätzliche Sterberate bei grainRatio = 0 (kein Getreide mehr vorhanden)
   },
   trade: {
     perCapitaDiffThreshold: 0.05,
@@ -2004,6 +2030,8 @@ const STRINGS = {
     panel_armee: "ARMEE",
     panel_kriegserklaerung: "KRIEGSERKLÄRUNG",
     panel_kaiserwahl: "KAISERWAHL",
+    title_up_headline: "⚜ AUFSTIEG! ⚜",
+    title_up_text: "Du wurdest zum {title} erhoben!",
   },
   en: {
     title_h1: "KAISERREICH", title_h2: "RISE OF A DYNASTY",
@@ -2061,6 +2089,8 @@ const STRINGS = {
     panel_armee: "ARMY",
     panel_kriegserklaerung: "DECLARATION OF WAR",
     panel_kaiserwahl: "IMPERIAL ELECTION",
+    title_up_headline: "⚜ PROMOTED! ⚜",
+    title_up_text: "You have been elevated to {title}!",
   },
 };
 let currentLocale = "de";
@@ -2619,7 +2649,7 @@ function makeRegion(name, isPlayer, fertility, startPop) {
     : [{ type: "bauernhof", level: 1, plotIndex: 0 }, { type: "saegewerk", level: 1, plotIndex: 1 }];
   const priceNoise = {};
   for (const gid in GOODS) priceNoise[gid] = 1.0;
-  return {
+  const region = {
     name, isPlayer, fertility,
     population, warehouse,
     buildings,
@@ -2636,6 +2666,8 @@ function makeRegion(name, isPlayer, fertility, startPop) {
     priceNoise,             // Marktspekulation: jährliche Preisschwankung unabhängig von Angebot/Nachfrage
     commander: isPlayer ? null : generateCommander(name), // individueller KI-Hauptmann, überlebt mehrere Schlachten
   };
+  computeGrainBalance(region); // Kornbilanz-Anzeige ist schon vor dem ersten Jahreswechsel gefüllt
+  return region;
 }
 
 let __charIdCounter = 1;
@@ -2810,6 +2842,24 @@ function computeProduction(region) {
     region.warehouse[g] = (region.warehouse[g] || 0) + produced[g];
   }
   return produced;
+}
+
+// ---------- Kornbilanz (§Original-Vertiefung: Korn verteilen) ----------
+// Hält fest, wie viel Getreide vor der Verteilung an das Volk zur Verfügung
+// steht (Lagerbestand nach der Ernte) und wie hoch der reine Grundbedarf der
+// Bevölkerung ist — die Kornbilanz (grainRatio) treibt danach sowohl die
+// Geburtenrate (Überschuss) als auch die Sterberate (Mangel/Hungersnot) direkt
+// mit (siehe updatePopulation() in population-dynasty.js), zusätzlich zum
+// bereits bestehenden, zufriedenheitsvermittelten Effekt.
+function computeGrainBalance(region) {
+  let need = 0;
+  for (const pid in region.population) {
+    const coeff = (POP_GROUPS[pid].needs.getreide) || 0;
+    need += coeff * region.population[pid].count * 0.01;
+  }
+  region.grainNeed = need;
+  region.grainAvailable = region.warehouse.getreide || 0;
+  region.grainRatio = need > 0 ? region.grainAvailable / need : 1;
 }
 
 // ---------- Preisbildung (§15/§21) ----------
@@ -3223,12 +3273,28 @@ function techBonus(state, category) {
 function updatePopulation(region) {
   const cfg = CONFIG.population;
   region.lastPopBreakdown = {};
+  // Direkter Korn-Effekt (siehe computeGrainBalance() in economy.js, vor der
+  // Verteilung berechnet): Überschuss hebt die Geburtenrate, Mangel hebt die
+  // Sterberate — zusätzlich zum bereits bestehenden, über die Zufriedenheit
+  // vermittelten Effekt (Getreide ist Teil von POP_GROUPS.needs).
+  const grainRatio = region.grainRatio !== undefined ? region.grainRatio : 1;
+  const grainBirthBonus = grainRatio > 1 ? Math.min(grainRatio - 1, 1) * cfg.grainBirthBonusMax : 0;
+  // Schwellenbasiert statt eines durchgehenden Effekts: ein chronischer, milder
+  // Kornmangel (Verhältnis z.B. 0.4–0.9) ist im Grundspiel ohne aktives
+  // Kornmanagement bereits der Normalfall über Jahrzehnte (siehe
+  // DEVELOPMENT.md) — nur eine echte Hungersnot (Verhältnis unter
+  // grainFamineThreshold) soll als zusätzlicher, spürbarer Sterberate-Effekt
+  // wirken, statt über lange Zeit einen zweiten, kaum sichtbaren Dauerdruck
+  // parallel zum bestehenden zufriedenheitsbasierten Effekt aufzubauen.
+  const grainDeathBonus = grainRatio < cfg.grainFamineThreshold
+    ? ((cfg.grainFamineThreshold - grainRatio) / cfg.grainFamineThreshold) * cfg.grainDeathBonusMax
+    : 0;
   for (const pid in region.population) {
     const grp = region.population[pid];
     const startCount = grp.count;
     const satFactor = (grp.satisfaction - 50) / 100; // -0.5..+0.5
-    const birthRate = cfg.baseBirthRate + satFactor * cfg.satisfactionBirthSwing;
-    const deathRate = cfg.baseDeathRate - satFactor * cfg.satisfactionDeathSwing;
+    const birthRate = cfg.baseBirthRate + satFactor * cfg.satisfactionBirthSwing + grainBirthBonus;
+    const deathRate = cfg.baseDeathRate - satFactor * cfg.satisfactionDeathSwing + grainDeathBonus;
     let hungerDeaths = 0;
     if (grp.satisfaction < cfg.hungerThreshold) hungerDeaths = grp.count * cfg.hungerDeathRate;
     const plagueDeaths = region.plagueMitigated === false ? grp.count * cfg.plagueUnmitigatedDeathRate :
@@ -3279,10 +3345,18 @@ function updateDynasty(state) {
   if (!ruler || !ruler.alive) return;
   const cfg = CONFIG.dynasty;
 
-  ruler.age += 1;
-  // Gesundheit sinkt mit dem Alter, stärker nach der Schwellenaltersgrenze
-  const ageDecay = ruler.age > cfg.healthDecayBaseAge ? (ruler.age - cfg.healthDecayBaseAge) * cfg.healthDecayPerYear : 0;
-  ruler.health = clamp(ruler.health - 1 - ageDecay * 0.1 + (rnd()*4-2), 0, 100);
+  // Alle noch lebenden Mitglieder der Dynastie (Herrscher, Gemahl/Gemahlin,
+  // Kinder) altern gemeinsam — vorher wurde nur ruler.age erhöht, wodurch
+  // Ehepartner und Kinder für immer im Geburtsalter eingefroren blieben
+  // (das verzerrte u.a. auch die Erbfolgestreit-Prüfung, die auf realistischen
+  // Altersabständen zwischen Geschwistern beruht).
+  for (const cid in state.characters) {
+    const c = state.characters[cid];
+    if (!c.alive) continue;
+    c.age += 1;
+    const decay = c.age > cfg.healthDecayBaseAge ? (c.age - cfg.healthDecayBaseAge) * cfg.healthDecayPerYear : 0;
+    c.health = clamp(c.health - 1 - decay * 0.1 + (rnd() * 4 - 2), 0, 100);
+  }
 
   // Heirat, falls unverheiratet und im heiratsfähigen Alter
   if (!ruler.spouseId && ruler.age >= cfg.marriageMinAge && ruler.age <= cfg.marriageMaxAge && rnd() < cfg.marriageChance) {
@@ -4400,11 +4474,13 @@ function advanceYear(state) {
       addChronicle(state, `In ${r.name} herrschte ${weather.name} (Ernteeinfluss ${(weather.factor*100).toFixed(0)}%).`);
     }
     computeProduction(r);
+    computeGrainBalance(r); // vor der Verteilung erfassen: verfügbares Getreide vs. Grundbedarf
     updatePriceNoise(r); // Marktspekulation: Preise schwanken auch ohne Angebots-/Nachfrageänderung
     const prices = computeRegionalPrices(r);
     r.prices = prices;
     consumeAndUpdateSatisfaction(r, prices);
     applyExtraGrainDistribution(state, r); // §Original: freiwillige Kornverteilung
+    r.grainDistributed = r.grainAvailable - (r.warehouse.getreide || 0); // tatsächlich ans Volk abgegeben (Grundbedarf + Kornausgabe)
     updatePopulation(r);
     if (r._manipulationYears > 0) r._manipulationYears -= 1; // §32 politische Manipulation klingt ab
     if (!r.isPlayer) aiRegionDevelops(r, state);
@@ -5889,6 +5965,24 @@ function render() {
   document.getElementById('popTable').innerHTML = popHtml;
   document.getElementById('satBar').style.width = Math.round(r.satisfactionAvg) + '%';
 
+  // Kornbilanz (§Original-Vertiefung): verfügbares Getreide vs. Grundbedarf,
+  // tatsächlich abgegebene Menge, und die direkte Wirkung auf Geburten-/
+  // Sterberate transparent machen (§83/§84)
+  if (r.grainAvailable !== undefined) {
+    const ratioPct = Math.round((r.grainRatio || 0) * 100);
+    const ratioClass = r.grainRatio >= 1 ? 'goodgood' : (r.grainRatio < CONFIG.population.grainFamineThreshold ? 'goodbad' : '');
+    const famineNote = r.grainRatio < CONFIG.population.grainFamineThreshold
+      ? '<br><span class="goodbad">⚠ Hungersnot — erhöhte Sterberate durch Kornmangel!</span>'
+      : (r.grainRatio > 1 ? '<br>Überschuss hebt die Geburtenrate leicht an.' : '');
+    document.getElementById('grainInfo').innerHTML =
+      `<span data-tip="Verfügbares Getreide (Lager nach der Ernte, vor Verteilung) im Verhältnis zum Grundbedarf der Bevölkerung.\nUnter ${Math.round(CONFIG.population.grainFamineThreshold*100)}% gilt es als echte Hungersnot und erhöht direkt die Sterberate; über 100% hebt der Überschuss leicht die Geburtenrate.">` +
+      `Getreide verfügbar: <b>${Math.round(r.grainAvailable).toLocaleString('de-DE')}</b> · ` +
+      `Grundbedarf: <b>${Math.round(r.grainNeed).toLocaleString('de-DE')}</b> · ` +
+      `Verhältnis: <b class="${ratioClass}">${ratioPct}%</b></span>` +
+      `<br>Ans Volk abgegeben (Grundbedarf + Kornausgabe): <b>${Math.round(r.grainDistributed || 0).toLocaleString('de-DE')}</b>` +
+      famineNote;
+  }
+
   // Stadtentwicklung (§25) & Infrastruktur (§27)
   const tierInfo = CONFIG.settlement.tiers[r.settlementTier || 0];
   const nextTierInfo = CONFIG.settlement.tiers[(r.settlementTier || 0) + 1];
@@ -6811,10 +6905,28 @@ document.getElementById('taxSlider').addEventListener('input', (e) => {
   document.getElementById('taxVal').textContent = val + '%';
 });
 
+// ---------- Titel-Aufstieg feiern (§101-Feedback): kurze, nicht-blockierende
+// Einblendung + kleine Fanfare, sobald checkTitleProgress() (politics.js)
+// state.titleIndex erhöht hat — sonst ginge der Fortschritt in der Chronik
+// unter, ohne dass er im Moment des Aufstiegs überhaupt auffällt. ----------
+let __titleUpTimer = null;
+function showTitleCelebration(titleObj) {
+  const el = document.getElementById('titleUpBanner');
+  el.innerHTML = `${t('title_up_headline')}<div class="sub">${t('title_up_text').replace('{title}', titleObj.name)}</div>`;
+  el.classList.add('show');
+  playBeep(523, 0.12);
+  setTimeout(() => playBeep(659, 0.12), 130);
+  setTimeout(() => playBeep(784, 0.25), 260);
+  if (__titleUpTimer) clearTimeout(__titleUpTimer);
+  __titleUpTimer = setTimeout(() => el.classList.remove('show'), 4000);
+}
+
 document.getElementById('btnAdvance').addEventListener('click', () => {
   if (state.gameOver) return;
   playBeep(330, 0.08);
+  const titleIndexBefore = state.titleIndex;
   advanceYear(state);
+  if (state.titleIndex > titleIndexBefore) showTitleCelebration(TITLES[state.titleIndex]);
   if (state.incomingAiWar) {
     // §31: die KI hat selbst den Krieg erklärt — der Spieler muss sich jetzt
     // dem interaktiven Kampfbildschirm als Verteidiger stellen. Ein evtl.

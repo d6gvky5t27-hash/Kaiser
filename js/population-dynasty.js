@@ -6,12 +6,28 @@
 function updatePopulation(region) {
   const cfg = CONFIG.population;
   region.lastPopBreakdown = {};
+  // Direkter Korn-Effekt (siehe computeGrainBalance() in economy.js, vor der
+  // Verteilung berechnet): Überschuss hebt die Geburtenrate, Mangel hebt die
+  // Sterberate — zusätzlich zum bereits bestehenden, über die Zufriedenheit
+  // vermittelten Effekt (Getreide ist Teil von POP_GROUPS.needs).
+  const grainRatio = region.grainRatio !== undefined ? region.grainRatio : 1;
+  const grainBirthBonus = grainRatio > 1 ? Math.min(grainRatio - 1, 1) * cfg.grainBirthBonusMax : 0;
+  // Schwellenbasiert statt eines durchgehenden Effekts: ein chronischer, milder
+  // Kornmangel (Verhältnis z.B. 0.4–0.9) ist im Grundspiel ohne aktives
+  // Kornmanagement bereits der Normalfall über Jahrzehnte (siehe
+  // DEVELOPMENT.md) — nur eine echte Hungersnot (Verhältnis unter
+  // grainFamineThreshold) soll als zusätzlicher, spürbarer Sterberate-Effekt
+  // wirken, statt über lange Zeit einen zweiten, kaum sichtbaren Dauerdruck
+  // parallel zum bestehenden zufriedenheitsbasierten Effekt aufzubauen.
+  const grainDeathBonus = grainRatio < cfg.grainFamineThreshold
+    ? ((cfg.grainFamineThreshold - grainRatio) / cfg.grainFamineThreshold) * cfg.grainDeathBonusMax
+    : 0;
   for (const pid in region.population) {
     const grp = region.population[pid];
     const startCount = grp.count;
     const satFactor = (grp.satisfaction - 50) / 100; // -0.5..+0.5
-    const birthRate = cfg.baseBirthRate + satFactor * cfg.satisfactionBirthSwing;
-    const deathRate = cfg.baseDeathRate - satFactor * cfg.satisfactionDeathSwing;
+    const birthRate = cfg.baseBirthRate + satFactor * cfg.satisfactionBirthSwing + grainBirthBonus;
+    const deathRate = cfg.baseDeathRate - satFactor * cfg.satisfactionDeathSwing + grainDeathBonus;
     let hungerDeaths = 0;
     if (grp.satisfaction < cfg.hungerThreshold) hungerDeaths = grp.count * cfg.hungerDeathRate;
     const plagueDeaths = region.plagueMitigated === false ? grp.count * cfg.plagueUnmitigatedDeathRate :
@@ -62,10 +78,18 @@ function updateDynasty(state) {
   if (!ruler || !ruler.alive) return;
   const cfg = CONFIG.dynasty;
 
-  ruler.age += 1;
-  // Gesundheit sinkt mit dem Alter, stärker nach der Schwellenaltersgrenze
-  const ageDecay = ruler.age > cfg.healthDecayBaseAge ? (ruler.age - cfg.healthDecayBaseAge) * cfg.healthDecayPerYear : 0;
-  ruler.health = clamp(ruler.health - 1 - ageDecay * 0.1 + (rnd()*4-2), 0, 100);
+  // Alle noch lebenden Mitglieder der Dynastie (Herrscher, Gemahl/Gemahlin,
+  // Kinder) altern gemeinsam — vorher wurde nur ruler.age erhöht, wodurch
+  // Ehepartner und Kinder für immer im Geburtsalter eingefroren blieben
+  // (das verzerrte u.a. auch die Erbfolgestreit-Prüfung, die auf realistischen
+  // Altersabständen zwischen Geschwistern beruht).
+  for (const cid in state.characters) {
+    const c = state.characters[cid];
+    if (!c.alive) continue;
+    c.age += 1;
+    const decay = c.age > cfg.healthDecayBaseAge ? (c.age - cfg.healthDecayBaseAge) * cfg.healthDecayPerYear : 0;
+    c.health = clamp(c.health - 1 - decay * 0.1 + (rnd() * 4 - 2), 0, 100);
+  }
 
   // Heirat, falls unverheiratet und im heiratsfähigen Alter
   if (!ruler.spouseId && ruler.age >= cfg.marriageMinAge && ruler.age <= cfg.marriageMaxAge && rnd() < cfg.marriageChance) {

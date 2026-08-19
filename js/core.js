@@ -149,7 +149,7 @@ function makeRegion(name, isPlayer, fertility, startPop) {
     : [{ type: "bauernhof", level: 1, plotIndex: 0 }, { type: "saegewerk", level: 1, plotIndex: 1 }];
   const priceNoise = {};
   for (const gid in GOODS) priceNoise[gid] = 1.0;
-  return {
+  const region = {
     name, isPlayer, fertility,
     population, warehouse,
     buildings,
@@ -166,6 +166,8 @@ function makeRegion(name, isPlayer, fertility, startPop) {
     priceNoise,             // Marktspekulation: jährliche Preisschwankung unabhängig von Angebot/Nachfrage
     commander: isPlayer ? null : generateCommander(name), // individueller KI-Hauptmann, überlebt mehrere Schlachten
   };
+  computeGrainBalance(region); // Kornbilanz-Anzeige ist schon vor dem ersten Jahreswechsel gefüllt
+  return region;
 }
 
 let __charIdCounter = 1;

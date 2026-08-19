@@ -57,7 +57,7 @@ Stand: nach Abschluss von MVP + Alpha + Beta (siehe ROADMAP.md).
 | § | Thema | Status | Anmerkung |
 |---|---|---|---|
 | 13 | Bevölkerungsgruppen | ✅ | Alle 10 geforderten Gruppen umgesetzt (Bauern, Landarbeiter, Handwerker, Bürger, Händler, Adel, Geistliche, Soldaten, Tagelöhner, Arme), jede mit eigenem Warenbedarf |
-| 14 | Bevölkerungsentwicklung | ✅ | Geburten/Tode/Hunger/Seuche vorhanden; echte Migration zwischen allen 8 Regionen (wer eine unzufriedene Region verlässt, landet mehrheitlich in einer attraktiveren Nachbarregion statt einfach zu verschwinden, ein kleinerer Anteil bleibt Wanderung zur/von der Außenwelt) |
+| 14 | Bevölkerungsentwicklung | ✅ | Geburten/Tode/Hunger/Seuche vorhanden; echte Migration zwischen allen 8 Regionen; Kornbilanz (verfügbares Getreide vs. Grundbedarf) wirkt jetzt zusätzlich direkt auf Geburten-/Sterberate (Überschuss hebt Geburten, echte Hungersnot hebt die Sterberate) und ist als eigenes Panel sichtbar |
 | 15 | Wirtschaft (Angebot/Nachfrage) | ✅ | Vollständig implementiert und getestet |
 | 16 | Waren | ✅ | 23 Waren umgesetzt, inkl. Papier/Bücher/Schmuck/Seide/Glaswaren |
 | 17 | Produktionsketten | ✅ | 23 Ketten; zwei echte zweistufige Ketten (Holz→Papier→Bücher, Getreide→Mehl→Brot über eigene neue Gebäude Kornmühle/Bäckerei) |

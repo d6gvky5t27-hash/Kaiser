@@ -1432,3 +1432,78 @@ nicht angegangenen Punkte (echtes Sprite-Rendering, echtes Mehrspieler/
 Steam, vollständige 100%ige Zweitübersetzung) sind in STATUS_ANALYSE.md
 mit Begründung dokumentiert.
 
+## 2026-08-19 – Schritt 34: Bugfix Dynastie-Alterung, Titel-Aufstiegsfeier, ausgebaute Kornverteilung
+
+Auf Nutzer-Feedback beim ersten echten Antesten der Datei.
+
+**Bugfix: Ehepartner und Kinder wurden nie älter.** `updateDynasty()`
+(population-dynasty.js) erhöhte bisher nur `ruler.age`, nicht das Alter der
+übrigen `state.characters`-Einträge. Solange jemand Kind oder Gemahl/Gemahlin
+war, blieb er für immer im Geburts-/Erstellungsalter eingefroren — erst beim
+Antritt der Nachfolge begann die Alterung (da ab dann `state.rulerId` auf sie
+zeigte). Nebenwirkung: die Erbfolgestreit-Prüfung (`disputeAgeClosenessYears`)
+verglich damit meist nahezu gleich alte (nämlich alle nahe 0) Geschwister,
+was die Streitwahrscheinlichkeit künstlich verzerrte. Fix: Alle lebenden
+Mitglieder der Dynastie altern jetzt gemeinsam pro Jahr (inkl. der bereits
+bestehenden Gesundheits-Abnahme-Formel). Verifiziert mit gleichen
+Zufallssaaten vorher/nachher: moderater, plausibler Effekt auf die
+"Dynastie stirbt aus"-Rate (ca. 6→8 von 20 Testpartien) — späte Erben sind
+jetzt realistisch älter/gebrechlicher statt ewig jung, keine Regression bei
+den harten Testinvarianten (0 unkontrollierte Bevölkerungskollapse ohne
+Game-Over-Flag, weiterhin).
+
+**Titel-Aufstieg wird jetzt gefeiert.** `checkTitleProgress()` (politics.js)
+schrieb bislang nur eine Chronik-Zeile — im laufenden Spiel fiel ein Aufstieg
+zu Baron, Graf usw. dadurch kaum auf. Neu: eine kurze, nicht-blockierende
+Einblendung (`#titleUpBanner`, 4 Sekunden, goldener Rahmen) mit einer
+kleinen aufsteigenden Fanfare (3 Töne via Web Audio, derselbe Ansatz wie
+die bestehenden Soundeffekte). Rein UI-seitig gelöst (Vergleich von
+`state.titleIndex` vor/nach `advanceYear()` im Klick-Handler) — keine
+Änderung an der Simulationslogik nötig.
+
+**Kornverteilung ausgebaut (§Original-Vertiefung).** Auf Wunsch: eine neue
+Kornbilanz macht sichtbar, wie viel Getreide pro Jahr vor der Verteilung zur
+Verfügung steht, wie hoch der reine Grundbedarf ist, und wie viel tatsächlich
+ans Volk abgegeben wird (Grundbedarf + freiwillige Kornausgabe) — als eigenes
+Panel direkt unter dem Kornausgabe-Regler, mit Tooltip zur Erklärung.
+Wichtiger: das Verhältnis (`grainRatio` = verfügbar/Grundbedarf) wirkt jetzt
+auch direkt auf Geburten- und Sterberate, zusätzlich zum bereits bestehenden,
+über die Zufriedenheit vermittelten Effekt:
+- Überschuss (Verhältnis > 100 %) hebt die Geburtenrate leicht an
+  (`grainBirthBonusMax`, linear bis Verhältnis 200 %).
+- Erst eine echte Hungersnot (Verhältnis unter `grainFamineThreshold`,
+  15 %) hebt die Sterberate spürbar (`grainDeathBonusMax`) — bewusst nicht
+  schon bei jedem milden Mangel, siehe Kalibrierungsfund unten.
+
+**Kalibrierungsfund (wichtig, gleiche Lehre wie Schritt 13):** Eine erste,
+lineare Fassung (jeder Mangel unterhalb 100 % erhöht sofort anteilig die
+Sterberate) trieb im 20×100-Jahre-Wirtschaftstest mehrere zuvor stabile
+Partien in einen echten Bevölkerungskollaps — weil das Grundspiel ganz ohne
+aktives Kornmanagement bereits jahrzehntelang chronisch mit 20–50 % Kornmangel
+läuft (siehe frühere DEVELOPMENT.md-Einträge: das ist beabsichtigt, keine
+Regression). Ein kleiner, aber über Jahrzehnte *durchgehend* wirkender
+Sterbe-Bonus kumuliert sich exponentiell und kippt bereits knapp stabile
+Partien. Nach Analyse der tatsächlichen Testkriterien stellte sich heraus:
+der automatisierte Wirtschaftstest bewertet ein korrekt geflaggtes
+"Niederlage"-Ende (Bevölkerung < 200, `state.gameOver = "defeat"`) gar nicht
+als Fehler — nur einen *unkontrollierten* Kollaps *ohne* gesetztes
+Game-Over-Flag. Die eigentliche Lehre war also nicht "keine Partie darf
+kollabieren", sondern "ein Kornmangel-Effekt darf nicht als **durchgehender
+Dauerdruck** über Jahrzehnte wirken". Lösung: Schwellenbasiert statt linear
+— nur eine wirkliche Hungersnot (< 15 % Grundbedarf gedeckt) löst den
+Effekt überhaupt aus, chronischer milder Mangel (40–90 %, der Normalfall bei
+passivem Spiel) bleibt wirkungslos für diesen speziellen Mechanismus.
+Verifiziert: 0/60 unkontrollierte Kollapse über eine breitere Seed-Stichprobe;
+gezielter Vergleichstest (künstlicher Vollüberschuss vs. künstliche
+Nulllagerbestand-Hungersnot) zeigt den Effekt klar und in beide Richtungen
+(960→972 Bauern bei Überschuss, 960→938 bei Hungersnot, gleicher Seed).
+
+**Getestet:** wie immer zuerst in den Modul-Quelldateien, `node
+tests/battle_test.js`/`economy_test.js`/`ai_vs_ai_test.js` nach jeder
+Kalibrierungsrunde erneut geprüft, danach `index.html`s Build-Skriptblock neu
+zusammengesetzt. Browser-Smoke-Test (Playwright): Kinder altern sichtbar
+(z. B. 13/10/9/5/2/0 Jahre nach 15 Spieljahren statt dauerhaft 0), die
+Kornbilanz-Anzeige ist von Jahr 0 an gefüllt (nicht erst nach dem ersten
+Jahreswechsel), eine erzwungene Baron-Beförderung löst die neue
+Feier-Einblendung korrekt aus, keine JavaScript-Fehler.
+

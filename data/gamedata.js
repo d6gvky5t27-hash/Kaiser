@@ -37,6 +37,16 @@ const CONFIG = {
     taxSatisfactionPenalty: 40,    // Zufriedenheitsverlust bei taxRate=1.0
     satisfactionBaseline: 50,      // Homöostase-Zielwert
     homeostasisStrength: 0.2,      // wie stark Zufriedenheit zur Mitte zurückgezogen wird
+    // Direkter Korn-Effekt auf Geburten-/Sterberate (zusätzlich zum bereits
+    // bestehenden, zufriedenheitsvermittelten Effekt — Getreide ist über
+    // POP_GROUPS.needs.getreide bereits Teil der Zufriedenheitsformel, dieser
+    // Bonus/Malus macht den Zusammenhang aber direkt sicht- und spürbar).
+    // grainRatio = verfügbares Getreide / Grundbedarf, siehe computeGrainBalance().
+    // Bewusst moderat kalibriert, um keinen zweiten Bevölkerungskollaps-Pfad
+    // neben dem bereits bestehenden satisfaction-basierten zu öffnen.
+    grainBirthBonusMax: 0.006,  // zusätzliche Geburtenrate bei grainRatio >= 2.0 (doppelter Bedarf gedeckt)
+    grainFamineThreshold: 0.15, // unterhalb dieses Verhältnisses gilt es als echte Hungersnot
+    grainDeathBonusMax: 0.03,  // zusätzliche Sterberate bei grainRatio = 0 (kein Getreide mehr vorhanden)
   },
   trade: {
     perCapitaDiffThreshold: 0.05,
@@ -1360,6 +1370,8 @@ const STRINGS = {
     panel_armee: "ARMEE",
     panel_kriegserklaerung: "KRIEGSERKLÄRUNG",
     panel_kaiserwahl: "KAISERWAHL",
+    title_up_headline: "⚜ AUFSTIEG! ⚜",
+    title_up_text: "Du wurdest zum {title} erhoben!",
   },
   en: {
     title_h1: "KAISERREICH", title_h2: "RISE OF A DYNASTY",
@@ -1417,6 +1429,8 @@ const STRINGS = {
     panel_armee: "ARMY",
     panel_kriegserklaerung: "DECLARATION OF WAR",
     panel_kaiserwahl: "IMPERIAL ELECTION",
+    title_up_headline: "⚜ PROMOTED! ⚜",
+    title_up_text: "You have been elevated to {title}!",
   },
 };
 let currentLocale = "de";

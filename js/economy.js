@@ -55,6 +55,24 @@ function computeProduction(region) {
   return produced;
 }
 
+// ---------- Kornbilanz (§Original-Vertiefung: Korn verteilen) ----------
+// Hält fest, wie viel Getreide vor der Verteilung an das Volk zur Verfügung
+// steht (Lagerbestand nach der Ernte) und wie hoch der reine Grundbedarf der
+// Bevölkerung ist — die Kornbilanz (grainRatio) treibt danach sowohl die
+// Geburtenrate (Überschuss) als auch die Sterberate (Mangel/Hungersnot) direkt
+// mit (siehe updatePopulation() in population-dynasty.js), zusätzlich zum
+// bereits bestehenden, zufriedenheitsvermittelten Effekt.
+function computeGrainBalance(region) {
+  let need = 0;
+  for (const pid in region.population) {
+    const coeff = (POP_GROUPS[pid].needs.getreide) || 0;
+    need += coeff * region.population[pid].count * 0.01;
+  }
+  region.grainNeed = need;
+  region.grainAvailable = region.warehouse.getreide || 0;
+  region.grainRatio = need > 0 ? region.grainAvailable / need : 1;
+}
+
 // ---------- Preisbildung (§15/§21) ----------
 // Marktspekulation: Preise schwanken jedes Jahr zusätzlich zur reinen
 // Angebot/Nachfrage-Rechnung — mittelwert-rückkehrender Zufallsprozess,

@@ -24,11 +24,13 @@ function advanceYear(state) {
       addChronicle(state, `In ${r.name} herrschte ${weather.name} (Ernteeinfluss ${(weather.factor*100).toFixed(0)}%).`);
     }
     computeProduction(r);
+    computeGrainBalance(r); // vor der Verteilung erfassen: verfügbares Getreide vs. Grundbedarf
     updatePriceNoise(r); // Marktspekulation: Preise schwanken auch ohne Angebots-/Nachfrageänderung
     const prices = computeRegionalPrices(r);
     r.prices = prices;
     consumeAndUpdateSatisfaction(r, prices);
     applyExtraGrainDistribution(state, r); // §Original: freiwillige Kornverteilung
+    r.grainDistributed = r.grainAvailable - (r.warehouse.getreide || 0); // tatsächlich ans Volk abgegeben (Grundbedarf + Kornausgabe)
     updatePopulation(r);
     if (r._manipulationYears > 0) r._manipulationYears -= 1; // §32 politische Manipulation klingt ab
     if (!r.isPlayer) aiRegionDevelops(r, state);
