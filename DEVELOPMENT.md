@@ -1780,3 +1780,34 @@ ein anderes Seitenverhältnis hatte als die x/y-Koordinaten der Gebiete
 beiden Achsen gleich skalieren) — sowie ein Beschriftungsfehler, bei dem der
 Verteidigungsbildschirm fälschlich das angreifende KI-Gebiet statt des
 verteidigten Spielergebiets im Titel zeigte.
+
+## 2026-08-20 – Schritt 39: Markthandel in die Marktpreise-Tabelle integriert, Regionalhandel-Risiko/Ertrag überarbeitet
+
+Zwei kleinere Nutzerwünsche nach weiterem Antesten der Kriegskarte.
+
+**Markthandel jetzt Teil der Marktpreise-Tabelle.** Der bisher separate
+"MARKTPLATZ"-Block (ein Dropdown zur Warenwahl + Kaufen/Verkaufen für genau
+eine Ware) ist entfallen — jede Zeile der Marktpreise-Tabelle hat jetzt
+direkt eigene Kaufen-/Verkaufen-Buttons, mit einer gemeinsamen Mengenangabe
+im Tabellenkopf. `doMarketTrade(action)` (las die Ware aus einem separaten
+Dropdown) wurde zu `doMarketTrade(gid, action)`, das die Warenkennung direkt
+von der jeweiligen Zeile bekommt.
+
+**Regionalhandel: höheres Risiko, aber auch höherer Ertrag.** Nutzer-
+Feedback: der Regionalhandel lohnte sich kaum gegenüber dem sicheren
+lokalen Markt — 12% Transportkosten plus ein erwarteter Räuberverlust von
+6%×35% ≈ 2% ergaben zusammen mehr Abzug als die pauschalen 8% Auf-/Abschlag
+beim lokalen Markt, ohne kompensierenden Mehrwert. Neu kalibriert:
+Transportkosten von 12% auf 7% gesenkt (mehr vom Preisunterschied bleibt als
+Gewinn), dafür Räuberrisiko von 6% auf 12% verdoppelt und der Verlust bei
+einem Überfall von 35% auf 50% der Ladung erhöht — ein echtes Risiko-Ertrag-
+Profil statt eines strikt schlechteren Ablegers des lokalen Markts. Die
+Anzeige im Regionalhandel-Panel nennt jetzt explizit den möglichen
+Ladungsverlust bei einem Überfall.
+
+**Getestet:** `node tests/economy_test.js` erneut grün (0/20 unkontrollierte
+Bevölkerungskollapse — die Regionalhandel-Kalibrierung betrifft ohnehin nur
+spielergesteuerte Aktionen, die der passive Test nicht auslöst).
+Playwright: alle 18 Warenzeilen zeigen korrekt Kaufen-/Verkaufen-Buttons,
+ein Testkauf über die neue Zeilen-Schaltfläche erhöht den Lagerbestand
+korrekt, keine JavaScript-Fehler.

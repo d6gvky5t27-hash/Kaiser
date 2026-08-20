@@ -327,12 +327,18 @@ const CONFIG = {
   // §20/§21: Regionalhandel — echte Arbitrage zwischen zwei konkreten Regionen
   // statt nur dem eigenen lokalen Markt (Beispiel aus der Spec: Getreide in
   // Köln 45 / Mainz 62 / München 98 — Preisunterschiede gezielt ausnutzen).
-  // Transportkosten sind höher als beim lokalen Markt, dazu ein Räuberrisiko
-  // (§20 "Gefahren: Räuber, Piraten, Krieg, schlechte Straßen, Wetter, Zölle").
+  // Nutzer-Feedback: der Regionalhandel lohnte sich kaum gegenüber dem
+  // sicheren lokalen Markt (12% Transportkosten + 6%×35% ≈ 2% erwarteter
+  // Räuberverlust, macht insgesamt mehr Abzug als die 8% des lokalen
+  // Marktes, ohne kompensierenden Mehrwert). Jetzt echtes Risiko-Ertrag-
+  // Profil: niedrigere Transportkosten lassen mehr vom Preisunterschied als
+  // Gewinn durch, dafür ist ein Räuberüberfall doppelt so wahrscheinlich UND
+  // kostet die Hälfte der Ladung statt gut ein Drittel (§20 "Gefahren:
+  // Räuber, Piraten, Krieg, schlechte Straßen, Wetter, Zölle").
   interregionalTrade: {
-    transportCostShare: 0.12,
-    banditRiskChance: 0.06,
-    banditLossShare: 0.35,
+    transportCostShare: 0.07,
+    banditRiskChance: 0.12,
+    banditLossShare: 0.5,
   },
   // Kornverteilung über den Eigenbedarf hinaus — hebt Zufriedenheit und lockt
   // Zuwanderer an, kostet aber Getreide (Original-Tipp: "mehr als nötig" verteilen)

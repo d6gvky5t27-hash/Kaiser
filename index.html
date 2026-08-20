@@ -557,9 +557,6 @@
       <h2 class="title">MARKTPREISE &amp; LAGER</h2>
       <table id="priceTable"></table>
 
-      <h2 class="title">MARKTPLATZ</h2>
-      <div id="marketPanel" style="font-size:var(--fs-body);"></div>
-
       <h2 class="title">REGIONALHANDEL (ARBITRAGE)</h2>
       <div id="interregionalTradePanel" style="font-size:var(--fs-body);"></div>
 
@@ -1107,12 +1104,18 @@ const CONFIG = {
   // §20/§21: Regionalhandel — echte Arbitrage zwischen zwei konkreten Regionen
   // statt nur dem eigenen lokalen Markt (Beispiel aus der Spec: Getreide in
   // Köln 45 / Mainz 62 / München 98 — Preisunterschiede gezielt ausnutzen).
-  // Transportkosten sind höher als beim lokalen Markt, dazu ein Räuberrisiko
-  // (§20 "Gefahren: Räuber, Piraten, Krieg, schlechte Straßen, Wetter, Zölle").
+  // Nutzer-Feedback: der Regionalhandel lohnte sich kaum gegenüber dem
+  // sicheren lokalen Markt (12% Transportkosten + 6%×35% ≈ 2% erwarteter
+  // Räuberverlust, macht insgesamt mehr Abzug als die 8% des lokalen
+  // Marktes, ohne kompensierenden Mehrwert). Jetzt echtes Risiko-Ertrag-
+  // Profil: niedrigere Transportkosten lassen mehr vom Preisunterschied als
+  // Gewinn durch, dafür ist ein Räuberüberfall doppelt so wahrscheinlich UND
+  // kostet die Hälfte der Ladung statt gut ein Drittel (§20 "Gefahren:
+  // Räuber, Piraten, Krieg, schlechte Straßen, Wetter, Zölle").
   interregionalTrade: {
-    transportCostShare: 0.12,
-    banditRiskChance: 0.06,
-    banditLossShare: 0.35,
+    transportCostShare: 0.07,
+    banditRiskChance: 0.12,
+    banditLossShare: 0.5,
   },
   // Kornverteilung über den Eigenbedarf hinaus — hebt Zufriedenheit und lockt
   // Zuwanderer an, kostet aber Getreide (Original-Tipp: "mehr als nötig" verteilen)
@@ -6787,34 +6790,22 @@ function render() {
     banner.style.display = 'none';
   }
 
-  // Preise & Lager (mit Preis-Tooltip gemäß §84)
+  // Preise & Lager (mit Preis-Tooltip gemäß §84), Markthandel direkt in der
+  // Zeile (Nutzerwunsch: nicht mehr als eigener Block darunter, sondern
+  // Kaufen/Verkaufen schön hinter Preis/Lager in derselben Tabelle)
   const prices = r.prices || computeRegionalPrices(r);
-  let priceHtml = '<tr><th>Ware</th><th>Preis</th><th>Lager</th></tr>';
+  const marketQtyVal = document.getElementById('marketQty') ? document.getElementById('marketQty').value : 20;
+  let priceHtml = `<tr><th>Ware</th><th>Preis</th><th>Lager</th><th colspan="2">Handel: <input type="number" id="marketQty" value="${marketQtyVal}" min="1" style="width:50px; font-family:inherit; padding:3px;"></th></tr>`;
   for (const gid in GOODS) {
     const pb = r.priceBreakdown && r.priceBreakdown[gid];
     const tip = pb
       ? `Basispreis ${pb.basis}\nNachfrage ${pb.nachfrage}\nAngebot ${pb.angebot}\nMarktstimmung ×${pb.marktstimmung}\nMultiplikator gesamt ×${pb.multiplikator}\nGesamt ${pb.gesamt}`
       : 'Noch keine Daten.';
-    priceHtml += `<tr><td style="display:flex; align-items:center; gap:5px;"><span style="line-height:0;">${renderGoodIcon(gid, 18)}</span>${GOODS[gid].name}</td><td data-tip="${tip}">${prices[gid]}</td><td>${Math.round(r.warehouse[gid]||0)}</td></tr>`;
+    priceHtml += `<tr><td style="display:flex; align-items:center; gap:5px;"><span style="line-height:0;">${renderGoodIcon(gid, 18)}</span>${GOODS[gid].name}</td><td data-tip="${tip}">${prices[gid]}</td><td>${Math.round(r.warehouse[gid]||0)}</td>` +
+      `<td><button class="dipbtn" data-tip="Kaufen (+${Math.round(CONFIG.market.buyMarkupShare*100)}%)" onclick="doMarketTrade('${gid}','buy')">Kaufen</button></td>` +
+      `<td><button class="dipbtn" data-tip="Verkaufen (−${Math.round(CONFIG.market.sellCommissionShare*100)}%)" onclick="doMarketTrade('${gid}','sell')">Verkaufen</button></td></tr>`;
   }
   document.getElementById('priceTable').innerHTML = priceHtml;
-
-  // Marktplatz (§20/§21/§73)
-  const selectedGood = document.getElementById('marketGoodSelect') ? document.getElementById('marketGoodSelect').value : 'getreide';
-  const goodOptions = Object.entries(GOODS).map(([gid, g]) =>
-    `<option value="${gid}" ${gid===selectedGood?'selected':''}>${g.name}</option>`).join('');
-  const marketPrice = prices[selectedGood];
-  const marketStock = Math.round(r.warehouse[selectedGood] || 0);
-  document.getElementById('marketPanel').innerHTML = `
-    <div style="display:flex; align-items:center; gap:8px;">
-      <span style="display:inline-flex; width:34px; height:34px; background:var(--panel); border:2px solid #0a0c11; align-items:center; justify-content:center; flex-shrink:0;">${renderGoodIcon(selectedGood, 26)}</span>
-      <select id="marketGoodSelect" onchange="render()">${goodOptions}</select>
-    </div>
-    Preis: ${marketPrice} Taler · Lager: ${marketStock}<br>
-    <input type="number" id="marketQty" value="20" min="1" style="width:60px; font-family:inherit; padding:3px;">
-    <button onclick="doMarketTrade('buy')">Kaufen (+${Math.round(CONFIG.market.buyMarkupShare*100)}%)</button>
-    <button onclick="doMarketTrade('sell')">Verkaufen (−${Math.round(CONFIG.market.sellCommissionShare*100)}%)</button>
-  `;
 
   // Regionalhandel: Arbitrage zwischen der eigenen und einer konkreten Zielregion (§20/§21)
   const irtGood = document.getElementById('irtGoodSelect') ? document.getElementById('irtGoodSelect').value : 'getreide';
@@ -6844,7 +6835,7 @@ function render() {
     <input type="number" id="irtQty" value="20" min="1" style="width:60px; font-family:inherit; padding:3px;">
     <button onclick="doInterregionalTrade('export')">Exportieren (dort verkaufen)</button>
     <button onclick="doInterregionalTrade('import')">Importieren (dort kaufen)</button>
-    <div style="font-size:var(--fs-body); margin-top:var(--sp-1);">Transportkosten ${Math.round(CONFIG.interregionalTrade.transportCostShare*100)}% · Räuberrisiko ${Math.round(CONFIG.interregionalTrade.banditRiskChance*100)}%</div>
+    <div style="font-size:var(--fs-body); margin-top:var(--sp-1);">Transportkosten ${Math.round(CONFIG.interregionalTrade.transportCostShare*100)}% · Räuberrisiko ${Math.round(CONFIG.interregionalTrade.banditRiskChance*100)}% (bei Überfall <span class="goodbad">−${Math.round(CONFIG.interregionalTrade.banditLossShare*100)}% der Ladung</span>) — höheres Risiko als der lokale Markt, dafür mehr vom Preisunterschied als Gewinn</div>
   `;
 
   // Diplomatie
@@ -7736,8 +7727,7 @@ function doInterregionalTrade(action) {
   render();
 }
 
-function doMarketTrade(action) {
-  const gid = document.getElementById('marketGoodSelect').value;
+function doMarketTrade(gid, action) {
   const qty = parseInt(document.getElementById('marketQty').value, 10) || 0;
   const r = state.regions.player;
   const result = action === 'buy' ? buyGoodFromMarket(state, r, gid, qty) : sellGoodToMarket(state, r, gid, qty);
