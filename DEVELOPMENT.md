@@ -1701,3 +1701,82 @@ Kassenbuch zeigt nach einem Gebäudekauf korrekt „Neubau: Bauernhof −200“
 unter „Weitere Ein-/Ausgaben“, Steuereinnahmen sind jetzt spürbar (+94 statt
 +1); Startregion „Republik Venedig“ ausgewählt → Topbar/Zustand zeigen
 korrekt Name, Fruchtbarkeit 0,85, Bevölkerung 2.200, Startkapital 2.100 Taler.
+
+## 2026-08-20 – Schritt 38: Kriegskarte — Risiko-artige Gebietseroberung
+
+Auf Nutzerwunsch: "wir sollten für die Kriegsphase und Militär eine Art
+Brettspiel wie Risiko anlegen." Größter Einzelschritt bisher.
+
+**Umfang geklärt statt geraten:** Zwei echte Architekturentscheidungen wurden
+vorab mit dem Nutzer geklärt (nicht selbst geraten): (1) eine "echte
+Mehrgebiets-Karte" statt nur die 8 bestehenden Regionen als Felder, (2) die
+bestehende taktische Kampf-Engine bleibt für jeden Zusammenstoß erhalten,
+die Kriegskarte ist nur die neue strategische Ebene darüber.
+
+**Umsetzung:** Neue Datentabelle `TERRITORIES` (gamedata.js) — 16 Gebiete,
+vier pro kriegsfähiger Region (Spieler + ai1 Mainau + ai2 Rheinfeld + ai3
+Bergheim, die einzigen mit echter Diplomatie; ai4-ai7 bleiben reine
+Hintergrundregionen). Jede Region hat eine befestigte Hauptstadt (Gelände
+"Burg", starke Verteidigung über die bestehenden Geländeboni der Kampf-
+Engine) und drei Provinzgebiete, davon je eines an eine Nachbarregion
+grenzend, plus Querverbindungen zwischen den KI-Regionen für eine
+zusammenhängende kleine Karte. Neues Modul `js/war-map.js` verwaltet
+Besitzer/Garnison pro Gebiet (`state.territories`), Truppenstationierung aus
+der bestehenden Rekruten-Reserve, Verlegung zwischen eigenen Nachbargebieten,
+und baut Kampfarmeen aus den Gebiets-Garnisonen statt aus der gesamten
+Region auf.
+
+**Krieg wird ein andauernder Zustand.** "Krieg erklären" löste bisher sofort
+eine abstrakte Alles-oder-nichts-Schlacht aus (`declareWar()` in
+military.js). Diese Funktion wurde umgebaut: sie bricht weiterhin Verträge/
+crash die Beziehung wie zuvor, setzt aber jetzt `state.warState[aiId] =
+true` und eröffnet die Kriegskarte, statt eine Schlacht sofort aufzulösen.
+Der Spieler erobert danach Gebiet für Gebiet, jeder Angriff läuft über die
+volle interaktive Kampf-Engine (Formation/Taktik/Gelände/Moral, exakt wie
+zuvor). Ein Friedensvertrag beendet die Kampagne (bereits eroberte Gebiete
+bleiben beim Eroberer). Erobert der Spieler ALLE Heimatgebiete einer Region,
+unterwirft sie sich automatisch als Vasall (nutzt das bereits bestehende,
+getestete Vasallentribut-System weiter statt eine neue Wirtschafts-
+Zusammenführung zu bauen).
+
+**KI bleibt kein Punchingball.** Im Krieg befindliche KI-Regionen erholen
+ihre Garnisonen langsam (jährliche Annäherung an die Zielstärke) und können
+mit einer Jahreswahrscheinlichkeit selbst ein Grenzgebiet des Spielers
+angreifen (`aiTerritoryCounterAttack`) — löst denselben interaktiven
+Verteidigungsbildschirm aus wie ein KI-Überraschungskrieg (§31), nur
+gebietsscharf statt regionsweit.
+
+**Bewusste Vereinfachungen (Scope-Entscheidungen, transparent gehalten):**
+- Von der KI selbst erklärte Überraschungskriege (§31, `incomingAiWar`)
+  bleiben unverändert eine regionsweite Sofortschlacht — nur die vom Spieler
+  ausgelösten Kriege laufen über die neue Kriegskarte. Setzt aber ebenfalls
+  `state.warState`, damit danach auf der Kriegskarte weitergekämpft werden
+  kann.
+- Die alte, regionsweite Belagerungsmechanik (Aushungern/Bestechen vor einem
+  Sturmangriff) wird nicht mehr ausgelöst — eine befestigte Hauptstadt
+  bekommt stattdessen automatisch den "Burg"-Geländebonus, wenn sie als
+  Gebiet angegriffen wird. Der alte Code bleibt unbenutzt erhalten (gleiches
+  Vorgehen wie schon bei der alten Sofort-Kriegsauflösung zuvor).
+- Kriegsverbündete (rollWarAllies) werden weiterhin gewürfelt und im
+  Kriegschronik-Text erwähnt, wirken sich aber (noch) nicht mechanisch auf
+  einzelne Gebietskämpfe aus.
+
+**Getestet:** `node tests/battle_test.js`/`economy_test.js`/`ai_vs_ai_test.js`
+(beide Letzteren um das neue `war-map`-Modul in der Bündelungsreihenfolge
+ergänzt) — 0/20 unkontrollierte Bevölkerungskollapse, KI-Dominanz 47 % unter
+der 50 %-Schwelle, keine Regression. Node-Skript verifiziert
+`checkRegionConquest` (alle 4 Gebiete einer Region erobert → Vasallisierung,
+Prestige/Taler-Bonus, Krieg endet) und `aiTerritoryCounterAttack` (löst
+zuverlässig `state.pendingTerritoryDefense` aus). Playwright-Durchlauf durch
+den kompletten Spielerangriff (Krieg erklären → Karte öffnet automatisch →
+Truppen aus der Reserve stationieren → Nachbargebiet angreifen → Kampf-
+Engine → Sieg → Gebiet wechselt den Besitzer → zurück zur Karte) und die
+KI-Verteidigung (KI greift Spielergebiet an → Warnhinweis →
+Verteidigungsbildschirm mit korrekt beschrifteten Seiten → Kampf → Ergebnis
+korrekt angewendet) — keine JavaScript-Fehler. Ein Layout-Bug beim ersten
+Rendern behoben: die Kartenknoten überlappten stark, weil der Kartenrahmen
+ein anderes Seitenverhältnis hatte als die x/y-Koordinaten der Gebiete
+(behoben durch ein quadratisches Kartenraster, in dem Prozentwerte auf
+beiden Achsen gleich skalieren) — sowie ein Beschriftungsfehler, bei dem der
+Verteidigungsbildschirm fälschlich das angreifende KI-Gebiet statt des
+verteidigten Spielergebiets im Titel zeigte.

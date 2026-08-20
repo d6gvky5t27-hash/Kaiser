@@ -274,6 +274,7 @@ function newGame(options) {
   state.rulerId = id;
 
   addChronicle(state, `Im Jahre 1500 übernahm ${ruler.name} ${dynastyName} die Herrschaft über ${state.regions.player.name}.`);
+  initTerritories(state); // Kriegskarte (§Original-Vertiefung): Gebietsbesitz/Garnisonen initialisieren
   return state;
 }
 

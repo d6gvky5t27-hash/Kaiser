@@ -95,6 +95,8 @@ function advanceYear(state) {
   updateIntel(state);
   updateReligion(state, r);
   checkAiWarInitiative(state); // §31: KI wägt nicht nur ab, sondern erklärt ggf. tatsächlich Krieg
+  reinforceAiTerritories(state); // Kriegskarte: KI-Garnisonen erholen sich langsam
+  aiTerritoryCounterAttack(state); // Kriegskarte: eine im Krieg befindliche Region kann zurückschlagen
 
   // §47 alternative Siegbedingungen prüfen
   checkAlternativeVictory(state);

@@ -80,6 +80,18 @@ const CONFIG = {
     transferShare: 0.15,
     transferCap: 200,
   },
+  warMap: {
+    // Risiko-artige Kriegskarte (§Original-Vertiefung, Nutzerwunsch): löst die
+    // alte Sofortauflösung bei "Krieg erklären" ab. Ein Krieg ist jetzt ein
+    // andauernder Zustand (state.warState), in dem Gebiet für Gebiet über die
+    // bestehende taktische Kampf-Engine erobert wird (siehe js/war-map.js).
+    capitalGarrisonShare: 0.4,     // Anteil der KI-Regionsstärke, der auf die Hauptstadt entfällt
+    provinceGarrisonShare: 0.2,    // Anteil je einfachem Provinzgebiet (3 pro Region)
+    reinforceRate: 0.15,           // wie schnell KI-Garnisonen sich jährlich Richtung Zielstärke erholen
+    counterAttackChance: 0.25,     // Wahrscheinlichkeit pro Jahr, dass eine KI-Region im Krieg zurückschlägt
+    conquestPrestigeGain: 40,      // Bonus für die vollständige Eroberung einer Region
+    conquestTreasuryGain: 500,
+  },
   ai: {
     buildChance: 0.3,
     buildWealthThreshold: 600,
@@ -1339,6 +1351,39 @@ const EXTRA_REGIONS = [
     "fertility": 0.95,
     "pop": 2750
   }
+];
+
+// ---------- Kriegskarte: Gebiete für die Risiko-artige Eroberungskampagne
+// (§Original-Vertiefung, Nutzerwunsch) ----------
+// Jede der vier kriegsfähigen Regionen (Spieler + ai1-ai3, die einzigen mit
+// echter Diplomatie/Kriegserklärung) wird in 4 Gebiete unterteilt: eine
+// befestigte Hauptstadt (terrain "burg", stärkste Garnison) und drei
+// Provinzgebiete, von denen je eines an eine Nachbarregion grenzt — dazu
+// noch eine Verbindung zwischen den Nachbarregionen untereinander für eine
+// zusammenhängende kleine Karte. "region" ist die feste Heimatregion (für
+// die Eroberungsprüfung: gehören ALLE ihre Gebiete dem Spieler?); der
+// tatsächliche, veränderliche Besitzer steht zur Laufzeit in
+// state.territories[id].owner.
+const TERRITORIES = [
+  { id: "p_hauptstadt", name: "Hauptstadt", region: "player", x: 50, y: 50, terrain: "burg", capital: true, adjacent: ["p_nord", "p_ost", "p_sued"] },
+  { id: "p_nord", name: "Nordmark", region: "player", x: 50, y: 28, terrain: "ebene", adjacent: ["p_hauptstadt", "m_sued"] },
+  { id: "p_ost", name: "Ostmark", region: "player", x: 72, y: 55, terrain: "wald", adjacent: ["p_hauptstadt", "r_west"] },
+  { id: "p_sued", name: "Südmark", region: "player", x: 50, y: 74, terrain: "huegel", adjacent: ["p_hauptstadt", "b_nord"] },
+
+  { id: "m_hauptstadt", name: "Mainau-Stadt", region: "ai1", x: 50, y: 8, terrain: "burg", capital: true, adjacent: ["m_sued", "m_ost", "m_west"] },
+  { id: "m_sued", name: "Grenzmark Mainau", region: "ai1", x: 50, y: 22, terrain: "ebene", adjacent: ["m_hauptstadt", "p_nord"] },
+  { id: "m_ost", name: "Ostmainau", region: "ai1", x: 70, y: 12, terrain: "wald", adjacent: ["m_hauptstadt", "r_nord"] },
+  { id: "m_west", name: "Westmainau", region: "ai1", x: 30, y: 12, terrain: "huegel", adjacent: ["m_hauptstadt"] },
+
+  { id: "r_hauptstadt", name: "Rheinfeld-Stadt", region: "ai2", x: 90, y: 50, terrain: "burg", capital: true, adjacent: ["r_west", "r_nord", "r_sued"] },
+  { id: "r_west", name: "Grenzmark Rheinfeld", region: "ai2", x: 74, y: 52, terrain: "ebene", adjacent: ["r_hauptstadt", "p_ost"] },
+  { id: "r_nord", name: "Nordrheinfeld", region: "ai2", x: 76, y: 22, terrain: "wald", adjacent: ["r_hauptstadt", "m_ost"] },
+  { id: "r_sued", name: "Südrheinfeld", region: "ai2", x: 76, y: 78, terrain: "huegel", adjacent: ["r_hauptstadt", "b_ost"] },
+
+  { id: "b_hauptstadt", name: "Bergheim-Stadt", region: "ai3", x: 50, y: 92, terrain: "burg", capital: true, adjacent: ["b_nord", "b_ost", "b_west"] },
+  { id: "b_nord", name: "Grenzmark Bergheim", region: "ai3", x: 50, y: 76, terrain: "ebene", adjacent: ["b_hauptstadt", "p_sued"] },
+  { id: "b_ost", name: "Ostbergheim", region: "ai3", x: 70, y: 88, terrain: "wald", adjacent: ["b_hauptstadt", "r_sued"] },
+  { id: "b_west", name: "Westbergheim", region: "ai3", x: 30, y: 88, terrain: "huegel", adjacent: ["b_hauptstadt"] },
 ];
 
 // ---------- Auswählbare Startregionen für das Jahr 1500 (§8-Vertiefung) ----------

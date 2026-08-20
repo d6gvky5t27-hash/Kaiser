@@ -356,6 +356,38 @@
     background: var(--panel-dark); padding: var(--sp-3); margin-bottom: var(--sp-3); border-radius: var(--r-sm);
     border: 2px solid var(--gold); display: none;
   }
+
+  /* Kriegskarte: Risiko-artige Gebietseroberung (§Original-Vertiefung) */
+  #warMapOverlay {
+    position: fixed; inset: 0; background: rgba(44,31,18,0.8); display: none;
+    align-items: center; justify-content: center; z-index: 210;
+  }
+  #warMapFrame {
+    width: 900px; max-height: 92vh; overflow-y: auto; background: var(--blue);
+    border: 5px solid var(--ink); border-radius: var(--r-lg); box-shadow: 8px 8px 0 rgba(44,31,18,0.3);
+    padding: var(--sp-3); color: #fff6e2;
+  }
+  #warMapBoard {
+    /* Quadratisch, damit x-/y-Prozentwerte gleich skalieren (bei einem
+       rechteckigen Container würden die Knoten je nach Achse unterschiedlich
+       groß wirken und überlappen) */
+    position: relative; width: 100%; aspect-ratio: 1 / 1; background: #3a5a2d;
+    border: 3px solid var(--ink); border-radius: var(--r-md); margin-bottom: var(--sp-3); overflow: hidden;
+  }
+  #warMapSvg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #warMapNodes { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .wmNode {
+    position: absolute; transform: translate(-50%, -50%); width: 11%; aspect-ratio: 1;
+    border-radius: 50%; border: 3px solid var(--ink); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 2px 2px 0 rgba(44,31,18,0.4); transition: transform 0.1s;
+  }
+  .wmNode:hover { transform: translate(-50%, -50%) scale(1.1); z-index: 5; }
+  .wmNode.selected { outline: 3px solid #fff6e2; outline-offset: 2px; z-index: 4; }
+  .wmNode.capital { border-width: 4px; border-color: var(--gold); }
+  .wmNodeLabel { font-family: var(--font-display); font-size: var(--fs-body); color: #fff6e2; text-shadow: 1px 1px 0 rgba(0,0,0,0.5); }
+  #warMapDetail { color: var(--ink); }
+  #warMapDetail select, #warMapDetail input { font-family: var(--font); font-size: var(--fs-body); padding: 4px; border-radius: var(--r-sm); border: 2px solid var(--ink); }
 </style>
 </head>
 <body>
@@ -730,6 +762,21 @@
   </div>
 </div>
 
+<!-- Kriegskarte: Risiko-artige Gebietseroberung (§Original-Vertiefung) -->
+<div id="warMapOverlay">
+  <div id="warMapFrame">
+    <h2 class="title">⚔ KRIEGSKARTE: <span id="wm-title"></span> ⚔</h2>
+    <div id="warMapBoard">
+      <svg id="warMapSvg" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <g id="warMapLines"></g>
+      </svg>
+      <div id="warMapNodes"></div>
+    </div>
+    <div id="warMapDetail" class="diploBlock"></div>
+    <div style="text-align:center; margin-top:var(--sp-2);"><button onclick="closeWarMap()">Kriegskarte schließen</button></div>
+  </div>
+</div>
+
 <script>
 // ============================================================
 // DATENSCHICHT — bewusst getrennt von der Spiellogik (§65 Modding)
@@ -812,6 +859,18 @@ const CONFIG = {
     perCapitaDiffThreshold: 0.05,
     transferShare: 0.15,
     transferCap: 200,
+  },
+  warMap: {
+    // Risiko-artige Kriegskarte (§Original-Vertiefung, Nutzerwunsch): löst die
+    // alte Sofortauflösung bei "Krieg erklären" ab. Ein Krieg ist jetzt ein
+    // andauernder Zustand (state.warState), in dem Gebiet für Gebiet über die
+    // bestehende taktische Kampf-Engine erobert wird (siehe js/war-map.js).
+    capitalGarrisonShare: 0.4,     // Anteil der KI-Regionsstärke, der auf die Hauptstadt entfällt
+    provinceGarrisonShare: 0.2,    // Anteil je einfachem Provinzgebiet (3 pro Region)
+    reinforceRate: 0.15,           // wie schnell KI-Garnisonen sich jährlich Richtung Zielstärke erholen
+    counterAttackChance: 0.25,     // Wahrscheinlichkeit pro Jahr, dass eine KI-Region im Krieg zurückschlägt
+    conquestPrestigeGain: 40,      // Bonus für die vollständige Eroberung einer Region
+    conquestTreasuryGain: 500,
   },
   ai: {
     buildChance: 0.3,
@@ -2074,6 +2133,39 @@ const EXTRA_REGIONS = [
   }
 ];
 
+// ---------- Kriegskarte: Gebiete für die Risiko-artige Eroberungskampagne
+// (§Original-Vertiefung, Nutzerwunsch) ----------
+// Jede der vier kriegsfähigen Regionen (Spieler + ai1-ai3, die einzigen mit
+// echter Diplomatie/Kriegserklärung) wird in 4 Gebiete unterteilt: eine
+// befestigte Hauptstadt (terrain "burg", stärkste Garnison) und drei
+// Provinzgebiete, von denen je eines an eine Nachbarregion grenzt — dazu
+// noch eine Verbindung zwischen den Nachbarregionen untereinander für eine
+// zusammenhängende kleine Karte. "region" ist die feste Heimatregion (für
+// die Eroberungsprüfung: gehören ALLE ihre Gebiete dem Spieler?); der
+// tatsächliche, veränderliche Besitzer steht zur Laufzeit in
+// state.territories[id].owner.
+const TERRITORIES = [
+  { id: "p_hauptstadt", name: "Hauptstadt", region: "player", x: 50, y: 50, terrain: "burg", capital: true, adjacent: ["p_nord", "p_ost", "p_sued"] },
+  { id: "p_nord", name: "Nordmark", region: "player", x: 50, y: 28, terrain: "ebene", adjacent: ["p_hauptstadt", "m_sued"] },
+  { id: "p_ost", name: "Ostmark", region: "player", x: 72, y: 55, terrain: "wald", adjacent: ["p_hauptstadt", "r_west"] },
+  { id: "p_sued", name: "Südmark", region: "player", x: 50, y: 74, terrain: "huegel", adjacent: ["p_hauptstadt", "b_nord"] },
+
+  { id: "m_hauptstadt", name: "Mainau-Stadt", region: "ai1", x: 50, y: 8, terrain: "burg", capital: true, adjacent: ["m_sued", "m_ost", "m_west"] },
+  { id: "m_sued", name: "Grenzmark Mainau", region: "ai1", x: 50, y: 22, terrain: "ebene", adjacent: ["m_hauptstadt", "p_nord"] },
+  { id: "m_ost", name: "Ostmainau", region: "ai1", x: 70, y: 12, terrain: "wald", adjacent: ["m_hauptstadt", "r_nord"] },
+  { id: "m_west", name: "Westmainau", region: "ai1", x: 30, y: 12, terrain: "huegel", adjacent: ["m_hauptstadt"] },
+
+  { id: "r_hauptstadt", name: "Rheinfeld-Stadt", region: "ai2", x: 90, y: 50, terrain: "burg", capital: true, adjacent: ["r_west", "r_nord", "r_sued"] },
+  { id: "r_west", name: "Grenzmark Rheinfeld", region: "ai2", x: 74, y: 52, terrain: "ebene", adjacent: ["r_hauptstadt", "p_ost"] },
+  { id: "r_nord", name: "Nordrheinfeld", region: "ai2", x: 76, y: 22, terrain: "wald", adjacent: ["r_hauptstadt", "m_ost"] },
+  { id: "r_sued", name: "Südrheinfeld", region: "ai2", x: 76, y: 78, terrain: "huegel", adjacent: ["r_hauptstadt", "b_ost"] },
+
+  { id: "b_hauptstadt", name: "Bergheim-Stadt", region: "ai3", x: 50, y: 92, terrain: "burg", capital: true, adjacent: ["b_nord", "b_ost", "b_west"] },
+  { id: "b_nord", name: "Grenzmark Bergheim", region: "ai3", x: 50, y: 76, terrain: "ebene", adjacent: ["b_hauptstadt", "p_sued"] },
+  { id: "b_ost", name: "Ostbergheim", region: "ai3", x: 70, y: 88, terrain: "wald", adjacent: ["b_hauptstadt", "r_sued"] },
+  { id: "b_west", name: "Westbergheim", region: "ai3", x: 30, y: 88, terrain: "huegel", adjacent: ["b_hauptstadt"] },
+];
+
 // ---------- Auswählbare Startregionen für das Jahr 1500 (§8-Vertiefung) ----------
 // Auf Nutzerwunsch: statt einer einzigen fiktiven "Deine Provinz" darf der
 // Spieler bei der Charaktererstellung aus real existierenden europäischen
@@ -2987,6 +3079,7 @@ function newGame(options) {
   state.rulerId = id;
 
   addChronicle(state, `Im Jahre 1500 übernahm ${ruler.name} ${dynastyName} die Herrschaft über ${state.regions.player.name}.`);
+  initTerritories(state); // Kriegskarte (§Original-Vertiefung): Gebietsbesitz/Garnisonen initialisieren
   return state;
 }
 
@@ -4068,6 +4161,9 @@ function proposePeaceTreaty(state, aiId) {
   if (state.treasury < cost) return { ok: false, reason: `Nicht genug Taler (benötigt: ${cost}).` };
   state.treasury -= cost;
   dip.relation = clamp(dip.relation + cfg.peaceTreatyRelationGain, -100, 100);
+  // Kriegskarte: ein Friedensvertrag beendet eine andauernde Gebietskampagne
+  // (bereits eroberte Gebiete bleiben beim Eroberer, kein Rückzug).
+  if (state.warState && state.warState[aiId]) state.warState[aiId] = false;
   addChronicle(state, `Ein Friedensvertrag mit ${state.regions[aiId].name} wurde für ${cost} Taler geschlossen.`);
   return { ok: true, cost };
 }
@@ -4291,8 +4387,11 @@ function rollWarAllies(state, targetId) {
 
 // ============================================================
 // MILITARY — Berater, Truppen, Armeestärke, Unterhalt, KI-Stärke-
-// Schätzung; alte Sofort-/Belagerungsauflösung bleibt als unbenutzter
-// Code stehen, seit die eigenständige Kampf-Engine übernommen hat (§33/§34)
+// Schätzung; declareWar() eröffnet seit der Kriegskarte (js/war-map.js) eine
+// andauernde Kampagne statt einer Sofortschlacht. Die alte
+// Belagerungsauflösung (startSiege/siegeStarve/siegeBribe/resolveSiegeStorm
+// weiter unten) bleibt als unbenutzter Code stehen, seit die "Burg"-
+// Geländeboni der Kampf-Engine dieselbe Rolle pro Gebiet übernehmen (§33/§34)
 // ============================================================
 
 function generateAdvisorCandidate(role) {
@@ -4457,6 +4556,12 @@ function checkAiWarInitiative(state) {
   const diffCfg = CONFIG.difficulty[state.difficulty] || CONFIG.difficulty.normal;
   if (!state.aiWarCooldown) state.aiWarCooldown = {};
   for (const aiId in state.diplomacy) {
+    // Kriegskarte: eine bereits andauernde Kampagne (state.warState) läuft über
+    // die Gebietsangriffe (aiTerritoryCounterAttack), kein zweites "erklärt
+    // Krieg"-Ereignis nötig; ebenso keine neue Kriegserklärung gegen eine
+    // bereits vollständig eroberte (vasallisierte) Region.
+    if (state.warState && state.warState[aiId]) continue;
+    if (state.regions[aiId] && state.regions[aiId].conquered) continue;
     if ((state.aiWarCooldown[aiId] || 0) > 0) { state.aiWarCooldown[aiId] -= 1; continue; }
     // Militärische Schwäche allein reicht nicht — es braucht auch eine wirklich
     // schlechte Beziehung als Rechtfertigung (siehe aiWarMaxRelationForAggression).
@@ -4467,85 +4572,49 @@ function checkAiWarInitiative(state) {
     if (rnd() > cfg.aiWarInitiativeChance) continue; // nicht jede günstige Gelegenheit wird sofort genutzt
     state.aiWarCooldown[aiId] = cfg.aiWarCooldownYears;
     state.incomingAiWar = aiId;
+    if (state.warState) state.warState[aiId] = true; // Kriegskarte: ab jetzt eine andauernde Kampagne
     addChronicle(state, `${state.regions[aiId].name} erklärt dir ohne Vorwarnung den Krieg!`);
     return aiId;
   }
   return null;
 }
 
-function declareWar(state, aiId, formation) {
+// Kriegskarte (§Original-Vertiefung): "Krieg erklären" löst seitdem keine
+// Sofortschlacht mehr aus, sondern eröffnet eine andauernde Kampagne
+// (state.warState[aiId] = true), die der Spieler über die Gebietsangriffe
+// auf der Kriegskarte (js/war-map.js) austrägt — jeder einzelne Zusammenstoß
+// weiterhin über die volle interaktive Kampf-Engine. Die alte
+// Wahrscheinlichkeits-Sofortauflösung und die Belagerungsauslösung entfallen
+// hier bewusst: eine befestigte Hauptstadt bekommt stattdessen automatisch
+// die "Burg"-Geländeboni der Kampf-Engine, wenn sie als Gebiet angegriffen
+// wird — granularer als die alte regionsweite Belagerung.
+function declareWar(state, aiId) {
   const cfg = CONFIG.military;
   const dip = state.diplomacy[aiId];
   const region = state.regions[aiId];
   const hadPact = dip.treaties.nichtangriff || dip.treaties.allianz;
 
   // §Original "Kaiser": die übrigen Herrscher werden gefragt, ob sie
-  // unterstützen, dem Gegner helfen oder neutral bleiben
+  // unterstützen, dem Gegner helfen oder neutral bleiben (rein narrativ in
+  // der Kriegskarten-Fassung — noch ohne mechanische Stärkewirkung auf
+  // einzelne Gebietskämpfe).
   const allyResults = rollWarAllies(state, aiId);
-  let allyStrengthBonus = 0, enemyStrengthBonus = 0;
-  const allyLines = [];
-  for (const result of allyResults) {
-    const theirStrength = estimateAiStrength(state.regions[result.aiId]);
-    if (result.stance === "supportPlayer") {
-      allyStrengthBonus += theirStrength * CONFIG.warAllies.strengthContribution;
-      allyLines.push(`${result.name} unterstützt dich.`);
-    } else if (result.stance === "supportEnemy") {
-      enemyStrengthBonus += theirStrength * CONFIG.warAllies.strengthContribution;
-      allyLines.push(`${result.name} unterstützt ${region.name}.`);
-    } else {
-      allyLines.push(`${result.name} bleibt neutral.`);
-    }
-  }
+  const allyLines = allyResults.map(result =>
+    result.stance === "supportPlayer" ? `${result.name} unterstützt dich.`
+    : result.stance === "supportEnemy" ? `${result.name} unterstützt ${region.name}.`
+    : `${result.name} bleibt neutral.`
+  );
 
-  // Verträge enden mit der Kriegserklärung, unabhängig vom weiteren Verlauf
   dip.treaties.nichtangriff = false;
   dip.treaties.allianz = false;
   dip.treaties.handel = false;
   dip.relation = clamp(dip.relation + cfg.warRelationCrash, -100, 100);
   if (hadPact) state.prestige = Math.max(0, state.prestige - cfg.breakPactPrestigePenalty);
 
-  // §36: Eine befestigte Region (Stadtmauer) löst eine mehrjährige Belagerung
-  // aus, statt sich sofort aufzulösen — unbefestigte Ziele bleiben eine
-  // Sofortschlacht (vereinfachtes Schlachtsystem, §35)
-  const wallLevel = buildingLevelSum(region, "stadtmauer");
-  if (wallLevel > 0) {
-    const duration = Math.min(CONFIG.siege.maxDuration, wallLevel * CONFIG.siege.durationPerWallLevel);
-    state.pendingSiege = {
-      targetId: aiId, formation, allyStrengthBonus, enemyStrengthBonus,
-      duration, defenderStrengthFactor: 1.0,
-    };
-    const report = `Belagerung von ${region.name} beginnt (Stadtmauer verteidigt, geschätzte Dauer bis zu ${duration} Jahre).\n${allyLines.join(" ")}`;
-    addChronicle(state, report.replace(/\n/g, " "));
-    return { ok: true, siegeStarted: true, report, allyLines };
-  }
-
-  const playerStrength = armyStrength(state, formation) + allyStrengthBonus;
-  const aiStrength = estimateAiStrength(region) + enemyStrengthBonus;
-  const winChance = playerStrength / Math.max(playerStrength + aiStrength, 1);
-  const won = rnd() < winChance;
-
-  const formationName = formation && FORMATIONS[formation] ? FORMATIONS[formation].name : null;
-  let report;
-  if (won) {
-    const loot = Math.round((region.warehouse.getreide||0) * cfg.lootShareOnWin * 2 + Object.values(region.population).reduce((s,g)=>s+g.count,0) * 0.05);
-    state.treasury += loot;
-    state.prestige += cfg.victoryPrestigeGain;
-    for (const type in state.army) state.army[type] = Math.round(state.army[type] * (1 - cfg.winTroopLossShare));
-    state.stats.warsWon++;
-    if (!state.warsWonAgainst) state.warsWonAgainst = {};
-    state.warsWonAgainst[aiId] = true;
-    report = `Sieg gegen ${region.name}${formationName ? ` (Formation: ${formationName})` : ""}! Beute: ${loot} Taler, Prestige +${cfg.victoryPrestigeGain}.`;
-  } else {
-    state.stats.warsLost++;
-    state.prestige = Math.max(0, state.prestige - cfg.defeatPrestigeLoss);
-    for (const type in state.army) state.army[type] = Math.round(state.army[type] * (1 - cfg.loseTroopLossShare));
-    const r = state.regions.player;
-    for (const pid in r.population) r.population[pid].satisfaction = clamp(r.population[pid].satisfaction - cfg.loseSatisfactionPenalty, 0, 100);
-    report = `Niederlage gegen ${region.name}${formationName ? ` (Formation: ${formationName})` : ""}. Schwere Verluste, Prestige -${cfg.defeatPrestigeLoss}.`;
-  }
-  if (allyLines.length) report += `\n${allyLines.join(" ")}`;
+  state.warState[aiId] = true;
+  const report = `Krieg gegen ${region.name} erklärt! Die Kampagne beginnt — erobere ihre Gebiete auf der Kriegskarte.\n${allyLines.join(" ")}`;
   addChronicle(state, report.replace(/\n/g, " "));
-  return { ok: true, won, report, allyLines };
+  return { ok: true, report, allyLines };
 }
 
 // ---------- Mehrere Siegbedingungen (§47) ----------
@@ -4685,6 +4754,304 @@ function evaluateAiWarDecision(state, aiId) {
 // ---------- Ein voller Rundenschritt (ein Jahr) ----------
 
 // ============================================================
+// KRIEGSKARTE — Risiko-artige Gebietseroberung als strategische Ebene über
+// der bestehenden taktischen Kampf-Engine (§Original-Vertiefung, Nutzerwunsch:
+// "wir sollten für die Kriegsphase und Militär eine Art Brettspiel wie
+// Risiko anlegen"). Krieg ist jetzt ein andauernder Zustand
+// (state.warState[aiId]) statt einer einmaligen Sofortauflösung: der Spieler
+// erobert Gebiet für Gebiet, jeder einzelne Zusammenstoß läuft weiterhin
+// über die volle interaktive Kampf-Engine (battle-engine/, battle-bridge.js).
+// Muss nach core.js, military.js und battle-bridge.js geladen werden.
+// ============================================================
+
+function territoryById(id) {
+  return TERRITORIES.find(t => t.id === id);
+}
+
+// Initialisiert state.territories (Besitzer + Garnison/Aufstellung) einmalig
+// beim Spielstart. Muss aufgerufen werden, NACHDEM state.regions vollständig
+// aufgebaut ist (estimateAiStrength braucht die fertige Region).
+function initTerritories(state) {
+  const cfg = CONFIG.warMap;
+  state.warState = { ai1: false, ai2: false, ai3: false };
+  state.territories = {};
+  state.pendingTerritoryDefense = null;
+  for (const t of TERRITORIES) {
+    if (t.region === "player") {
+      state.territories[t.id] = { owner: "player", garrison: 0, deployment: {} };
+      continue;
+    }
+    const region = state.regions[t.region];
+    const totalStrength = estimateAiStrength(region);
+    const share = t.capital ? cfg.capitalGarrisonShare : cfg.provinceGarrisonShare;
+    state.territories[t.id] = { owner: t.region, garrison: Math.round(totalStrength * share), deployment: {} };
+  }
+}
+
+// ---------- Truppen-Reserve/Stationierung ----------
+
+function totalDeployedOfType(state, troopType) {
+  let total = 0;
+  for (const id in state.territories) {
+    const terr = state.territories[id];
+    if (terr.owner === "player" && terr.deployment[troopType]) total += terr.deployment[troopType];
+  }
+  return total;
+}
+
+function reserveCountOfType(state, troopType) {
+  return Math.max(0, Math.round((state.army[troopType] || 0) - totalDeployedOfType(state, troopType)));
+}
+
+function deployToTerritory(state, territoryId, troopType, count) {
+  const terr = state.territories[territoryId];
+  if (!terr || terr.owner !== "player") return { ok: false, reason: "Dieses Gebiet gehört dir nicht." };
+  if (!TROOP_TYPES[troopType]) return { ok: false, reason: "Unbekannter Truppentyp." };
+  count = Math.round(count);
+  if (count <= 0) return { ok: false, reason: "Ungültige Anzahl." };
+  const reserve = reserveCountOfType(state, troopType);
+  if (reserve < count) return { ok: false, reason: `Nicht genug Reserve-Truppen (${reserve} verfügbar).` };
+  terr.deployment[troopType] = (terr.deployment[troopType] || 0) + count;
+  return { ok: true };
+}
+
+function recallFromTerritory(state, territoryId, troopType, count) {
+  const terr = state.territories[territoryId];
+  if (!terr || terr.owner !== "player") return { ok: false, reason: "Dieses Gebiet gehört dir nicht." };
+  count = Math.round(count);
+  const have = terr.deployment[troopType] || 0;
+  if (count <= 0 || have < count) return { ok: false, reason: "Nicht genug Truppen in diesem Gebiet." };
+  terr.deployment[troopType] -= count;
+  return { ok: true };
+}
+
+function moveBetweenTerritories(state, fromId, toId, troopType, count) {
+  const from = state.territories[fromId];
+  const to = state.territories[toId];
+  if (!from || !to || from.owner !== "player" || to.owner !== "player") {
+    return { ok: false, reason: "Beide Gebiete müssen dir gehören." };
+  }
+  const fromDef = territoryById(fromId);
+  if (!fromDef.adjacent.includes(toId)) return { ok: false, reason: "Die Gebiete grenzen nicht aneinander." };
+  count = Math.round(count);
+  const have = from.deployment[troopType] || 0;
+  if (count <= 0 || have < count) return { ok: false, reason: "Nicht genug Truppen in diesem Gebiet." };
+  from.deployment[troopType] -= count;
+  to.deployment[troopType] = (to.deployment[troopType] || 0) + count;
+  return { ok: true };
+}
+
+// ---------- Kampfarmeen aus Gebiets-Garnisonen aufbauen (Ergänzung zu den
+// bestehenden buildPlayerBattleArmy/buildAiBattleArmy aus battle-bridge.js,
+// die weiterhin für Belagerungen und von der KI selbst erklärte
+// Überraschungsangriffe genutzt werden) ----------
+
+function buildPlayerTerritoryArmy(state, territoryId) {
+  const terr = state.territories[territoryId];
+  const stacks = [];
+  const push = (unitType, count) => { if (count > 0) stacks.push(createUnitStack(unitType, Math.round(count))); };
+  const d = terr.deployment;
+  push("miliz", d.miliz || 0);
+  push("bogenschuetzen", (d.bogenschuetzen || 0) + (d.armbrustschuetzen || 0));
+  push("pikeniere", d.pikeniere || 0);
+  push("kavallerie", d.ritter || 0);
+  push("schwere_kavallerie", d.schwere_kavallerie || 0);
+  push("infanterie", d.soeldner || 0);
+  if (stacks.length === 0) stacks.push(createUnitStack("miliz", 1));
+
+  const ruler = state.characters[state.rulerId];
+  const commander = createCommander(
+    ruler ? `${ruler.name} ${ruler.surname}` : "Unbekannter Feldherr",
+    ruler ? clamp(ruler.stats.diplomatie * 5, 10, 90) : 50,
+    ruler ? clamp(ruler.stats.militaer * 5, 10, 95) : 50,
+    ruler ? clamp(ruler.stats.charisma * 5, 10, 90) : 50,
+    ruler ? clamp(ruler.age, 20, 80) : 40
+  );
+  const marschallBonus = advisorEffectBonus(state, "marschall");
+  if (marschallBonus) commander.leadership = clamp(commander.leadership + marschallBonus * 100, 10, 99);
+  return { commander, stacks };
+}
+
+function buildAiTerritoryArmy(state, territoryId) {
+  const terr = state.territories[territoryId];
+  const region = state.regions[terr.owner];
+  const totalSoldierCount = Math.max(20, Math.round(terr.garrison));
+  const kaserneLevel = buildingLevelSum(region, "kaserne");
+  const hasArtillery = kaserneLevel >= 2;
+  const hasPikes = kaserneLevel >= 1;
+  const shares = hasArtillery
+    ? { infanterie: 0.42, bogenschuetzen: 0.20, kavallerie: 0.18, artillerie: 0.08, pikeniere: 0.12 }
+    : hasPikes
+      ? { infanterie: 0.45, bogenschuetzen: 0.22, kavallerie: 0.18, pikeniere: 0.15 }
+      : { infanterie: 0.55, bogenschuetzen: 0.25, kavallerie: 0.20 };
+  const stacks = [];
+  for (const unitType in shares) {
+    const count = Math.round(totalSoldierCount * shares[unitType]);
+    if (count > 0) stacks.push(createUnitStack(unitType, count, { morale: 55 }));
+  }
+  if (stacks.length === 0) stacks.push(createUnitStack("miliz", totalSoldierCount));
+
+  if (!region.commander) region.commander = generateCommander(region.name); // defensiv für ältere Spielstände
+  const persisted = region.commander;
+  const commander = createCommander(persisted.name, persisted.tactics, persisted.leadership, persisted.courage, persisted.experience);
+  return { commander, stacks };
+}
+
+// Baut die vollständige Kampf-Armee für einen Gebietskampf. attackerTerritoryId
+// gehört immer der angreifenden Seite, defenderTerritoryId der verteidigenden
+// — welche davon der Spieler ist, hängt von playerIsAttacker ab (bei einem
+// KI-Gegenangriff, siehe aiTerritoryCounterAttack(), ist der Spieler Verteidiger).
+function buildTerritoryBattleArmies(state, attackerTerritoryId, defenderTerritoryId, playerIsAttacker) {
+  const attTerr = state.territories[attackerTerritoryId];
+  const defTerr = state.territories[defenderTerritoryId];
+  const attackerName = playerIsAttacker ? state.regions.player.name : state.regions[attTerr.owner].name;
+  const defenderName = playerIsAttacker ? state.regions[defTerr.owner].name : state.regions.player.name;
+  const attackerBuild = playerIsAttacker ? buildPlayerTerritoryArmy(state, attackerTerritoryId) : buildAiTerritoryArmy(state, attackerTerritoryId);
+  const defenderBuild = playerIsAttacker ? buildAiTerritoryArmy(state, defenderTerritoryId) : buildPlayerTerritoryArmy(state, defenderTerritoryId);
+  const armyA = createArmy(attackerName, attackerBuild.commander, attackerBuild.stacks, { isAttacker: true, isHomeTerritory: false });
+  const armyB = createArmy(defenderName, defenderBuild.commander, defenderBuild.stacks, { isAttacker: false, isHomeTerritory: true });
+  return { armyA, armyB };
+}
+
+// ---------- Ergebnis eines Gebietskampfs anwenden ----------
+// playerIsAttacker: true = normaler Spielerangriff (armyA=Spieler); false =
+// KI-Gegenangriff, bei dem der Spieler verteidigt (armyB=Spieler).
+
+function applyTerritoryBattleResult(state, attackerTerritoryId, defenderTerritoryId, battleResult, playerIsAttacker) {
+  const cfg = CONFIG.military;
+  const attTerr = state.territories[attackerTerritoryId];
+  const defTerr = state.territories[defenderTerritoryId];
+  const r = battleResult.result;
+  const playerWon = playerIsAttacker ? r.winner === "A" : r.winner === "B";
+
+  const playerArmy = playerIsAttacker ? battleResult.armyA : battleResult.armyB;
+  const survivalRatio = {};
+  for (const stack of playerArmy.stacks) {
+    survivalRatio[stack.unitType] = stack.maxSoldiers > 0 ? stack.soldiers / stack.maxSoldiers : 1;
+  }
+  const applyRatio = (unitType, fallback) => (survivalRatio[unitType] !== undefined ? survivalRatio[unitType] : fallback);
+  const playerTerr = playerIsAttacker ? attTerr : defTerr;
+  const d = playerTerr.deployment;
+  d.miliz = Math.round((d.miliz || 0) * applyRatio("miliz", 0.9));
+  const rangedRatio = applyRatio("bogenschuetzen", 0.9);
+  d.bogenschuetzen = Math.round((d.bogenschuetzen || 0) * rangedRatio);
+  d.armbrustschuetzen = Math.round((d.armbrustschuetzen || 0) * rangedRatio);
+  d.pikeniere = Math.round((d.pikeniere || 0) * applyRatio("pikeniere", 0.9));
+  d.ritter = Math.round((d.ritter || 0) * applyRatio("kavallerie", 0.9));
+  d.schwere_kavallerie = Math.round((d.schwere_kavallerie || 0) * applyRatio("schwere_kavallerie", 0.9));
+  d.soeldner = Math.round((d.soeldner || 0) * applyRatio("infanterie", 0.9));
+
+  const aiTerr = playerIsAttacker ? defTerr : attTerr;
+  const aiArmy = playerIsAttacker ? battleResult.armyB : battleResult.armyA;
+  const aiRatios = aiArmy.stacks.map(s => (s.maxSoldiers > 0 ? s.soldiers / s.maxSoldiers : 1));
+  const avgAiRatio = aiRatios.length ? aiRatios.reduce((a, b) => a + b, 0) / aiRatios.length : 0.85;
+  const aiId = aiTerr.owner;
+  const dip = state.diplomacy[aiId];
+  const territoryName = territoryById(playerIsAttacker ? defenderTerritoryId : attackerTerritoryId).name;
+
+  if (playerWon) {
+    if (playerIsAttacker) {
+      const originalOwner = aiTerr.owner;
+      aiTerr.owner = "player";
+      aiTerr.garrison = 0;
+      aiTerr.deployment = {};
+      state.prestige += Math.round(cfg.victoryPrestigeGain * 0.5);
+      addChronicle(state, `${territoryName} (${state.regions[originalOwner].name}) erobert!`);
+      checkRegionConquest(state, originalOwner);
+    } else {
+      // Verteidigt: der KI-Angreifer wird zurückgeschlagen, das Gebiet bleibt beim Spieler
+      aiTerr.garrison = Math.round(aiTerr.garrison * avgAiRatio);
+      state.prestige += Math.round(cfg.victoryPrestigeGain * 0.3);
+      addChronicle(state, `Der Angriff auf ${territoryName} wurde erfolgreich abgewehrt!`);
+    }
+  } else {
+    if (playerIsAttacker) {
+      aiTerr.garrison = Math.round(aiTerr.garrison * avgAiRatio);
+      state.prestige = Math.max(0, state.prestige - Math.round(cfg.defeatPrestigeLoss * 0.5));
+      addChronicle(state, `Angriff auf ${territoryName} gescheitert.`);
+    } else {
+      const originalOwner = "player";
+      defTerr.owner = aiId; // aiTerr === defTerr in diesem Zweig
+      defTerr.garrison = Math.round((estimateAiStrength(state.regions[aiId]) * CONFIG.warMap.provinceGarrisonShare) * 0.5);
+      defTerr.deployment = {};
+      state.prestige = Math.max(0, state.prestige - cfg.defeatPrestigeLoss);
+      for (const pid in state.regions.player.population) {
+        state.regions.player.population[pid].satisfaction = clamp(state.regions.player.population[pid].satisfaction - cfg.loseSatisfactionPenalty * 0.5, 0, 100);
+      }
+      addChronicle(state, `${territoryName} wurde von ${state.regions[aiId].name} erobert!`);
+    }
+  }
+  if (dip) dip.relation = clamp(dip.relation + cfg.warRelationCrash * 0.3, -100, 100);
+  checkAlternativeVictory(state);
+}
+
+// Prüft, ob der Spieler jetzt ALLE Heimatgebiete einer Region kontrolliert —
+// dann unterwirft sich die Region als Vasall (nutzt das bestehende, bereits
+// getestete Vasallentribut-System aus applyMonthlyFinances() weiter).
+function checkRegionConquest(state, aiId) {
+  const region = state.regions[aiId];
+  if (!region || region.conquered) return false;
+  const homeTerritoryIds = TERRITORIES.filter(t => t.region === aiId).map(t => t.id);
+  const allPlayerOwned = homeTerritoryIds.every(id => state.territories[id].owner === "player");
+  if (!allPlayerOwned) return false;
+  const cfg = CONFIG.warMap;
+  region.conquered = true;
+  state.warState[aiId] = false;
+  state.vassals[aiId] = true;
+  state.prestige += cfg.conquestPrestigeGain;
+  state.treasury += cfg.conquestTreasuryGain;
+  state.stats.warsWon++;
+  addChronicle(state, `${region.name} ist vollständig erobert und unterwirft sich als Vasall!`);
+  return true;
+}
+
+// ---------- Jährliche KI-Aktivität auf der Kriegskarte (aus advanceYear()) ----------
+
+// Garnisonen ohne Spielerbesitz nähern sich langsam ihrer rechnerischen
+// Zielstärke wieder an (Rekrutierung/Nachschub der KI-Region), begrenzt
+// durch reinforceRate — verhindert, dass ein einmal geschwächtes Gebiet für
+// immer wehrlos bleibt, ohne den Krieg trivial zu machen.
+function reinforceAiTerritories(state) {
+  const cfg = CONFIG.warMap;
+  for (const t of TERRITORIES) {
+    if (t.region === "player") continue;
+    const terr = state.territories[t.id];
+    if (terr.owner !== t.region) continue; // vom Spieler eroberte Gebiete werden nicht für die Ursprungsregion verstärkt
+    const region = state.regions[t.region];
+    if (region.conquered) continue;
+    const targetStrength = estimateAiStrength(region) * (t.capital ? cfg.capitalGarrisonShare : cfg.provinceGarrisonShare);
+    terr.garrison = Math.round(terr.garrison + (targetStrength - terr.garrison) * cfg.reinforceRate);
+  }
+}
+
+// Eine im Krieg befindliche KI-Region kann ein eigenes Grenzgebiet nutzen, um
+// ein angrenzendes Spieler-Gebiet anzugreifen — löst NICHT selbst die
+// Schlacht auf (Sache der interaktiven Kampf-Engine), sondern markiert nur
+// state.pendingTerritoryDefense, das die UI beim nächsten Rendern aufgreift.
+function aiTerritoryCounterAttack(state) {
+  const cfg = CONFIG.warMap;
+  if (state.pendingTerritoryDefense) return null;
+  if (state.incomingAiWar) return null; // dieses Jahr schon eine erzwungene Verteidigung fällig, kein zweiter Überfall
+  for (const aiId in state.warState) {
+    if (!state.warState[aiId]) continue;
+    if (state.regions[aiId].conquered) continue;
+    if (rnd() > cfg.counterAttackChance) continue;
+    const borderTerritories = TERRITORIES.filter(t =>
+      t.region === aiId && state.territories[t.id].owner === aiId &&
+      t.adjacent.some(adjId => state.territories[adjId].owner === "player")
+    );
+    if (!borderTerritories.length) continue;
+    const attacker = borderTerritories[Math.floor(rnd() * borderTerritories.length)];
+    const targets = attacker.adjacent.filter(adjId => state.territories[adjId].owner === "player");
+    const targetId = targets[Math.floor(rnd() * targets.length)];
+    state.pendingTerritoryDefense = { attackerTerritoryId: attacker.id, defenderTerritoryId: targetId };
+    addChronicle(state, `${state.regions[aiId].name} greift ${territoryById(targetId).name} an!`);
+    return state.pendingTerritoryDefense;
+  }
+  return null;
+}
+
+// ============================================================
 // ADVANCE YEAR — der zentrale jährliche Rundenschritt, der alle
 // anderen Module orchestriert. Muss nach allen anderen js/*-Dateien
 // geladen werden.
@@ -4781,6 +5148,8 @@ function advanceYear(state) {
   updateIntel(state);
   updateReligion(state, r);
   checkAiWarInitiative(state); // §31: KI wägt nicht nur ab, sondern erklärt ggf. tatsächlich Krieg
+  reinforceAiTerritories(state); // Kriegskarte: KI-Garnisonen erholen sich langsam
+  aiTerritoryCounterAttack(state); // Kriegskarte: eine im Krieg befindliche Region kann zurückschlagen
 
   // §47 alternative Siegbedingungen prüfen
   checkAlternativeVictory(state);
@@ -6598,11 +6967,19 @@ function renderMilitary() {
     const dip = state.diplomacy[aiId];
     const region = state.regions[aiId];
     const intel = state.intel[aiId];
+    if (region.conquered) {
+      warHtml += `<div class="diploBlock"><b>${region.name}</b> — <span class="goodgood">vollständig erobert, jetzt dein Vasall</span></div>`;
+      continue;
+    }
+    const atWar = state.warState && state.warState[aiId];
+    const homeTerritories = TERRITORIES.filter(t => t.region === aiId);
+    const ownedCount = homeTerritories.filter(t => state.territories[t.id].owner === 'player').length;
     warHtml += `<div class="diploBlock"><b>${region.name}</b> — geschätzte gegnerische Stärke: zwischen ${intel.rangeLow ?? '?'} und ${intel.rangeHigh ?? '?'} (Aufklärung: ${Math.round(intel.accuracy*100)}%)<br>
       ${region.commander ? `<i>Kommandant: ${region.commander.name} — ${region.commander.battlesFought} Schlacht(en), ${region.commander.battlesWon} Sieg(e)</i><br>` : ''}
       ${dip.treaties.nichtangriff ? '<i>Nichtangriffspakt aktiv — Kriegserklärung bricht ihn.</i><br>' : ''}
-      ${buildingLevelSum(region, 'stadtmauer') > 0 ? '<i>Befestigt (Stadtmauer) — löst eine mehrjährige Belagerung aus, bevor es zur Schlacht kommt.</i><br>' : ''}
-      <button class="dipbtn" onclick="doDeclareWar('${aiId}')" ${state.pendingSiege ? 'disabled' : ''}>Krieg erklären</button>
+      ${atWar
+        ? `<b class="goodbad">⚔ Im Krieg</b> — ${ownedCount}/${homeTerritories.length} Gebiete erobert. <button class="dipbtn" onclick="openWarMap('${aiId}')">🗺 Kriegskarte öffnen</button><br>`
+        : `<button class="dipbtn" onclick="doDeclareWar('${aiId}')">Krieg erklären</button>`}
       <button class="dipbtn" onclick="doSpy('${aiId}')">Spionieren (${CONFIG.intrigue.spyMissionCost} Taler)</button>
       <button class="dipbtn" onclick="doSabotage('${aiId}')">Sabotieren (${CONFIG.intrigue.sabotageCost} Taler, Risiko!)</button>
       <button class="dipbtn" onclick="doRumors('${aiId}')">Gerüchte streuen (${CONFIG.intrigue.rumorCost} Taler)</button>
@@ -6717,18 +7094,156 @@ let btState = null;
 let btWarTargetId = null;
 let btSiegeWeakenFactor = undefined;
 let btPlayerIsDefender = false; // §31: true, wenn die KI selbst den Krieg erklärt hat
+let btTerritoryContext = null; // Kriegskarte: { attackerTerritoryId, defenderTerritoryId, playerIsAttacker }, sonst null
 
 function doDeclareWar(aiId) {
-  if (state.pendingSiege) { alert('Es läuft bereits eine Belagerung — die muss zuerst abgeschlossen werden.'); return; }
-  if (!confirm(`Bist du sicher, dass du ${state.regions[aiId].name} den Krieg erklären willst?`)) return;
-  const isFortified = buildingLevelSum(state.regions[aiId], 'stadtmauer') > 0;
-  if (isFortified && !state.pendingSiege) {
-    const result = startSiege(state, aiId);
-    alert(`Belagerung von ${state.regions[aiId].name} beginnt (Stadtmauer verteidigt, bis zu ${result.duration} Jahre möglich). Nutze das Belagerungs-Panel im Militär-Reiter, um sie fortzusetzen.`);
-    render();
-    return;
+  if (!confirm(`Bist du sicher, dass du ${state.regions[aiId].name} den Krieg erklären willst? Damit beginnt eine andauernde Kampagne auf der Kriegskarte, kein Einzelgefecht.`)) return;
+  const result = declareWar(state, aiId);
+  playBeep(180, 0.2);
+  render();
+  openWarMap(aiId);
+}
+
+// ---------- Kriegskarte: Gebietsangriff über die Kampf-Engine ----------
+function openTerritoryBattleSetup(attackerTerritoryId, defenderTerritoryId, playerIsAttacker) {
+  btTerritoryContext = { attackerTerritoryId, defenderTerritoryId, playerIsAttacker };
+  const formOptions = Object.entries(BATTLE_FORMATIONS).map(([k,v]) => `<option value="${k}">${v.name}</option>`).join('');
+  const tacOptions = Object.entries(TACTICS).map(([k,v]) => `<option value="${k}">${v.name}</option>`).join('');
+  document.getElementById('btFormation').innerHTML = formOptions;
+  document.getElementById('btTactic').innerHTML = tacOptions;
+  const targetTerritoryId = defenderTerritoryId; // das Gebiet, um das gekämpft wird (Besitzer wechselt bei Sieg des Angreifers)
+  const targetLabel = territoryById(targetTerritoryId).name;
+  document.getElementById('btTitleBar').textContent = playerIsAttacker
+    ? `⚔ ANGRIFF AUF ${targetLabel.toUpperCase()} ⚔`
+    : `⚔ VERTEIDIGUNG VON ${targetLabel.toUpperCase()} ⚔`;
+  document.getElementById('btSetup').style.display = 'block';
+  document.getElementById('btBattleUi').style.display = 'none';
+  document.getElementById('btReport').style.display = 'none';
+  document.getElementById('btOverlay').style.display = 'flex';
+}
+
+// ---------- Kriegskarte: Karten-UI (Truppen stationieren/verlegen/angreifen) ----------
+let wmFocusAiId = null;
+let wmSelectedTerritory = null;
+const WM_OWNER_COLOR = { player: '#f0a83c', ai1: '#d64a3a', ai2: '#4a86c8', ai3: '#3f8b5c' };
+
+function openWarMap(aiId) {
+  wmFocusAiId = aiId;
+  wmSelectedTerritory = null;
+  document.getElementById('wm-title').textContent = state.regions[aiId].name;
+  renderWarMap();
+  document.getElementById('warMapOverlay').style.display = 'flex';
+}
+
+function closeWarMap() {
+  document.getElementById('warMapOverlay').style.display = 'none';
+  render();
+}
+
+function wmSelectTerritory(id) {
+  wmSelectedTerritory = id;
+  renderWarMap();
+}
+
+function renderWarMap() {
+  let linesHtml = '';
+  const drawn = new Set();
+  for (const t of TERRITORIES) {
+    for (const adjId of t.adjacent) {
+      const key = [t.id, adjId].sort().join('|');
+      if (drawn.has(key)) continue;
+      drawn.add(key);
+      const other = territoryById(adjId);
+      linesHtml += `<line x1="${t.x}" y1="${t.y}" x2="${other.x}" y2="${other.y}" stroke="rgba(255,246,226,0.4)" stroke-width="0.6" />`;
+    }
   }
-  openBattleSetup(aiId, false);
+  document.getElementById('warMapLines').innerHTML = linesHtml;
+
+  let nodesHtml = '';
+  for (const t of TERRITORIES) {
+    const terr = state.territories[t.id];
+    const color = WM_OWNER_COLOR[terr.owner] || '#888';
+    const strengthLabel = terr.owner === 'player'
+      ? Object.values(terr.deployment).reduce((a, b) => a + b, 0)
+      : Math.round(terr.garrison);
+    nodesHtml += `<div class="wmNode${t.capital ? ' capital' : ''}${wmSelectedTerritory === t.id ? ' selected' : ''}"
+      style="left:${t.x}%; top:${t.y}%; background:${color};"
+      onclick="wmSelectTerritory('${t.id}')" data-tip="${t.name} (${state.regions[terr.owner].name})">
+      <div class="wmNodeLabel">${strengthLabel}</div>
+    </div>`;
+  }
+  document.getElementById('warMapNodes').innerHTML = nodesHtml;
+  renderWarMapDetail();
+}
+
+function renderWarMapDetail() {
+  const detailEl = document.getElementById('warMapDetail');
+  if (!wmSelectedTerritory) { detailEl.innerHTML = '<i>Wähle ein Gebiet auf der Karte, um Truppen zu stationieren oder anzugreifen.</i>'; return; }
+  const t = territoryById(wmSelectedTerritory);
+  const terr = state.territories[t.id];
+  const ownerName = state.regions[terr.owner].name;
+  let html = `<b>${t.name}</b> (${ownerName}) — Gelände: ${TERRAIN_TYPES[t.terrain].name}${t.capital ? ' · Hauptstadt (starke Verteidigung)' : ''}<br>`;
+
+  if (terr.owner === 'player') {
+    const troopsHere = Object.entries(terr.deployment).filter(([,v]) => v > 0);
+    html += `Garnison: ${troopsHere.length ? troopsHere.map(([k,v]) => `${TROOP_TYPES[k].name} ${v}`).join(', ') : 'keine Truppen'}<br>`;
+
+    html += `<div class="subhead">Truppen aus der Reserve stationieren</div>`;
+    const reserveOptions = Object.keys(TROOP_TYPES).map(tt => `<option value="${tt}">${TROOP_TYPES[tt].name} (Reserve: ${reserveCountOfType(state, tt)})</option>`).join('');
+    html += `<select id="wmDeployType">${reserveOptions}</select> <input type="number" id="wmDeployCount" value="10" min="1" style="width:60px;"> <button onclick="wmDoDeploy()">Stationieren</button><br>`;
+
+    const ownedAdjacent = t.adjacent.filter(id => state.territories[id].owner === 'player');
+    if (ownedAdjacent.length && troopsHere.length) {
+      html += `<div class="subhead">Truppen verlegen</div>`;
+      const targetOptions = ownedAdjacent.map(id => `<option value="${id}">${territoryById(id).name}</option>`).join('');
+      const typeOptions = troopsHere.map(([k,v]) => `<option value="${k}">${TROOP_TYPES[k].name} (${v})</option>`).join('');
+      html += `Nach: <select id="wmMoveTarget">${targetOptions}</select> <select id="wmMoveType">${typeOptions}</select> <input type="number" id="wmMoveCount" value="10" min="1" style="width:60px;"> <button onclick="wmDoMove()">Verlegen</button><br>`;
+    }
+
+    const attackable = t.adjacent.filter(id => state.territories[id].owner !== 'player');
+    if (attackable.length && troopsHere.length) {
+      html += `<div class="subhead">Von hier aus angreifen</div>`;
+      attackable.forEach(id => {
+        html += `<button onclick="wmDoAttack('${t.id}','${id}')">${territoryById(id).name} angreifen</button> `;
+      });
+    }
+  } else {
+    html += `Geschätzte Garnison: ${Math.round(terr.garrison)}<br>`;
+    const attackFrom = t.adjacent.filter(id => state.territories[id].owner === 'player' &&
+      Object.values(state.territories[id].deployment).some(v => v > 0));
+    if (attackFrom.length) {
+      html += `<div class="subhead">Von hier aus angreifen</div>`;
+      attackFrom.forEach(id => {
+        html += `<button onclick="wmDoAttack('${id}','${t.id}')">Angriff von ${territoryById(id).name}</button> `;
+      });
+    } else {
+      html += `<i>Kein angrenzendes eigenes Gebiet mit stationierten Truppen — verlege zuerst Truppen an die Grenze.</i>`;
+    }
+  }
+  detailEl.innerHTML = html;
+}
+
+function wmDoDeploy() {
+  const troopType = document.getElementById('wmDeployType').value;
+  const count = parseInt(document.getElementById('wmDeployCount').value, 10);
+  const result = deployToTerritory(state, wmSelectedTerritory, troopType, count);
+  if (!result.ok) { alert(result.reason); return; }
+  renderWarMap();
+}
+
+function wmDoMove() {
+  const toId = document.getElementById('wmMoveTarget').value;
+  const troopType = document.getElementById('wmMoveType').value;
+  const count = parseInt(document.getElementById('wmMoveCount').value, 10);
+  const result = moveBetweenTerritories(state, wmSelectedTerritory, toId, troopType, count);
+  if (!result.ok) { alert(result.reason); return; }
+  renderWarMap();
+}
+
+function wmDoAttack(fromId, toId) {
+  if (!confirm(`Angriff von ${territoryById(fromId).name} auf ${territoryById(toId).name} — die Schlacht beginnt sofort.`)) return;
+  document.getElementById('warMapOverlay').style.display = 'none';
+  openTerritoryBattleSetup(fromId, toId, true);
 }
 
 function openBattleSetup(aiId, defending) {
@@ -6768,14 +7283,24 @@ function doSiegeAction(action) {
 }
 
 function btStartBattle() {
-  const armyA = buildPlayerBattleArmy(state, { defending: btPlayerIsDefender });
-  const armyB = buildAiBattleArmy(state, btWarTargetId, btSiegeWeakenFactor, { attacking: btPlayerIsDefender });
-  btSiegeWeakenFactor = undefined; // nur für diesen einen Sturmangriff gültig
+  let armyA, armyB, terrain;
+  if (btTerritoryContext) {
+    // Kriegskarte: Armeen aus den Gebiets-Garnisonen aufbauen, armyA ist
+    // immer der Angreifer (egal ob Spieler oder Gegenangriff der KI).
+    const { attackerTerritoryId, defenderTerritoryId, playerIsAttacker } = btTerritoryContext;
+    const armies = buildTerritoryBattleArmies(state, attackerTerritoryId, defenderTerritoryId, playerIsAttacker);
+    armyA = armies.armyA; armyB = armies.armyB;
+    terrain = territoryById(defenderTerritoryId).terrain; // das verteidigte Gebiet bestimmt das Gelände
+  } else {
+    armyA = buildPlayerBattleArmy(state, { defending: btPlayerIsDefender });
+    armyB = buildAiBattleArmy(state, btWarTargetId, btSiegeWeakenFactor, { attacking: btPlayerIsDefender });
+    btSiegeWeakenFactor = undefined; // nur für diesen einen Sturmangriff gültig
+    // §31: bei einer von der KI erklärten Verteidigung entscheidet die Befestigung
+    // der Spielerregion über das Gelände, nicht die des Angreifers.
+    terrain = determineWarTerrain(btPlayerIsDefender ? state.regions.player : state.regions[btWarTargetId]);
+  }
   armyA.formation = document.getElementById('btFormation').value;
   armyA.tactic = document.getElementById('btTactic').value;
-  // §31: bei einer von der KI erklärten Verteidigung entscheidet die Befestigung
-  // der Spielerregion über das Gelände, nicht die des Angreifers.
-  const terrain = determineWarTerrain(btPlayerIsDefender ? state.regions.player : state.regions[btWarTargetId]);
   const seed = Math.floor(rnd() * 0xFFFFFFFF);
 
   btState = createBattle(armyA, armyB, terrain, 'klar', seed);
@@ -6867,13 +7392,20 @@ function btShowBattleReport() {
   if (!reasons.length) reasons.push('die gegnerische Armee war in dieser Schlacht schlicht überlegen');
   document.getElementById('btWhyLost').innerHTML = `<b>Warum ${loserArmy.name} verlor:</b><br>` + reasons.map(x=>'– '+x).join('<br>');
 
-  applyBattleResultToGame(state, btWarTargetId, btState);
+  if (btTerritoryContext) {
+    const { attackerTerritoryId, defenderTerritoryId, playerIsAttacker } = btTerritoryContext;
+    applyTerritoryBattleResult(state, attackerTerritoryId, defenderTerritoryId, btState, playerIsAttacker);
+  } else {
+    applyBattleResultToGame(state, btWarTargetId, btState);
+  }
 }
 
 function btCloseReport() {
   document.getElementById('btOverlay').style.display = 'none';
   btPlayerIsDefender = false; // zurücksetzen, damit die nächste Schlacht wieder als Angriff gilt, falls nicht anders gesetzt
-  render();
+  const returnToWarMapAiId = btTerritoryContext && wmFocusAiId && !state.regions[wmFocusAiId].conquered ? wmFocusAiId : null;
+  btTerritoryContext = null;
+  if (returnToWarMapAiId) openWarMap(returnToWarMapAiId); else render();
 }
 
 function doInvestResearch(category) {
@@ -7319,20 +7851,28 @@ function showLedger(report, yearCompleted, titleIndexBefore) {
   document.getElementById('ledgerModal').style.display = 'flex';
 }
 
-function closeLedger() {
-  document.getElementById('ledgerModal').style.display = 'none';
-  const ctx = __ledgerContext || {};
-  __ledgerContext = null;
-  if (ctx.yearCompleted && state.titleIndex > ctx.titleIndexBefore) showTitleCelebration(TITLES[state.titleIndex]);
+// Gemeinsame Prioritätskette für alle "wartenden" Interrupt-Fenster
+// (KI-Kriegserklärung, KI-Gegenangriff auf der Kriegskarte, Vermählung,
+// Geburt, normales Ereignis) — von jedem Schließen-Handler dieser Fenster
+// aufgerufen, damit mehrere im selben Jahr anstehende Dinge nacheinander
+// statt gleichzeitig erscheinen.
+function advanceToNextPendingScreen() {
   if (state.incomingAiWar) {
     // §31: die KI hat selbst den Krieg erklärt — der Spieler muss sich jetzt
-    // dem interaktiven Kampfbildschirm als Verteidiger stellen. Ein evtl.
-    // gleichzeitig anstehendes Ereignis wird nächstes Jahr erneut geprüft.
+    // dem interaktiven Kampfbildschirm als Verteidiger stellen.
     const aiId = state.incomingAiWar;
     state.incomingAiWar = null;
     playBeep(180, 0.2);
     alert(`⚔ ${state.regions[aiId].name} hat dir ohne Vorwarnung den Krieg erklärt! Bereite deine Verteidigung vor.`);
     openBattleSetup(aiId, true);
+  } else if (state.pendingTerritoryDefense) {
+    // Kriegskarte: eine im Krieg befindliche Region schlägt auf einem ihrer
+    // Grenzgebiete zurück — der Spieler verteidigt das angegriffene Gebiet.
+    const { attackerTerritoryId, defenderTerritoryId } = state.pendingTerritoryDefense;
+    state.pendingTerritoryDefense = null;
+    playBeep(180, 0.2);
+    alert(`⚔ ${state.regions[state.territories[attackerTerritoryId].owner].name} greift ${territoryById(defenderTerritoryId).name} an! Bereite deine Verteidigung vor.`);
+    openTerritoryBattleSetup(attackerTerritoryId, defenderTerritoryId, false);
   } else if (state.pendingMarriage) {
     showMarriageAnnouncement(state.pendingMarriage);
   } else if (state.pendingBirth) {
@@ -7342,6 +7882,14 @@ function closeLedger() {
   } else {
     render();
   }
+}
+
+function closeLedger() {
+  document.getElementById('ledgerModal').style.display = 'none';
+  const ctx = __ledgerContext || {};
+  __ledgerContext = null;
+  if (ctx.yearCompleted && state.titleIndex > ctx.titleIndexBefore) showTitleCelebration(TITLES[state.titleIndex]);
+  advanceToNextPendingScreen();
 }
 
 document.getElementById('btnAdvance').addEventListener('click', () => {
@@ -7375,7 +7923,7 @@ function confirmBirthName() {
   }
   state.pendingBirth = null;
   document.getElementById('birthModal').style.display = 'none';
-  if (state.pendingEvent) showEvent(state.pendingEvent); else render();
+  advanceToNextPendingScreen();
 }
 
 // ---------- Vermählung des Herrschers (auf Nutzerwunsch: eigenes
@@ -7394,9 +7942,7 @@ function showMarriageAnnouncement(spouseId) {
 function closeMarriageAnnouncement() {
   state.pendingMarriage = null;
   document.getElementById('marriageModal').style.display = 'none';
-  if (state.pendingBirth) showBirthAnnouncement(state.pendingBirth);
-  else if (state.pendingEvent) showEvent(state.pendingEvent);
-  else render();
+  advanceToNextPendingScreen();
 }
 
 function showEvent(ev) {

@@ -1,7 +1,10 @@
 // ============================================================
 // MILITARY — Berater, Truppen, Armeestärke, Unterhalt, KI-Stärke-
-// Schätzung; alte Sofort-/Belagerungsauflösung bleibt als unbenutzter
-// Code stehen, seit die eigenständige Kampf-Engine übernommen hat (§33/§34)
+// Schätzung; declareWar() eröffnet seit der Kriegskarte (js/war-map.js) eine
+// andauernde Kampagne statt einer Sofortschlacht. Die alte
+// Belagerungsauflösung (startSiege/siegeStarve/siegeBribe/resolveSiegeStorm
+// weiter unten) bleibt als unbenutzter Code stehen, seit die "Burg"-
+// Geländeboni der Kampf-Engine dieselbe Rolle pro Gebiet übernehmen (§33/§34)
 // ============================================================
 
 function generateAdvisorCandidate(role) {
@@ -166,6 +169,12 @@ function checkAiWarInitiative(state) {
   const diffCfg = CONFIG.difficulty[state.difficulty] || CONFIG.difficulty.normal;
   if (!state.aiWarCooldown) state.aiWarCooldown = {};
   for (const aiId in state.diplomacy) {
+    // Kriegskarte: eine bereits andauernde Kampagne (state.warState) läuft über
+    // die Gebietsangriffe (aiTerritoryCounterAttack), kein zweites "erklärt
+    // Krieg"-Ereignis nötig; ebenso keine neue Kriegserklärung gegen eine
+    // bereits vollständig eroberte (vasallisierte) Region.
+    if (state.warState && state.warState[aiId]) continue;
+    if (state.regions[aiId] && state.regions[aiId].conquered) continue;
     if ((state.aiWarCooldown[aiId] || 0) > 0) { state.aiWarCooldown[aiId] -= 1; continue; }
     // Militärische Schwäche allein reicht nicht — es braucht auch eine wirklich
     // schlechte Beziehung als Rechtfertigung (siehe aiWarMaxRelationForAggression).
@@ -176,85 +185,49 @@ function checkAiWarInitiative(state) {
     if (rnd() > cfg.aiWarInitiativeChance) continue; // nicht jede günstige Gelegenheit wird sofort genutzt
     state.aiWarCooldown[aiId] = cfg.aiWarCooldownYears;
     state.incomingAiWar = aiId;
+    if (state.warState) state.warState[aiId] = true; // Kriegskarte: ab jetzt eine andauernde Kampagne
     addChronicle(state, `${state.regions[aiId].name} erklärt dir ohne Vorwarnung den Krieg!`);
     return aiId;
   }
   return null;
 }
 
-function declareWar(state, aiId, formation) {
+// Kriegskarte (§Original-Vertiefung): "Krieg erklären" löst seitdem keine
+// Sofortschlacht mehr aus, sondern eröffnet eine andauernde Kampagne
+// (state.warState[aiId] = true), die der Spieler über die Gebietsangriffe
+// auf der Kriegskarte (js/war-map.js) austrägt — jeder einzelne Zusammenstoß
+// weiterhin über die volle interaktive Kampf-Engine. Die alte
+// Wahrscheinlichkeits-Sofortauflösung und die Belagerungsauslösung entfallen
+// hier bewusst: eine befestigte Hauptstadt bekommt stattdessen automatisch
+// die "Burg"-Geländeboni der Kampf-Engine, wenn sie als Gebiet angegriffen
+// wird — granularer als die alte regionsweite Belagerung.
+function declareWar(state, aiId) {
   const cfg = CONFIG.military;
   const dip = state.diplomacy[aiId];
   const region = state.regions[aiId];
   const hadPact = dip.treaties.nichtangriff || dip.treaties.allianz;
 
   // §Original "Kaiser": die übrigen Herrscher werden gefragt, ob sie
-  // unterstützen, dem Gegner helfen oder neutral bleiben
+  // unterstützen, dem Gegner helfen oder neutral bleiben (rein narrativ in
+  // der Kriegskarten-Fassung — noch ohne mechanische Stärkewirkung auf
+  // einzelne Gebietskämpfe).
   const allyResults = rollWarAllies(state, aiId);
-  let allyStrengthBonus = 0, enemyStrengthBonus = 0;
-  const allyLines = [];
-  for (const result of allyResults) {
-    const theirStrength = estimateAiStrength(state.regions[result.aiId]);
-    if (result.stance === "supportPlayer") {
-      allyStrengthBonus += theirStrength * CONFIG.warAllies.strengthContribution;
-      allyLines.push(`${result.name} unterstützt dich.`);
-    } else if (result.stance === "supportEnemy") {
-      enemyStrengthBonus += theirStrength * CONFIG.warAllies.strengthContribution;
-      allyLines.push(`${result.name} unterstützt ${region.name}.`);
-    } else {
-      allyLines.push(`${result.name} bleibt neutral.`);
-    }
-  }
+  const allyLines = allyResults.map(result =>
+    result.stance === "supportPlayer" ? `${result.name} unterstützt dich.`
+    : result.stance === "supportEnemy" ? `${result.name} unterstützt ${region.name}.`
+    : `${result.name} bleibt neutral.`
+  );
 
-  // Verträge enden mit der Kriegserklärung, unabhängig vom weiteren Verlauf
   dip.treaties.nichtangriff = false;
   dip.treaties.allianz = false;
   dip.treaties.handel = false;
   dip.relation = clamp(dip.relation + cfg.warRelationCrash, -100, 100);
   if (hadPact) state.prestige = Math.max(0, state.prestige - cfg.breakPactPrestigePenalty);
 
-  // §36: Eine befestigte Region (Stadtmauer) löst eine mehrjährige Belagerung
-  // aus, statt sich sofort aufzulösen — unbefestigte Ziele bleiben eine
-  // Sofortschlacht (vereinfachtes Schlachtsystem, §35)
-  const wallLevel = buildingLevelSum(region, "stadtmauer");
-  if (wallLevel > 0) {
-    const duration = Math.min(CONFIG.siege.maxDuration, wallLevel * CONFIG.siege.durationPerWallLevel);
-    state.pendingSiege = {
-      targetId: aiId, formation, allyStrengthBonus, enemyStrengthBonus,
-      duration, defenderStrengthFactor: 1.0,
-    };
-    const report = `Belagerung von ${region.name} beginnt (Stadtmauer verteidigt, geschätzte Dauer bis zu ${duration} Jahre).\n${allyLines.join(" ")}`;
-    addChronicle(state, report.replace(/\n/g, " "));
-    return { ok: true, siegeStarted: true, report, allyLines };
-  }
-
-  const playerStrength = armyStrength(state, formation) + allyStrengthBonus;
-  const aiStrength = estimateAiStrength(region) + enemyStrengthBonus;
-  const winChance = playerStrength / Math.max(playerStrength + aiStrength, 1);
-  const won = rnd() < winChance;
-
-  const formationName = formation && FORMATIONS[formation] ? FORMATIONS[formation].name : null;
-  let report;
-  if (won) {
-    const loot = Math.round((region.warehouse.getreide||0) * cfg.lootShareOnWin * 2 + Object.values(region.population).reduce((s,g)=>s+g.count,0) * 0.05);
-    state.treasury += loot;
-    state.prestige += cfg.victoryPrestigeGain;
-    for (const type in state.army) state.army[type] = Math.round(state.army[type] * (1 - cfg.winTroopLossShare));
-    state.stats.warsWon++;
-    if (!state.warsWonAgainst) state.warsWonAgainst = {};
-    state.warsWonAgainst[aiId] = true;
-    report = `Sieg gegen ${region.name}${formationName ? ` (Formation: ${formationName})` : ""}! Beute: ${loot} Taler, Prestige +${cfg.victoryPrestigeGain}.`;
-  } else {
-    state.stats.warsLost++;
-    state.prestige = Math.max(0, state.prestige - cfg.defeatPrestigeLoss);
-    for (const type in state.army) state.army[type] = Math.round(state.army[type] * (1 - cfg.loseTroopLossShare));
-    const r = state.regions.player;
-    for (const pid in r.population) r.population[pid].satisfaction = clamp(r.population[pid].satisfaction - cfg.loseSatisfactionPenalty, 0, 100);
-    report = `Niederlage gegen ${region.name}${formationName ? ` (Formation: ${formationName})` : ""}. Schwere Verluste, Prestige -${cfg.defeatPrestigeLoss}.`;
-  }
-  if (allyLines.length) report += `\n${allyLines.join(" ")}`;
+  state.warState[aiId] = true;
+  const report = `Krieg gegen ${region.name} erklärt! Die Kampagne beginnt — erobere ihre Gebiete auf der Kriegskarte.\n${allyLines.join(" ")}`;
   addChronicle(state, report.replace(/\n/g, " "));
-  return { ok: true, won, report, allyLines };
+  return { ok: true, report, allyLines };
 }
 
 // ---------- Mehrere Siegbedingungen (§47) ----------

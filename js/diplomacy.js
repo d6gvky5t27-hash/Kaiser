@@ -158,6 +158,9 @@ function proposePeaceTreaty(state, aiId) {
   if (state.treasury < cost) return { ok: false, reason: `Nicht genug Taler (benötigt: ${cost}).` };
   state.treasury -= cost;
   dip.relation = clamp(dip.relation + cfg.peaceTreatyRelationGain, -100, 100);
+  // Kriegskarte: ein Friedensvertrag beendet eine andauernde Gebietskampagne
+  // (bereits eroberte Gebiete bleiben beim Eroberer, kein Rückzug).
+  if (state.warState && state.warState[aiId]) state.warState[aiId] = false;
   addChronicle(state, `Ein Friedensvertrag mit ${state.regions[aiId].name} wurde für ${cost} Taler geschlossen.`);
   return { ok: true, cost };
 }
