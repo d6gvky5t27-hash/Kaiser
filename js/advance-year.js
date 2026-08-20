@@ -50,9 +50,11 @@ function advanceYear(state) {
   runInterregionalTrade(state);
   applyInterRegionalMigration(state); // §14: Wanderung zwischen den 8 Regionen statt nur zur/von der Außenwelt
   updateDiplomacy(state);
-  const taxIncome = collectTaxes(state);
-  payArmyUpkeep(state);
-  payAdvisorSalaries(state);
+  // Steuern/Unterhalt/Gehälter/Zinsen/Tribut laufen seit dem Monatstakt über
+  // applyMonthlyFinances() (12×/Jahr) statt hier einmal jährlich — die
+  // Söldner-Fahnenflucht-Prüfung bleibt aber bewusst eine jährliche
+  // Stichprobe (ihre Wahrscheinlichkeiten sind auf diese Frequenz kalibriert).
+  checkSoeldnerDesertion(state, state.treasury < 0);
   const r = state.regions.player;
 
   // Geistlicher hebt die Zufriedenheit leicht
@@ -93,10 +95,6 @@ function advanceYear(state) {
   updateReligion(state, r);
   checkAiWarInitiative(state); // §31: KI wägt nicht nur ab, sondern erklärt ggf. tatsächlich Krieg
 
-  // §24 Staatsschulden: Zinsen fällig
-  payDebtInterest(state);
-  // §29 Vasallen zahlen Tribut
-  collectVassalTribute(state);
   // §47 alternative Siegbedingungen prüfen
   checkAlternativeVictory(state);
 
@@ -125,7 +123,78 @@ function advanceYear(state) {
     addChronicle(state, "Der Staatsbankrott ist unabwendbar. Deine Herrschaft endet.");
   }
 
-  return { taxIncome };
+  return {};
+}
+
+// ---------- Monatstakt: Kassenbuch ----------
+// Steuern/Unterhalt/Gehälter/Zinsen/Tribut laufen monatlich (jeweils
+// Jahresformel ÷12), damit die Staatskasse sich spürbar und nachvollziehbar
+// über die Zeit entwickelt statt einmal jährlich in einem Schlag zu
+// springen. Alles andere (Ernte, Bevölkerung, Diplomatie, Wahlen, Altern,
+// Ereignisse …) bleibt bewusst ein reiner Jahresrhythmus — siehe advanceMonth().
+function applyMonthlyFinances(state) {
+  const treasuryBefore = state.treasury;
+  const r = state.regions.player;
+
+  let totalWealth = 0;
+  for (const pid in r.population) totalWealth += r.population[pid].count * CONFIG.state.treasuryTaxWealthFactor;
+  const schatzmeisterBonus = advisorEffectBonus(state, "schatzmeister");
+  const verwaltungTechBonus = techBonus(state, "verwaltung");
+  const taxIncome = Math.round(totalWealth * r.taxRate * (1 + schatzmeisterBonus + verwaltungTechBonus) / 12);
+  state.treasury += taxIncome;
+
+  let upkeep = 0;
+  for (const type in state.army) upkeep += state.army[type] * TROOP_TYPES[type].upkeep;
+  upkeep = Math.round(upkeep / 12);
+  state.treasury -= upkeep;
+
+  const advisorCount = Object.values(state.advisors).filter(Boolean).length;
+  const salaries = Math.round(advisorCount * CONFIG.advisors.yearlySalary / 12);
+  state.treasury -= salaries;
+
+  let debtInterest = 0;
+  if (state.debt > 0) {
+    debtInterest = Math.round(state.debt * currentDebtInterestRate(state) / 12);
+    state.treasury -= debtInterest;
+  }
+
+  const vcfg = CONFIG.diplomacyExtra;
+  let vassalTribute = 0;
+  for (const aiId in state.vassals) {
+    if (!state.vassals[aiId]) continue;
+    const region = state.regions[aiId];
+    const totalPop = Object.values(region.population).reduce((s, g) => s + g.count, 0);
+    const tribute = Math.round(totalPop * vcfg.vassalizeTributeShare * 0.02 / 12);
+    state.treasury += tribute;
+    vassalTribute += tribute;
+  }
+
+  const report = {
+    year: state.year, month: state.month,
+    treasuryBefore, treasuryAfter: state.treasury,
+    taxIncome, upkeep, salaries, debtInterest, vassalTribute,
+    net: state.treasury - treasuryBefore,
+  };
+  state.lastMonthlyReport = report;
+  return report;
+}
+
+// Der primäre, spielergesteuerte Rundenschritt (auf Nutzerwunsch: mehr
+// spürbare Schritte innerhalb eines Herrscherlebens). Löst nach dem 12.
+// Monat automatisch den bereits bestehenden, unveränderten Jahresschritt
+// advanceYear() aus — Ernte/Bevölkerung/Diplomatie/Ereignisse etc. bleiben
+// exakt so kalibriert wie zuvor, nur die Staatskasse entwickelt sich jetzt
+// zusätzlich monatlich sichtbar.
+function advanceMonth(state) {
+  const report = applyMonthlyFinances(state);
+  state.month += 1;
+  let yearCompleted = false;
+  if (state.month > 12) {
+    state.month = 1;
+    advanceYear(state);
+    yearCompleted = true;
+  }
+  return { report, yearCompleted };
 }
 
 // ---------- Speichersystem (§64) — JSON Export/Import, kein Browser-Storage ----------

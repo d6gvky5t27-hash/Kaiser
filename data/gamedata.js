@@ -115,6 +115,10 @@ const CONFIG = {
     winTroopLossShare: 0.10,
     loseTroopLossShare: 0.35,
     loseSatisfactionPenalty: 8,
+    // Landgewinn nach Schlachtsieg (§29/§36 ergänzt um eine direkte
+    // Eroberungs-Option neben der rein diplomatischen Gebietsforderung)
+    warConquestHectares: 300,
+    warConquestMinDefenderLand: 1000, // die KI-Region darf nie unter dieses Minimum fallen
     // Söldner (§33/§34): unzuverlässig, keine Lehenstreue — desertieren eher
     soeldnerDesertionBaseChance: 0.03,
     soeldnerDesertionUnpaidChance: 0.5, // wenn die Staatskasse den Sold nicht mehr deckt
@@ -1355,7 +1359,7 @@ const STRINGS = {
     tab_diplomatie: "🤝 DIPLOMATIE",
     tab_karte: "🗺 KARTE & GEBÄUDE",
     tab_militaer: "⚔ MILITÄR",
-    btn_advance: "▶ JAHR VERGEHEN LASSEN",
+    btn_advance: "▶ MONAT VERGEHEN LASSEN",
     btn_save: "💾 SPEICHERN",
     btn_load: "📂 LADEN",
     tb_year: "Jahr", tb_treasury: "Schatz", tb_treasury_unit: "Taler", tb_prestige: "Prestige",
@@ -1414,7 +1418,7 @@ const STRINGS = {
     tab_diplomatie: "🤝 DIPLOMACY",
     tab_karte: "🗺 MAP & BUILDINGS",
     tab_militaer: "⚔ MILITARY",
-    btn_advance: "▶ ADVANCE YEAR",
+    btn_advance: "▶ ADVANCE MONTH",
     btn_save: "💾 SAVE",
     btn_load: "📂 LOAD",
     tb_year: "Year", tb_treasury: "Treasury", tb_treasury_unit: "gold", tb_prestige: "Prestige",

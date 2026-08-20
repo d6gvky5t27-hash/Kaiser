@@ -155,17 +155,6 @@ function consumeAndUpdateSatisfaction(region, prices) {
 
 // ---------- Bevölkerungsentwicklung (§13/§14) ----------
 
-function collectTaxes(state) {
-  const r = state.regions.player;
-  let totalWealth = 0;
-  for (const pid in r.population) totalWealth += r.population[pid].count * CONFIG.state.treasuryTaxWealthFactor;
-  const schatzmeisterBonus = advisorEffectBonus(state, "schatzmeister");
-  const verwaltungTechBonus = techBonus(state, "verwaltung");
-  const income = Math.round(totalWealth * r.taxRate * (1 + schatzmeisterBonus + verwaltungTechBonus));
-  state.treasury += income;
-  return income;
-}
-
 // ---------- Einfache Handels-KI zwischen Regionen (§21) ----------
 
 function runInterregionalTrade(state) {
@@ -280,13 +269,6 @@ function repayDebt(state, amount) {
   state.debt -= payable;
   addChronicle(state, `${payable} Taler Schulden wurden zurückgezahlt.`);
   return { ok: true };
-}
-
-function payDebtInterest(state) {
-  if (state.debt <= 0) return 0;
-  const interest = Math.round(state.debt * currentDebtInterestRate(state));
-  state.treasury -= interest;
-  return interest;
 }
 
 // ---------- Erweiterte Diplomatie (§29) ----------

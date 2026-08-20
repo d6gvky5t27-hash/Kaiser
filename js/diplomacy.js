@@ -89,20 +89,6 @@ function vassalize(state, aiId) {
   return { ok: true };
 }
 
-function collectVassalTribute(state) {
-  const cfg = CONFIG.diplomacyExtra;
-  let total = 0;
-  for (const aiId in state.vassals) {
-    if (!state.vassals[aiId]) continue;
-    const region = state.regions[aiId];
-    const totalPop = Object.values(region.population).reduce((s,g)=>s+g.count,0);
-    const tribute = Math.round(totalPop * cfg.vassalizeTributeShare * 0.02);
-    state.treasury += tribute;
-    total += tribute;
-  }
-  return total;
-}
-
 function demandTribute(state, aiId) {
   const cfg = CONFIG.diplomacyExtra;
   const dip = state.diplomacy[aiId];

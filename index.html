@@ -260,15 +260,20 @@
   }
   #titleUpBanner.show { opacity: 1; transform: translate(-50%, 0); }
   #titleUpBanner .sub { font-size: var(--fs-body); margin-top: var(--sp-2); color: #3a2f10; letter-spacing: 0; }
-  #eventModal {
+  #eventModal, #birthModal, #ledgerModal {
     position: fixed; inset: 0; background: rgba(0,0,0,0.75);
-    display: none; align-items: center; justify-content: center;
+    display: none; align-items: center; justify-content: center; z-index: 400;
   }
-  #eventBox {
+  #eventBox, #birthBox, #ledgerBox {
     width: 480px; background: var(--panel); border: 4px solid #0a0c11;
     box-shadow: 4px 4px 0 #0a0c11; padding: var(--sp-4); font-size: var(--fs-md); color: var(--ink);
   }
-  #eventBox h3 { background: var(--accent); color:#f2e6c9; margin: calc(var(--sp-4) * -1) calc(var(--sp-4) * -1) var(--sp-3) calc(var(--sp-4) * -1); padding: var(--sp-3); font-size: var(--fs-lg); font-weight: normal; }
+  #eventBox h3, #birthBox h3, #ledgerBox h3 { background: var(--accent); color:#f2e6c9; margin: calc(var(--sp-4) * -1) calc(var(--sp-4) * -1) var(--sp-3) calc(var(--sp-4) * -1); padding: var(--sp-3); font-size: var(--fs-lg); font-weight: normal; }
+  #birthBox input[type=text] { font-family: var(--font); font-size: var(--fs-md); padding: var(--sp-2); background: var(--panel-dark); color: var(--ink); border: 2px solid #0a0c11; width: 100%; box-sizing: border-box; margin: var(--sp-2) 0; }
+  #ledgerBox table { width: 100%; border-collapse: collapse; margin: var(--sp-2) 0; }
+  #ledgerBox td { padding: 2px 0; }
+  #ledgerBox td:last-child { text-align: right; }
+  #ledgerBox tr.ledgerTotal td { border-top: 2px solid #0a0c11; font-weight: bold; padding-top: var(--sp-1); }
   .slider-row { display:flex; align-items:center; gap: var(--sp-2); margin: var(--sp-2) 0; }
   input[type=range] { width: 120px; }
   .goodgood { color: var(--accent2); }
@@ -540,7 +545,7 @@
   </div>
 
   <div id="menubar">
-    <button id="btnAdvance" data-i18n="btn_advance">▶ JAHR VERGEHEN LASSEN</button>
+    <button id="btnAdvance" data-i18n="btn_advance">▶ MONAT VERGEHEN LASSEN</button>
     <button id="btnSave" data-i18n="btn_save">💾 SPEICHERN</button>
     <button id="btnLoad" data-i18n="btn_load">📂 LADEN</button>
     <input type="file" id="loadFile" accept="application/json" style="display:none;">
@@ -589,6 +594,28 @@
   <h3 id="ev-title"></h3>
   <p id="ev-text"></p>
   <div id="ev-options"></div>
+</div></div>
+
+<div id="birthModal"><div id="birthBox">
+  <h3>⚜ Nachwuchs am Hof! ⚜</h3>
+  <p id="birth-text"></p>
+  <label style="font-size:var(--fs-body);">Name des Kindes</label>
+  <input type="text" id="birth-name-input">
+  <div style="text-align:center; margin-top:var(--sp-3);"><button onclick="confirmBirthName()">Bestätigen</button></div>
+</div></div>
+
+<div id="ledgerModal"><div id="ledgerBox">
+  <h3 id="ledger-title">Kassenbuch</h3>
+  <table>
+    <tr><td>Steuereinnahmen</td><td id="ledger-tax"></td></tr>
+    <tr><td>Armee-Unterhalt</td><td id="ledger-upkeep"></td></tr>
+    <tr><td>Berater-Gehälter</td><td id="ledger-salaries"></td></tr>
+    <tr><td>Schuldzinsen</td><td id="ledger-interest"></td></tr>
+    <tr><td>Vasallentribut</td><td id="ledger-tribute"></td></tr>
+    <tr class="ledgerTotal"><td>Veränderung diesen Monat</td><td id="ledger-net"></td></tr>
+    <tr><td>Staatskasse jetzt</td><td id="ledger-total"></td></tr>
+  </table>
+  <div style="text-align:center; margin-top:var(--sp-2);"><button onclick="closeLedger()">Weiter</button></div>
 </div></div>
 
 <div id="gameover">
@@ -775,6 +802,10 @@ const CONFIG = {
     winTroopLossShare: 0.10,
     loseTroopLossShare: 0.35,
     loseSatisfactionPenalty: 8,
+    // Landgewinn nach Schlachtsieg (§29/§36 ergänzt um eine direkte
+    // Eroberungs-Option neben der rein diplomatischen Gebietsforderung)
+    warConquestHectares: 300,
+    warConquestMinDefenderLand: 1000, // die KI-Region darf nie unter dieses Minimum fallen
     // Söldner (§33/§34): unzuverlässig, keine Lehenstreue — desertieren eher
     soeldnerDesertionBaseChance: 0.03,
     soeldnerDesertionUnpaidChance: 0.5, // wenn die Staatskasse den Sold nicht mehr deckt
@@ -2015,7 +2046,7 @@ const STRINGS = {
     tab_diplomatie: "🤝 DIPLOMATIE",
     tab_karte: "🗺 KARTE & GEBÄUDE",
     tab_militaer: "⚔ MILITÄR",
-    btn_advance: "▶ JAHR VERGEHEN LASSEN",
+    btn_advance: "▶ MONAT VERGEHEN LASSEN",
     btn_save: "💾 SPEICHERN",
     btn_load: "📂 LADEN",
     tb_year: "Jahr", tb_treasury: "Schatz", tb_treasury_unit: "Taler", tb_prestige: "Prestige",
@@ -2074,7 +2105,7 @@ const STRINGS = {
     tab_diplomatie: "🤝 DIPLOMACY",
     tab_karte: "🗺 MAP & BUILDINGS",
     tab_militaer: "⚔ MILITARY",
-    btn_advance: "▶ ADVANCE YEAR",
+    btn_advance: "▶ ADVANCE MONTH",
     btn_save: "💾 SAVE",
     btn_load: "📂 LOAD",
     tb_year: "Year", tb_treasury: "Treasury", tb_treasury_unit: "gold", tb_prestige: "Prestige",
@@ -2689,6 +2720,9 @@ function newGame(options) {
 
   const state = {
     year: 1500,
+    month: 1, // §Monatstakt: 1-12, ein Jahr vergeht erst nach dem 12. Monat vollständig (advanceMonth())
+    lastMonthlyReport: null,
+    pendingBirth: null, // Kind wurde geboren, wartet auf einen vom Spieler vergebenen Namen
     seed: seed,
     difficulty: difficultyKey,
     treasury: Math.round(1500 * diffCfg.startTreasuryMultiplier * capitalCfg.treasuryMultiplier),
@@ -2944,17 +2978,6 @@ function consumeAndUpdateSatisfaction(region, prices) {
 
 // ---------- Bevölkerungsentwicklung (§13/§14) ----------
 
-function collectTaxes(state) {
-  const r = state.regions.player;
-  let totalWealth = 0;
-  for (const pid in r.population) totalWealth += r.population[pid].count * CONFIG.state.treasuryTaxWealthFactor;
-  const schatzmeisterBonus = advisorEffectBonus(state, "schatzmeister");
-  const verwaltungTechBonus = techBonus(state, "verwaltung");
-  const income = Math.round(totalWealth * r.taxRate * (1 + schatzmeisterBonus + verwaltungTechBonus));
-  state.treasury += income;
-  return income;
-}
-
 // ---------- Einfache Handels-KI zwischen Regionen (§21) ----------
 
 function runInterregionalTrade(state) {
@@ -3069,13 +3092,6 @@ function repayDebt(state, amount) {
   state.debt -= payable;
   addChronicle(state, `${payable} Taler Schulden wurden zurückgezahlt.`);
   return { ok: true };
-}
-
-function payDebtInterest(state) {
-  if (state.debt <= 0) return 0;
-  const interest = Math.round(state.debt * currentDebtInterestRate(state));
-  state.treasury -= interest;
-  return interest;
 }
 
 // ---------- Erweiterte Diplomatie (§29) ----------
@@ -3368,7 +3384,9 @@ function updateDynasty(state) {
     addChronicle(state, `${ruler.name} ${ruler.surname} vermählte sich mit ${spouse.name}.`);
   }
 
-  // Geburt eines Kindes
+  // Geburt eines Kindes — der voreingestellte Zufallsname bleibt als Fallback
+  // (z.B. für die Node-Tests ohne UI), state.pendingBirth lässt die Oberfläche
+  // aber ein Fenster zum eigenen Umbenennen anzeigen (auf Nutzerwunsch).
   if (ruler.spouseId && ruler.age >= cfg.birthMinAge && ruler.age <= cfg.birthMaxAge && rnd() < cfg.birthChance) {
     const child = createCharacter(rnd() < 0.5 ? "m" : "f", 0, ruler.surname);
     child.parentId = state.rulerId;
@@ -3376,6 +3394,7 @@ function updateDynasty(state) {
     state.characters[cid] = child;
     ruler.childrenIds.push(cid);
     addChronicle(state, `${ruler.gender === "m" ? "Dem Herrscherpaar" : "Der Herrscherin"} wurde ein Kind geboren: ${child.name} ${ruler.surname}.`);
+    state.pendingBirth = cid;
   }
 
   // Sterbewahrscheinlichkeit
@@ -3736,20 +3755,6 @@ function vassalize(state, aiId) {
   return { ok: true };
 }
 
-function collectVassalTribute(state) {
-  const cfg = CONFIG.diplomacyExtra;
-  let total = 0;
-  for (const aiId in state.vassals) {
-    if (!state.vassals[aiId]) continue;
-    const region = state.regions[aiId];
-    const totalPop = Object.values(region.population).reduce((s,g)=>s+g.count,0);
-    const tribute = Math.round(totalPop * cfg.vassalizeTributeShare * 0.02);
-    state.treasury += tribute;
-    total += tribute;
-  }
-  return total;
-}
-
 function demandTribute(state, aiId) {
   const cfg = CONFIG.diplomacyExtra;
   const dip = state.diplomacy[aiId];
@@ -4089,11 +4094,6 @@ function advisorEffectBonus(state, role) {
   return 0;
 }
 
-function payAdvisorSalaries(state) {
-  const count = Object.values(state.advisors).filter(Boolean).length;
-  state.treasury -= count * CONFIG.advisors.yearlySalary;
-}
-
 // ---------- Militär (§33/§34/§35) ----------
 
 function recruitTroops(state, type, count) {
@@ -4148,14 +4148,6 @@ function armyStrength(state, formation) {
   }
   const militaerTechBonus = techBonus(state, "militaer");
   return strength * (1 + marschallBonus + formationBonus + militaerTechBonus);
-}
-
-function payArmyUpkeep(state) {
-  let upkeep = 0;
-  for (const type in state.army) upkeep += state.army[type] * TROOP_TYPES[type].upkeep;
-  state.treasury -= upkeep;
-  checkSoeldnerDesertion(state, state.treasury < 0);
-  return upkeep;
 }
 
 // §33/§34: Söldner sind ohne Lehenstreue — sie desertieren eher, besonders
@@ -4500,9 +4492,11 @@ function advanceYear(state) {
   runInterregionalTrade(state);
   applyInterRegionalMigration(state); // §14: Wanderung zwischen den 8 Regionen statt nur zur/von der Außenwelt
   updateDiplomacy(state);
-  const taxIncome = collectTaxes(state);
-  payArmyUpkeep(state);
-  payAdvisorSalaries(state);
+  // Steuern/Unterhalt/Gehälter/Zinsen/Tribut laufen seit dem Monatstakt über
+  // applyMonthlyFinances() (12×/Jahr) statt hier einmal jährlich — die
+  // Söldner-Fahnenflucht-Prüfung bleibt aber bewusst eine jährliche
+  // Stichprobe (ihre Wahrscheinlichkeiten sind auf diese Frequenz kalibriert).
+  checkSoeldnerDesertion(state, state.treasury < 0);
   const r = state.regions.player;
 
   // Geistlicher hebt die Zufriedenheit leicht
@@ -4543,10 +4537,6 @@ function advanceYear(state) {
   updateReligion(state, r);
   checkAiWarInitiative(state); // §31: KI wägt nicht nur ab, sondern erklärt ggf. tatsächlich Krieg
 
-  // §24 Staatsschulden: Zinsen fällig
-  payDebtInterest(state);
-  // §29 Vasallen zahlen Tribut
-  collectVassalTribute(state);
   // §47 alternative Siegbedingungen prüfen
   checkAlternativeVictory(state);
 
@@ -4575,7 +4565,78 @@ function advanceYear(state) {
     addChronicle(state, "Der Staatsbankrott ist unabwendbar. Deine Herrschaft endet.");
   }
 
-  return { taxIncome };
+  return {};
+}
+
+// ---------- Monatstakt: Kassenbuch ----------
+// Steuern/Unterhalt/Gehälter/Zinsen/Tribut laufen monatlich (jeweils
+// Jahresformel ÷12), damit die Staatskasse sich spürbar und nachvollziehbar
+// über die Zeit entwickelt statt einmal jährlich in einem Schlag zu
+// springen. Alles andere (Ernte, Bevölkerung, Diplomatie, Wahlen, Altern,
+// Ereignisse …) bleibt bewusst ein reiner Jahresrhythmus — siehe advanceMonth().
+function applyMonthlyFinances(state) {
+  const treasuryBefore = state.treasury;
+  const r = state.regions.player;
+
+  let totalWealth = 0;
+  for (const pid in r.population) totalWealth += r.population[pid].count * CONFIG.state.treasuryTaxWealthFactor;
+  const schatzmeisterBonus = advisorEffectBonus(state, "schatzmeister");
+  const verwaltungTechBonus = techBonus(state, "verwaltung");
+  const taxIncome = Math.round(totalWealth * r.taxRate * (1 + schatzmeisterBonus + verwaltungTechBonus) / 12);
+  state.treasury += taxIncome;
+
+  let upkeep = 0;
+  for (const type in state.army) upkeep += state.army[type] * TROOP_TYPES[type].upkeep;
+  upkeep = Math.round(upkeep / 12);
+  state.treasury -= upkeep;
+
+  const advisorCount = Object.values(state.advisors).filter(Boolean).length;
+  const salaries = Math.round(advisorCount * CONFIG.advisors.yearlySalary / 12);
+  state.treasury -= salaries;
+
+  let debtInterest = 0;
+  if (state.debt > 0) {
+    debtInterest = Math.round(state.debt * currentDebtInterestRate(state) / 12);
+    state.treasury -= debtInterest;
+  }
+
+  const vcfg = CONFIG.diplomacyExtra;
+  let vassalTribute = 0;
+  for (const aiId in state.vassals) {
+    if (!state.vassals[aiId]) continue;
+    const region = state.regions[aiId];
+    const totalPop = Object.values(region.population).reduce((s, g) => s + g.count, 0);
+    const tribute = Math.round(totalPop * vcfg.vassalizeTributeShare * 0.02 / 12);
+    state.treasury += tribute;
+    vassalTribute += tribute;
+  }
+
+  const report = {
+    year: state.year, month: state.month,
+    treasuryBefore, treasuryAfter: state.treasury,
+    taxIncome, upkeep, salaries, debtInterest, vassalTribute,
+    net: state.treasury - treasuryBefore,
+  };
+  state.lastMonthlyReport = report;
+  return report;
+}
+
+// Der primäre, spielergesteuerte Rundenschritt (auf Nutzerwunsch: mehr
+// spürbare Schritte innerhalb eines Herrscherlebens). Löst nach dem 12.
+// Monat automatisch den bereits bestehenden, unveränderten Jahresschritt
+// advanceYear() aus — Ernte/Bevölkerung/Diplomatie/Ereignisse etc. bleiben
+// exakt so kalibriert wie zuvor, nur die Staatskasse entwickelt sich jetzt
+// zusätzlich monatlich sichtbar.
+function advanceMonth(state) {
+  const report = applyMonthlyFinances(state);
+  state.month += 1;
+  let yearCompleted = false;
+  if (state.month > 12) {
+    state.month = 1;
+    advanceYear(state);
+    yearCompleted = true;
+  }
+  return { report, yearCompleted };
 }
 
 // ---------- Speichersystem (§64) — JSON Export/Import, kein Browser-Storage ----------
@@ -5592,7 +5653,15 @@ function applyBattleResultToGame(state, aiId, battleResult) {
     state.stats.warsWon++;
     if (!state.warsWonAgainst) state.warsWonAgainst = {};
     state.warsWonAgainst[aiId] = true;
-    addChronicle(state, `Sieg in der Schlacht gegen ${region.name}! Beute: ${loot} Taler.`);
+    // Ein erkämpfter Sieg im offenen Feld/bei der Belagerung bringt zusätzlich
+    // eroberte Ländereien ein — die Region darf dabei nie unter ihr Minimum fallen.
+    const conqueredHectares = Math.min(cfg.warConquestHectares, Math.max(0, region.land - cfg.warConquestMinDefenderLand));
+    if (conqueredHectares > 0) {
+      region.land -= conqueredHectares;
+      state.regions.player.land += conqueredHectares;
+    }
+    addChronicle(state, `Sieg in der Schlacht gegen ${region.name}! Beute: ${loot} Taler.` +
+      (conqueredHectares > 0 ? ` Zudem werden ${conqueredHectares} Hektar Land erobert.` : ""));
   } else {
     state.prestige = Math.max(0, state.prestige - cfg.defeatPrestigeLoss);
     state.stats.warsLost++;
@@ -5930,7 +5999,7 @@ function render() {
   const nextTitle = TITLES[state.titleIndex+1];
 
   document.getElementById('tb-title').textContent = `${currentTitle.name} von ${r.name}`;
-  document.getElementById('tb-year').textContent = `${t('tb_year')} ${state.year}`;
+  document.getElementById('tb-year').textContent = `${t('tb_year')} ${state.year} (${state.month}/12)`;
   document.getElementById('tb-treasury').textContent = `${t('tb_treasury')} ${Math.round(state.treasury)} ${t('tb_treasury_unit')}`;
   document.getElementById('tb-treasury').setAttribute('data-tip', `Einnahmen u.a. aus Steuern (Satz ${Math.round(r.taxRate*100)}%)\nAusgaben: Armee-Unterhalt, Berater-Gehälter, Gebäude`);
   document.getElementById('tb-prestige').textContent = `${t('tb_prestige')} ${Math.round(state.prestige)}`;
@@ -6921,12 +6990,28 @@ function showTitleCelebration(titleObj) {
   __titleUpTimer = setTimeout(() => el.classList.remove('show'), 4000);
 }
 
-document.getElementById('btnAdvance').addEventListener('click', () => {
-  if (state.gameOver) return;
-  playBeep(330, 0.08);
-  const titleIndexBefore = state.titleIndex;
-  advanceYear(state);
-  if (state.titleIndex > titleIndexBefore) showTitleCelebration(TITLES[state.titleIndex]);
+// ---------- Kassenbuch (§Monatstakt): nach jedem Monat sicht- und
+// nachvollziehbar machen, wie sich die Staatskasse zusammensetzt, statt sie
+// nur einmal jährlich in einem Sprung zu sehen. ----------
+let __ledgerContext = null;
+function showLedger(report, yearCompleted, titleIndexBefore) {
+  __ledgerContext = { yearCompleted, titleIndexBefore };
+  document.getElementById('ledger-title').textContent = `Kassenbuch — Jahr ${report.year}, Monat ${report.month}/12`;
+  document.getElementById('ledger-tax').textContent = '+' + Math.round(report.taxIncome).toLocaleString('de-DE');
+  document.getElementById('ledger-upkeep').textContent = '−' + Math.round(report.upkeep).toLocaleString('de-DE');
+  document.getElementById('ledger-salaries').textContent = '−' + Math.round(report.salaries).toLocaleString('de-DE');
+  document.getElementById('ledger-interest').textContent = '−' + Math.round(report.debtInterest).toLocaleString('de-DE');
+  document.getElementById('ledger-tribute').textContent = '+' + Math.round(report.vassalTribute).toLocaleString('de-DE');
+  document.getElementById('ledger-net').textContent = (report.net >= 0 ? '+' : '') + Math.round(report.net).toLocaleString('de-DE') + ' Taler';
+  document.getElementById('ledger-total').textContent = Math.round(report.treasuryAfter).toLocaleString('de-DE') + ' Taler';
+  document.getElementById('ledgerModal').style.display = 'flex';
+}
+
+function closeLedger() {
+  document.getElementById('ledgerModal').style.display = 'none';
+  const ctx = __ledgerContext || {};
+  __ledgerContext = null;
+  if (ctx.yearCompleted && state.titleIndex > ctx.titleIndexBefore) showTitleCelebration(TITLES[state.titleIndex]);
   if (state.incomingAiWar) {
     // §31: die KI hat selbst den Krieg erklärt — der Spieler muss sich jetzt
     // dem interaktiven Kampfbildschirm als Verteidiger stellen. Ein evtl.
@@ -6936,12 +7021,48 @@ document.getElementById('btnAdvance').addEventListener('click', () => {
     playBeep(180, 0.2);
     alert(`⚔ ${state.regions[aiId].name} hat dir ohne Vorwarnung den Krieg erklärt! Bereite deine Verteidigung vor.`);
     openBattleSetup(aiId, true);
+  } else if (state.pendingBirth) {
+    showBirthAnnouncement(state.pendingBirth);
   } else if (state.pendingEvent) {
     showEvent(state.pendingEvent);
   } else {
     render();
   }
+}
+
+document.getElementById('btnAdvance').addEventListener('click', () => {
+  if (state.gameOver) return;
+  playBeep(330, 0.08);
+  const titleIndexBefore = state.titleIndex;
+  const { report, yearCompleted } = advanceMonth(state);
+  render();
+  showLedger(report, yearCompleted, titleIndexBefore);
 });
+
+// ---------- Geburt eines Kindes (auf Nutzerwunsch): der Spieler darf das
+// Kind selbst benennen, statt nur den automatisch vergebenen Namen zu sehen. ----------
+function showBirthAnnouncement(childId) {
+  const child = state.characters[childId];
+  const ruler = state.characters[state.rulerId];
+  document.getElementById('birth-text').textContent =
+    `${ruler.gender === 'm' ? 'Dir' : 'Dir'} wurde ein ${child.gender === 'm' ? 'Sohn' : 'Tochter'} geboren!`;
+  document.getElementById('birth-name-input').value = child.name;
+  document.getElementById('birthModal').style.display = 'flex';
+  playBeep(660, 0.1);
+  setTimeout(() => playBeep(880, 0.15), 120);
+}
+
+function confirmBirthName() {
+  const childId = state.pendingBirth;
+  const input = document.getElementById('birth-name-input');
+  const newName = input.value.trim();
+  if (childId && state.characters[childId] && newName) {
+    state.characters[childId].name = newName;
+  }
+  state.pendingBirth = null;
+  document.getElementById('birthModal').style.display = 'none';
+  if (state.pendingEvent) showEvent(state.pendingEvent); else render();
+}
 
 function showEvent(ev) {
   document.getElementById('ev-title').textContent = ev.title;

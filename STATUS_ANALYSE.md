@@ -124,7 +124,7 @@ Stand: nach Abschluss von MVP + Alpha + Beta (siehe ROADMAP.md).
 | 70 | KI-Debugging (Entscheidungsgründe) | ✅ | Faktor-Aufschlüsselung für die Kriegsentscheidung im Spec-Format vorhanden; die Analyse ist keine reine Simulation mehr — sie deckt sich jetzt exakt mit der tatsächlichen Entscheidungslogik der KI (§31), die dieselbe Berechnung nutzt |
 | 71 | Balancing-Konfiguration | ✅ | Zentrales `CONFIG`-Objekt, keine Magic Numbers im Code |
 | 72 | Erster technischer Meilenstein | ✅ | Vertical Slice mit allen Kernsystemen erreicht (3 statt 5 Nachbarn, 6 statt 10 Waren — im MVP bewusst reduziert, seitdem aber ausgebaut) |
-| 73 | Erster spielbarer Prototyp | 🟡 | Fast alles erfüllt; "Land kaufen" (Gebietskauf/-erweiterung) fehlt weiterhin |
+| 73 | Erster spielbarer Prototyp | ✅ | Alle Kernsysteme vorhanden; Land kann gekauft/verkauft (`buyLand`/`sellLand`), diplomatisch gefordert (`demandTerritory`) und seit Schritt 35 auch durch einen gewonnenen Krieg erobert werden (`applyBattleResultToGame`) |
 | 74 | Entwicklungsphasen | ✅ | Phasenweise abgearbeitet (dokumentiert in DEVELOPMENT.md) |
 | 75 | Inkrementelles Arbeiten | ✅ | Spiel blieb nach jedem Schritt lauffähig, mit Regressionstests abgesichert |
 | 76 | Automatisierte Tests | 🟡 | Nur der Wirtschaftstest ist als Datei dauerhaft vorhanden (`tests/economy_test.js`); Tests für Bevölkerung/Erbschaft/Diplomatie/Speicherstände/Ereignisse liefen nur ad-hoc während der Entwicklung, sind nicht als wiederholbare Testdateien abgelegt |

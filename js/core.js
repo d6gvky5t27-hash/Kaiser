@@ -189,6 +189,9 @@ function newGame(options) {
 
   const state = {
     year: 1500,
+    month: 1, // §Monatstakt: 1-12, ein Jahr vergeht erst nach dem 12. Monat vollständig (advanceMonth())
+    lastMonthlyReport: null,
+    pendingBirth: null, // Kind wurde geboren, wartet auf einen vom Spieler vergebenen Namen
     seed: seed,
     difficulty: difficultyKey,
     treasury: Math.round(1500 * diffCfg.startTreasuryMultiplier * capitalCfg.treasuryMultiplier),

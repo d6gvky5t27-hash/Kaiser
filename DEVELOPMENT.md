@@ -1507,3 +1507,68 @@ Kornbilanz-Anzeige ist von Jahr 0 an gefüllt (nicht erst nach dem ersten
 Jahreswechsel), eine erzwungene Baron-Beförderung löst die neue
 Feier-Einblendung korrekt aus, keine JavaScript-Fehler.
 
+
+## 2026-08-20 – Schritt 35: Monatstakt mit Kassenbuch, Nachwuchs-Namensvergabe, Landeroberung im Krieg
+
+Wieder auf Nutzer-Feedback nach weiterem Antesten — vier Wünsche in einer Runde.
+
+**1 Runde = 1 Monat statt 1 Jahr.** Größte Architektur-Änderung dieser Runde.
+Ziel: mehr spielbare Züge pro Herrscherleben, ohne die sorgfältig kalibrierte
+*jährliche* Wirtschafts-/Bevölkerungssimulation anzufassen (gleiche Vorsicht
+wie bei den Lehren aus Schritt 13 und Schritt 34). Lösung: `advanceYear()`
+bleibt als reine Jahres-Makrosimulation vollständig unverändert (Wetter/Ernte,
+Bevölkerungswachstum, Migration, Diplomatie-Drift, Wahlen, Alterung,
+Forschung, KI-Kriegsinitiative, Events, Ausbaustufe usw.) — nur die fünf
+bisherigen Schatzkammer-Zahlungsaufrufe (`collectTaxes`, `payArmyUpkeep`,
+`payAdvisorSalaries`, `payDebtInterest`, `collectVassalTribute`) wurden aus
+ihr entfernt. Neu: `applyMonthlyFinances(state)` (advance-year.js) berechnet
+Steuereinnahmen/Heeresunterhalt/Berater-Gehälter/Schuldzinsen/Vasallentribut
+mit denselben Formeln ÷12, jeden Monat. `advanceMonth(state)` ruft das auf,
+zählt `state.month` (1–12) hoch und stößt auf Monat 12 automatisch das
+unveränderte `advanceYear()` an. Die Söldner-Desertionsprüfung
+(`checkSoeldnerDesertion`, vorher in `payArmyUpkeep` verschachtelt) wird
+bewusst weiterhin nur einmal pro Jahr aufgerufen (jetzt direkt aus
+`advanceYear`) — sonst würde ein monatlicher Aufruf die jährlich kalibrierte
+Desertionswahrscheinlichkeit verzwölffachen. `economy_test.js`/
+`ai_vs_ai_test.js` wurden auf `12× advanceMonth()` pro simuliertem Jahr
+umgestellt, damit sie weiterhin "N Jahre Spielzeit" korrekt simulieren, jetzt
+aber auch den echten monatlichen Finanzpfad mitprüfen.
+
+**Kassenbuch-Fenster nach jedem Monat.** Neues `#ledgerModal`: zeigt nach
+jedem Klick auf "▶ MONAT VERGEHEN LASSEN" Steuereinnahmen, Heeresunterhalt,
+Berater-Gehälter, Schuldzinsen, Vasallentribut, die monatliche
+Nettoveränderung und den neuen Kassenstand — Werte aus dem von
+`applyMonthlyFinances` zurückgegebenen Report. Titel-Aufstiegsfeier,
+KI-Kriegserklärung, Event- und Geburts-Fenster reihen sich danach wie bisher
+in eine Prioritätskette ein (`closeLedger()`).
+
+**Nachwuchs: Namensvergabe durch den Spieler + Ankündigungsfenster.** Bei
+einer Geburt setzt `updateDynasty()` (population-dynasty.js) jetzt zusätzlich
+`state.pendingBirth` auf die neue Charakter-ID (der zufällig vorbelegte Name
+bleibt als Fallback für die Node-Tests ohne UI). Neues `#birthModal` zeigt
+"Dir wurde ein Sohn/eine Tochter geboren!", ein Textfeld vorbelegt mit dem
+Zufallsnamen, und ein Bestätigen-Button (`confirmBirthName()`), der den Namen
+im `state.characters`-Eintrag überschreibt.
+
+**Landeroberung als Kriegsbeute.** Bisher gab ein gewonnener Kampf nur Beute
+(Taler) und Ansehen — Landbesitz änderte sich nur über den bereits
+bestehenden Landkauf (`buyLand`) oder die rein diplomatische Gebietsforderung
+(`demandTerritory`, §29). Neu: `applyBattleResultToGame()` (battle-bridge.js)
+überträgt bei einem Sieg zusätzlich `CONFIG.military.warConquestHectares`
+(300) Hektar von der besiegten Region auf den Spieler — genau wie bei
+`demandTerritory` durch ein Minimum (`warConquestMinDefenderLand`, 1000
+Hektar) gedeckelt, damit eine KI-Region nie land- bzw. baugrundlos wird. Die
+bestehende `#landPanel`-Anzeige (Hektar, mögliche Baugrundstücke, Landpreis)
+zeigt den Zuwachs automatisch an, keine weitere UI-Änderung nötig.
+
+**Getestet:** `node tests/battle_test.js`/`economy_test.js`/`ai_vs_ai_test.js`
+nach dem Umbau erneut grün (0/20 unkontrollierte Bevölkerungskollapse,
+Preis-/Dominanz-Werte im bekannten Rahmen). Playwright-Smoke-Test:
+Button-Beschriftung korrekt, Kassenbuch erscheint bereits nach dem ersten
+Klick mit plausiblen Werten, Jahr/Monat zählen korrekt hoch und Jahr 1500
+wechselt nach 12 Klicks korrekt zu 1501/Monat 1, erzwungene Geburt zeigt das
+Namensfenster mit dem Vorschlagsnamen und übernimmt den eingegebenen Namen
+korrekt in `state.characters`. Landeroberung separat per Node-Skript
+verifiziert: 300 Hektar wandern bei einem simulierten Sieg vom KI- zum
+Spielerkonto, Chronik-Eintrag stimmt, und im Grenzfall (Verteidiger nahe am
+Minimum) wird das 1000-Hektar-Minimum korrekt eingehalten statt unterschritten.

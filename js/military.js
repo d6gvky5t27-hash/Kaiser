@@ -47,11 +47,6 @@ function advisorEffectBonus(state, role) {
   return 0;
 }
 
-function payAdvisorSalaries(state) {
-  const count = Object.values(state.advisors).filter(Boolean).length;
-  state.treasury -= count * CONFIG.advisors.yearlySalary;
-}
-
 // ---------- Militär (§33/§34/§35) ----------
 
 function recruitTroops(state, type, count) {
@@ -106,14 +101,6 @@ function armyStrength(state, formation) {
   }
   const militaerTechBonus = techBonus(state, "militaer");
   return strength * (1 + marschallBonus + formationBonus + militaerTechBonus);
-}
-
-function payArmyUpkeep(state) {
-  let upkeep = 0;
-  for (const type in state.army) upkeep += state.army[type] * TROOP_TYPES[type].upkeep;
-  state.treasury -= upkeep;
-  checkSoeldnerDesertion(state, state.treasury < 0);
-  return upkeep;
 }
 
 // §33/§34: Söldner sind ohne Lehenstreue — sie desertieren eher, besonders

@@ -219,7 +219,15 @@ function applyBattleResultToGame(state, aiId, battleResult) {
     state.stats.warsWon++;
     if (!state.warsWonAgainst) state.warsWonAgainst = {};
     state.warsWonAgainst[aiId] = true;
-    addChronicle(state, `Sieg in der Schlacht gegen ${region.name}! Beute: ${loot} Taler.`);
+    // Ein erkämpfter Sieg im offenen Feld/bei der Belagerung bringt zusätzlich
+    // eroberte Ländereien ein — die Region darf dabei nie unter ihr Minimum fallen.
+    const conqueredHectares = Math.min(cfg.warConquestHectares, Math.max(0, region.land - cfg.warConquestMinDefenderLand));
+    if (conqueredHectares > 0) {
+      region.land -= conqueredHectares;
+      state.regions.player.land += conqueredHectares;
+    }
+    addChronicle(state, `Sieg in der Schlacht gegen ${region.name}! Beute: ${loot} Taler.` +
+      (conqueredHectares > 0 ? ` Zudem werden ${conqueredHectares} Hektar Land erobert.` : ""));
   } else {
     state.prestige = Math.max(0, state.prestige - cfg.defeatPrestigeLoss);
     state.stats.warsLost++;

@@ -35,7 +35,7 @@ let playerVictories = 0;
 for (let run = 0; run < RUNS; run++) {
   const state = newGame({ seed: run * 7919 }); // deterministisch, aber pro Run verschieden
   for (let year = 0; year < YEARS; year++) {
-    advanceYear(state);
+    for (let m = 0; m < 12; m++) { advanceMonth(state); if (state.gameOver) break; } // Monatstakt: 12x advanceMonth() = 1 Jahr, inkl. monatlicher Finanzen
     if (state.gameOver) break;
   }
 

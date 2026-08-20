@@ -101,7 +101,9 @@ function updateDynasty(state) {
     addChronicle(state, `${ruler.name} ${ruler.surname} vermählte sich mit ${spouse.name}.`);
   }
 
-  // Geburt eines Kindes
+  // Geburt eines Kindes — der voreingestellte Zufallsname bleibt als Fallback
+  // (z.B. für die Node-Tests ohne UI), state.pendingBirth lässt die Oberfläche
+  // aber ein Fenster zum eigenen Umbenennen anzeigen (auf Nutzerwunsch).
   if (ruler.spouseId && ruler.age >= cfg.birthMinAge && ruler.age <= cfg.birthMaxAge && rnd() < cfg.birthChance) {
     const child = createCharacter(rnd() < 0.5 ? "m" : "f", 0, ruler.surname);
     child.parentId = state.rulerId;
@@ -109,6 +111,7 @@ function updateDynasty(state) {
     state.characters[cid] = child;
     ruler.childrenIds.push(cid);
     addChronicle(state, `${ruler.gender === "m" ? "Dem Herrscherpaar" : "Der Herrscherin"} wurde ein Kind geboren: ${child.name} ${ruler.surname}.`);
+    state.pendingBirth = cid;
   }
 
   // Sterbewahrscheinlichkeit
