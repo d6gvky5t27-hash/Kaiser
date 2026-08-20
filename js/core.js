@@ -173,7 +173,7 @@ function makeRegion(name, isPlayer, fertility, startPop) {
     infrastructureLevel: 0, // §27: Infrastruktur
     land: Math.round(startPop * (CONFIG.land.startHectares / 2400)), // proportional zur Startbevölkerung, 2400=Referenzgröße Spieler
     extraGrainRate: 0,      // §Original: freiwillige Kornverteilung über den Bedarf hinaus
-    governanceStyle: 15,    // §Original: Regierungsstil 0=sehr fair .. 100=gierig (moderater Startwert)
+    governanceStyle: 50,    // §Original: Regierungsstil 0=sehr fair .. 100=gierig (50=neutrale Mitte, keine Wirkung ohne Spieleraktion)
     priceNoise,             // Marktspekulation: jährliche Preisschwankung unabhängig von Angebot/Nachfrage
     commander: isPlayer ? null : generateCommander(name), // individueller KI-Hauptmann, überlebt mehrere Schlachten
   };
@@ -231,6 +231,7 @@ function newGame(options) {
     },
     army: { miliz: 0, bogenschuetzen: 0, armbrustschuetzen: 0, pikeniere: 0, ritter: 0, schwere_kavallerie: 0, soeldner: 0 },
     advisors: { schatzmeister: null, marschall: null, diplomat: null, spionagemeister: null, geistlicher: null, handelsberater: null },
+    advisorLevels: { schatzmeister: 0, marschall: 0, diplomat: 0, spionagemeister: 0, geistlicher: 0, handelsberater: 0 }, // §Original-Vertiefung: Berater-Ausbaustufen 0 (unbesetzt) bis maxLevel
     religiousInfluence: CONFIG.religion.startInfluence,
     intel: {
       ai1: { accuracy: clamp(CONFIG.intrigue.baseIntelAccuracy + diffCfg.intelAccuracyBonus, 0.05, 1) },

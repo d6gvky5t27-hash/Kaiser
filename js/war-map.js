@@ -113,7 +113,7 @@ function buildPlayerTerritoryArmy(state, territoryId) {
     ruler ? clamp(ruler.age, 20, 80) : 40
   );
   const marschallBonus = advisorEffectBonus(state, "marschall");
-  if (marschallBonus) commander.leadership = clamp(commander.leadership + marschallBonus * 100, 10, 99);
+  if (marschallBonus) commander.leadership = clamp(commander.leadership + marschallBonus * 15, 10, 99);
   return { commander, stacks };
 }
 

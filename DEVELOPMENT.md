@@ -1811,3 +1811,80 @@ spielergesteuerte Aktionen, die der passive Test nicht auslöst).
 Playwright: alle 18 Warenzeilen zeigen korrekt Kaufen-/Verkaufen-Buttons,
 ein Testkauf über die neue Zeilen-Schaltfläche erhöht den Lagerbestand
 korrekt, keine JavaScript-Fehler.
+
+## 2026-08-20 – Schritt 40: Beraterstufen, Bevölkerungsentwicklung im Kassenbuch, spürbarer Regierungsstil
+
+Drei Nutzerwünsche nach weiterem Antesten: "die berater können verschiedene
+stufen haben und haben auch andere beraterkosten, der einfluß muss auch
+spürbar sein", "die geburtenrate, todesrate, zuwanderer und abwandrrer soll
+nach jeder runde mit angezeigt werden", "welchen sinn macht der
+regierungsstil, da muss mehr einfluß aufs spiel geben".
+
+**Berater mit drei Stufen statt An/Aus.** Jede der 6 Beraterrollen hat jetzt
+einen eigenen Grundpreis (`ADVISOR_ROLES[role].baseCost`, 120–220 Taler statt
+pauschal 150) und lässt sich bis Stufe 3 ausbauen
+(`advisorUpgradeCost(role, level) = baseCost * 1.8^level`, dasselbe Muster
+wie beim bestehenden Gebäude-Ausbau). `advisorEffectBonus()` skaliert jede
+Rollenwirkung linear mit der Stufe. Der bisher komplett wirkungslose
+Spionagemeister (nur ein "Beta"-Textstub) hebt jetzt tatsächlich die
+Aufklärungsgenauigkeit über Nachbarregionen (`updateIntel`-Untergrenze).
+Der Geistliche-Bonus lief vorher über eine vom Beratersystem losgelöste
+Extra-Formel mit einer nie benutzten Variable — jetzt läuft er korrekt über
+`advisorEffectBonus`. Nebenbei einen Skalierungsfehler beim Marschall
+behoben: der Anführungs-Bonus multiplizierte mit ×100 statt einem kleinen
+Faktor und sättigte dadurch die 10–99-Obergrenze bereits bei Stufe 1 —
+Stufe 2/3 hätten sich für diesen Effekt nicht bemerkbar gemacht. Das
+Berater-Panel zeigt jetzt pro Rolle Stufe, aktuelle Wirkung in Klartext
+("+34% Steuereinnahmen" usw.), Jahresgehalt (skaliert mit Stufe) sowie
+"Ausbauen"/"Entlassen"-Buttons.
+
+**Bevölkerungsentwicklung im Kassenbuch.** `updatePopulation()` summiert
+jetzt Geburten/Todesfälle über alle Bevölkerungsgruppen
+(`region.lastPopSummary`), `applyInterRegionalMigration()` setzt
+`lastNetMigration` neu für jede Region statt nur bei Wanderungsbewegung. Das
+Kassenbuch-Fenster zeigt am Jahresende (nicht in den übrigen 11 Monaten,
+da sich diese Werte nur einmal pro Jahr ändern) einen neuen Abschnitt
+"Bevölkerungsentwicklung dieses Jahr" mit Geburten, Todesfällen,
+Zu-/Abwanderung und der resultierenden Gesamtbevölkerung.
+
+**Regierungsstil jetzt ein echter beidseitiger Regler.** Die alte Formel
+wirkte nur in Richtung "gierig" (Regler 0–100 wurde effektiv 0–50 gierig,
+darunter praktisch kein Effekt) und mit sehr kleinen Konfigwerten — kaum
+spürbar, wie vom Nutzer bemängelt. Neu: `swing = (Regler/100 - 0.5) * 2`
+läuft von −1 (sehr fair) über 0 (Mitte) bis +1 (gierig) und wirkt in beide
+Richtungen auf Staatskasse, Zufriedenheit und Legitimität; die Konfigwerte
+wurden spürbar angehoben (`incomeFactorAtGreedy` 0,03→0,15,
+`legitimacyPenaltyAtGreedy` 1,5→3). Eine neue Live-Vorschau
+(`updateGovernanceInfo()`) zeigt direkt unter dem Regler die jährliche
+Wirkung in Talern/Zufriedenheit/Legitimität, live aktualisiert beim
+Ziehen.
+
+**Regressionsfund und Fix.** Nach der Umstellung auf den symmetrischen
+Regler zeigte `node tests/ai_vs_ai_test.js` einen schweren Rückfall: die
+Spieler-Titelverteilung nach 100 rein passiven Jahren (Referenzwert seit
+Schritt 13: praktisch immer "Freiherr", da der Spieler nichts tut) sprang
+auf `Landgraf 21/100, Freiherr 15/100, Baron 33/100, Graf 31/100`, und
+"Preise nahe Obergrenze" in `economy_test.js` verdoppelte sich. Ursache: der
+Startwert `governanceStyle` blieb bei `15` (kalibriert für die alte,
+einseitige Formel) — unter der neuen, symmetrischen und deutlich stärkeren
+Formel liegt 15 weit im "fairen" Bereich und erzeugt dadurch automatisch,
+jedes Jahr, ohne jede Spieleraktion einen Zufriedenheits-/Legitimitätsbonus
+(+5,6/+2,1 pro Jahr) — genau die Art von unauffällig wirkendem, sich über
+100 Jahre aufsummierendem Effekt, vor der Schritt 13 bereits gewarnt hatte.
+Fix: Startwert auf `50` (den echten wirkungsfreien Mittelpunkt der neuen
+Formel) gesetzt und die Regler-Beschriftungsschwellen (bisher asymmetrisch
+bei 25/50/75) auf ein neues 5-stufiges Schema mit "Ausgewogen" in der Mitte
+(20/40/60/80) umgestellt, damit der neue Standardwert nicht fälschlich als
+"Streng" erscheint.
+
+**Getestet:** `node tests/battle_test.js` unverändert grün. Nach dem Fix
+`node tests/economy_test.js`: "Preise nahe Obergrenze" wieder bei 3/20
+(Referenzbereich), 0/20 unkontrollierte Bevölkerungskollapse.
+`node tests/ai_vs_ai_test.js`: Spieler-Titelverteilung wieder "Freiherr:
+100/100", Spieler-Siege 0/100 wie erwartet bei rein passivem Spiel —
+Regression bestätigt behoben. Playwright: Berater anwerben und ausbauen
+(Kosten korrekt von 220 auf 396 Taler gestiegen, Stufe 1→2, Wirkungstext
+aktualisiert), ein volles Jahr durchlaufen und das Kassenbuch zeigt die
+neue Bevölkerungssektion mit korrekten Werten, Regierungsstil-Regler auf
+"Gierig" (90) gezogen zeigt sofort +288 Taler/−6,4 Zufriedenheit/−2,4
+Legitimität in der Live-Vorschau — keine JavaScript-Fehler.

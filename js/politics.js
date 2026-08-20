@@ -122,13 +122,15 @@ function resolveElection(state) {
 
 function applyGovernanceStyle(state, r) {
   const cfg = CONFIG.governance;
-  const style = clamp(r.governanceStyle || 0, 0, 100) / 100; // 0..1
+  // -1 (Regler=0, sehr fair) .. 0 (Regler=50, Mitte) .. +1 (Regler=100, gierig) —
+  // ein echter, beidseitiger Regler statt nur einer Wirkung Richtung "gierig".
+  const swing = (clamp(r.governanceStyle || 0, 0, 100) / 100 - 0.5) * 2;
   const totalPop = Object.values(r.population).reduce((s,g)=>s+g.count,0);
-  const extraIncome = Math.round(totalPop * cfg.incomeFactorAtGreedy * style);
+  const extraIncome = Math.round(totalPop * cfg.incomeFactorAtGreedy * swing);
   state.treasury += extraIncome;
-  const satPenalty = cfg.satisfactionPenaltyAtGreedy * style;
-  if (satPenalty) for (const pid in r.population) r.population[pid].satisfaction = clamp(r.population[pid].satisfaction - satPenalty * 0.15, 0, 100);
-  state.legitimacy = clamp(state.legitimacy - cfg.legitimacyPenaltyAtGreedy * style, 0, 100);
+  const satDelta = -cfg.satisfactionPenaltyAtGreedy * swing;
+  if (satDelta) for (const pid in r.population) r.population[pid].satisfaction = clamp(r.population[pid].satisfaction + satDelta, 0, 100);
+  state.legitimacy = clamp(state.legitimacy - cfg.legitimacyPenaltyAtGreedy * swing, 0, 100);
   return extraIncome;
 }
 

@@ -6,6 +6,7 @@
 function updatePopulation(region) {
   const cfg = CONFIG.population;
   region.lastPopBreakdown = {};
+  let totalBirths = 0, totalDeaths = 0;
   // Direkter Korn-Effekt (siehe computeGrainBalance() in economy.js, vor der
   // Verteilung berechnet): Überschuss hebt die Geburtenrate, Mangel hebt die
   // Sterberate — zusätzlich zum bereits bestehenden, über die Zufriedenheit
@@ -44,8 +45,14 @@ function updatePopulation(region) {
       seuchentote: -Math.round(plagueDeaths),
       gesamt: grp.count - startCount,
     };
+    totalBirths += Math.round(births);
+    totalDeaths += Math.round(naturalDeaths + hungerDeaths + plagueDeaths);
   }
   region.plagueMitigated = null;
+  // Regionsweite Summe fürs Kassenbuch (Nutzerwunsch: Geburten-/Todesrate und
+  // Zu-/Abwanderung nach jeder Runde sichtbar) — Wanderungssaldo wird von
+  // applyInterRegionalMigration() ergänzt, das nach updatePopulation() läuft.
+  region.lastPopSummary = { geburten: totalBirths, todesfaelle: totalDeaths };
 }
 
 // ---------- Staatsfinanzen (nur Spieler) ----------
@@ -213,7 +220,8 @@ function applyInterRegionalMigration(state) {
   }
 
   for (const id of regionIds) {
-    const migrants = netMigrants[id];
+    const migrants = netMigrants[id] || 0;
+    state.regions[id].lastNetMigration = migrants; // Nutzerwunsch: Zu-/Abwanderer im Kassenbuch sichtbar
     if (!migrants) continue;
     const r = state.regions[id];
     const totalPop = totalPops[id];

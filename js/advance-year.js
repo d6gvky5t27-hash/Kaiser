@@ -58,10 +58,10 @@ function advanceYear(state) {
   checkSoeldnerDesertion(state, state.treasury < 0);
   const r = state.regions.player;
 
-  // Geistlicher hebt die Zufriedenheit leicht
-  const geistlicherBonus = advisorEffectBonus(state, "geistlicher");
+  // Geistlicher hebt die Zufriedenheit — Stärke skaliert mit seiner Ausbaustufe
   if (state.advisors.geistlicher) {
-    for (const pid in r.population) r.population[pid].satisfaction = clamp(r.population[pid].satisfaction + CONFIG.advisors.geistlicherSatBonus * 0.5, 0, 100);
+    const geistlicherLevel = state.advisorLevels.geistlicher || 1;
+    for (const pid in r.population) r.population[pid].satisfaction = clamp(r.population[pid].satisfaction + CONFIG.advisors.geistlicherSatBonus * geistlicherLevel * 0.5, 0, 100);
   }
 
   // Legitimität erholt sich langsam, niedrige Legitimität drückt die Zufriedenheit (§45)
@@ -163,8 +163,12 @@ function applyMonthlyFinances(state) {
   upkeep = Math.round(upkeep / 12);
   state.treasury -= upkeep;
 
-  const advisorCount = Object.values(state.advisors).filter(Boolean).length;
-  const salaries = Math.round(advisorCount * CONFIG.advisors.yearlySalary / 12);
+  // Gehalt pro Amt skaliert mit der Ausbaustufe (ein Stufe-3-Berater kostet 3× so viel)
+  let advisorSalaryUnits = 0;
+  for (const role in state.advisors) {
+    if (state.advisors[role]) advisorSalaryUnits += state.advisorLevels[role] || 1;
+  }
+  const salaries = Math.round(advisorSalaryUnits * CONFIG.advisors.yearlySalary / 12);
   state.treasury -= salaries;
 
   let debtInterest = 0;

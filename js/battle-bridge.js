@@ -45,7 +45,7 @@ function buildPlayerBattleArmy(state, opts) {
   );
 
   const marschallBonus = advisorEffectBonus(state, "marschall");
-  if (marschallBonus) commander.leadership = clamp(commander.leadership + marschallBonus * 100, 10, 99);
+  if (marschallBonus) commander.leadership = clamp(commander.leadership + marschallBonus * 15, 10, 99);
 
   return createArmy(r.name, commander, stacks, { isAttacker: !opts.defending, isHomeTerritory: !!opts.defending });
 }

@@ -524,6 +524,7 @@
         <input type="range" id="governanceSlider" min="0" max="100" value="30">
         <span id="governanceVal">Fair</span>
       </div>
+      <div id="governanceInfo" style="font-size:var(--fs-body); margin:var(--sp-1) 0 var(--sp-3) 0;"></div>
       <div class="slider-row">
         <label>Kornausgabe</label>
         <input type="range" id="grainSlider" min="0" max="100" value="0">
@@ -686,6 +687,15 @@
   <div id="ledger-other-wrap" style="display:none;">
     <div class="subhead">Weitere Ein-/Ausgaben diesen Monat</div>
     <table id="ledger-other-table"></table>
+  </div>
+  <div id="ledger-pop-wrap" style="display:none;">
+    <div class="subhead">Bevölkerungsentwicklung dieses Jahr</div>
+    <table>
+      <tr><td>Geburten</td><td id="ledger-pop-births"></td></tr>
+      <tr><td>Todesfälle</td><td id="ledger-pop-deaths"></td></tr>
+      <tr><td>Zu-/Abwanderung</td><td id="ledger-pop-migration"></td></tr>
+      <tr class="ledgerTotal"><td>Bevölkerung jetzt</td><td id="ledger-pop-total"></td></tr>
+    </table>
   </div>
   <table>
     <tr class="ledgerTotal"><td>Staatskasse jetzt</td><td id="ledger-total"></td></tr>
@@ -961,14 +971,23 @@ const CONFIG = {
                                   // Beziehung), nicht nur militärische Schwäche — reine Wirtschafts-Erststrategien
                                   // bleiben so sicher, solange die Beziehung gepflegt wird (Geschenke etc.)
   },
+  // Berater-Stufen (Nutzerwunsch: unterschiedliche Kosten je Amt + Stufe, spürbarer
+  // Effekt). Jedes Amt hat einen eigenen Grundpreis (ADVISOR_ROLES[role].baseCost,
+  // wichtigere Ämter wie Schatzmeister/Marschall kosten mehr als z.B. Geistlicher),
+  // eine Ausbaustufe 1-3 (wie bei Gebäuden: Kosten der nächsten Stufe = Grundpreis ×
+  // upgradeCostMultiplier^aktuelleStufe), und der Effekt UND das Jahresgehalt skalieren
+  // beide linear mit der Stufe — ein Stufe-3-Berater kostet spürbar mehr Unterhalt,
+  // wirkt aber auch dreimal so stark wie ein frisch berufener.
   advisors: {
-    hireCost: 150,
-    yearlySalary: 40,
-    schatzmeisterMaxBonus: 0.20,    // Steuereinnahmen bis zu +20 % je nach Verwaltungswert
-    marschallStrengthDivisor: 8,    // Militärstärkebonus = Marschall-Militärwert / diesem Wert
-    diplomatRelationBonusDivisor: 12, // zusätzlicher Beziehungsgewinn = Diplomatiewert / diesem Wert
-    handelsberaterProductionDivisor: 60, // Produktionsbonus = Handelswert / diesem Wert
-    geistlicherSatBonus: 3,
+    maxLevel: 3,
+    upgradeCostMultiplier: 1.8,
+    yearlySalary: 40,                // Grundgehalt pro Stufe (Stufe-2-Berater kostet 2×, Stufe-3 3×)
+    schatzmeisterMaxBonus: 0.20,     // Steuereinnahmen bis zu +20 % pro Stufe je nach Verwaltungswert
+    marschallStrengthDivisor: 8,     // Militärstärkebonus = Marschall-Militärwert / diesem Wert, pro Stufe
+    diplomatRelationBonusDivisor: 12, // zusätzlicher Beziehungsgewinn = Diplomatiewert / diesem Wert, pro Stufe
+    handelsberaterProductionDivisor: 60, // Produktionsbonus = Handelswert / diesem Wert, pro Stufe
+    spionagemeisterAccuracyDivisor: 40, // zusätzliche Aufklärungsgenauigkeit (Basiswert) = Intelligenzwert / diesem Wert, pro Stufe
+    geistlicherSatBonus: 3,          // Zufriedenheitsbonus pro Stufe
   },
   election: {
     triggerChancePerYear: 0.25,
@@ -1125,10 +1144,19 @@ const CONFIG = {
     migrationBonusFactor: 0.015,
   },
   // Regierungsstil "Sehr fair" bis "Gierig" — zusätzlicher Hebel neben der Steuer
+  // §Original-Justizregler: Nutzer-Feedback ("welchen Sinn macht der
+  // Regierungsstil?") — die Effekte waren im Verhältnis zu den übrigen
+  // Finanz-/Zufriedenheitsgrößen (siehe Steuerreform, Schritt 37) verschwindend
+  // klein und wirkten nur in eine Richtung (nur "gierig" hatte überhaupt einen
+  // Effekt, "sehr fair" unterschied sich kaum von der Mitte). Jetzt ein echter,
+  // beidseitiger Regler um die Mitte (Regler=50): "sehr fair" kostet spürbar
+  // Staatseinnahmen, hebt aber Zufriedenheit/Legitimität; "gierig" füllt die
+  // Kasse, kostet aber ebenso spürbar Zufriedenheit/Legitimität. Siehe
+  // applyGovernanceStyle() in politics.js.
   governance: {
-    incomeFactorAtGreedy: 0.03,      // Zusatzeinnahmen pro Bevölkerungseinheit bei Regler=100
-    satisfactionPenaltyAtGreedy: 8,  // Zufriedenheitsverlust bei Regler=100
-    legitimacyPenaltyAtGreedy: 1.5,  // Legitimitätsverlust/Jahr bei Regler=100
+    incomeFactorAtGreedy: 0.15,      // Zusatzeinnahmen pro Kopf bei vollem Ausschlag Richtung "gierig" (bzw. Verlust Richtung "sehr fair")
+    satisfactionPenaltyAtGreedy: 8,  // Zufriedenheitsverlust/-gewinn pro Jahr bei vollem Ausschlag
+    legitimacyPenaltyAtGreedy: 3,    // Legitimitätsverlust/-gewinn pro Jahr bei vollem Ausschlag
   },
   // §Original: vor einer Kriegserklärung werden die übrigen Herrscher gefragt,
   // ob sie unterstützen, den Gegner unterstützen, Durchmarsch gewähren oder neutral bleiben
@@ -2076,32 +2104,38 @@ const ADVISOR_ROLES = {
   "schatzmeister": {
     "name": "Schatzmeister",
     "statKey": "verwaltung",
-    "desc": "Erhöht die Steuereinnahmen."
+    "desc": "Erhöht die Steuereinnahmen.",
+    "baseCost": 220
   },
   "marschall": {
     "name": "Marschall",
     "statKey": "militaer",
-    "desc": "Stärkt die Armee."
+    "desc": "Stärkt die Armee.",
+    "baseCost": 220
   },
   "diplomat": {
     "name": "Diplomat",
     "statKey": "diplomatie",
-    "desc": "Verbessert diplomatische Erfolge."
+    "desc": "Verbessert diplomatische Erfolge.",
+    "baseCost": 160
   },
   "spionagemeister": {
     "name": "Spionagemeister",
     "statKey": "intelligenz",
-    "desc": "Grundlage für künftige Aufklärung (Beta)."
+    "desc": "Verbessert die Aufklärungsgenauigkeit über Nachbarregionen.",
+    "baseCost": 140
   },
   "geistlicher": {
     "name": "Geistlicher",
     "statKey": "charisma",
-    "desc": "Hebt die Zufriedenheit leicht."
+    "desc": "Hebt die Zufriedenheit.",
+    "baseCost": 120
   },
   "handelsberater": {
     "name": "Handelsberater",
     "statKey": "handel",
-    "desc": "Steigert die Produktion."
+    "desc": "Steigert die Produktion.",
+    "baseCost": 160
   }
 };
 
@@ -2981,7 +3015,7 @@ function makeRegion(name, isPlayer, fertility, startPop) {
     infrastructureLevel: 0, // §27: Infrastruktur
     land: Math.round(startPop * (CONFIG.land.startHectares / 2400)), // proportional zur Startbevölkerung, 2400=Referenzgröße Spieler
     extraGrainRate: 0,      // §Original: freiwillige Kornverteilung über den Bedarf hinaus
-    governanceStyle: 15,    // §Original: Regierungsstil 0=sehr fair .. 100=gierig (moderater Startwert)
+    governanceStyle: 50,    // §Original: Regierungsstil 0=sehr fair .. 100=gierig (50=neutrale Mitte, keine Wirkung ohne Spieleraktion)
     priceNoise,             // Marktspekulation: jährliche Preisschwankung unabhängig von Angebot/Nachfrage
     commander: isPlayer ? null : generateCommander(name), // individueller KI-Hauptmann, überlebt mehrere Schlachten
   };
@@ -3039,6 +3073,7 @@ function newGame(options) {
     },
     army: { miliz: 0, bogenschuetzen: 0, armbrustschuetzen: 0, pikeniere: 0, ritter: 0, schwere_kavallerie: 0, soeldner: 0 },
     advisors: { schatzmeister: null, marschall: null, diplomat: null, spionagemeister: null, geistlicher: null, handelsberater: null },
+    advisorLevels: { schatzmeister: 0, marschall: 0, diplomat: 0, spionagemeister: 0, geistlicher: 0, handelsberater: 0 }, // §Original-Vertiefung: Berater-Ausbaustufen 0 (unbesetzt) bis maxLevel
     religiousInfluence: CONFIG.religion.startInfluence,
     intel: {
       ai1: { accuracy: clamp(CONFIG.intrigue.baseIntelAccuracy + diffCfg.intelAccuracyBonus, 0.05, 1) },
@@ -3628,6 +3663,7 @@ function techBonus(state, category) {
 function updatePopulation(region) {
   const cfg = CONFIG.population;
   region.lastPopBreakdown = {};
+  let totalBirths = 0, totalDeaths = 0;
   // Direkter Korn-Effekt (siehe computeGrainBalance() in economy.js, vor der
   // Verteilung berechnet): Überschuss hebt die Geburtenrate, Mangel hebt die
   // Sterberate — zusätzlich zum bereits bestehenden, über die Zufriedenheit
@@ -3666,8 +3702,14 @@ function updatePopulation(region) {
       seuchentote: -Math.round(plagueDeaths),
       gesamt: grp.count - startCount,
     };
+    totalBirths += Math.round(births);
+    totalDeaths += Math.round(naturalDeaths + hungerDeaths + plagueDeaths);
   }
   region.plagueMitigated = null;
+  // Regionsweite Summe fürs Kassenbuch (Nutzerwunsch: Geburten-/Todesrate und
+  // Zu-/Abwanderung nach jeder Runde sichtbar) — Wanderungssaldo wird von
+  // applyInterRegionalMigration() ergänzt, das nach updatePopulation() läuft.
+  region.lastPopSummary = { geburten: totalBirths, todesfaelle: totalDeaths };
 }
 
 // ---------- Staatsfinanzen (nur Spieler) ----------
@@ -3835,7 +3877,8 @@ function applyInterRegionalMigration(state) {
   }
 
   for (const id of regionIds) {
-    const migrants = netMigrants[id];
+    const migrants = netMigrants[id] || 0;
+    state.regions[id].lastNetMigration = migrants; // Nutzerwunsch: Zu-/Abwanderer im Kassenbuch sichtbar
     if (!migrants) continue;
     const r = state.regions[id];
     const totalPop = totalPops[id];
@@ -3973,13 +4016,15 @@ function resolveElection(state) {
 
 function applyGovernanceStyle(state, r) {
   const cfg = CONFIG.governance;
-  const style = clamp(r.governanceStyle || 0, 0, 100) / 100; // 0..1
+  // -1 (Regler=0, sehr fair) .. 0 (Regler=50, Mitte) .. +1 (Regler=100, gierig) —
+  // ein echter, beidseitiger Regler statt nur einer Wirkung Richtung "gierig".
+  const swing = (clamp(r.governanceStyle || 0, 0, 100) / 100 - 0.5) * 2;
   const totalPop = Object.values(r.population).reduce((s,g)=>s+g.count,0);
-  const extraIncome = Math.round(totalPop * cfg.incomeFactorAtGreedy * style);
+  const extraIncome = Math.round(totalPop * cfg.incomeFactorAtGreedy * swing);
   state.treasury += extraIncome;
-  const satPenalty = cfg.satisfactionPenaltyAtGreedy * style;
-  if (satPenalty) for (const pid in r.population) r.population[pid].satisfaction = clamp(r.population[pid].satisfaction - satPenalty * 0.15, 0, 100);
-  state.legitimacy = clamp(state.legitimacy - cfg.legitimacyPenaltyAtGreedy * style, 0, 100);
+  const satDelta = -cfg.satisfactionPenaltyAtGreedy * swing;
+  if (satDelta) for (const pid in r.population) r.population[pid].satisfaction = clamp(r.population[pid].satisfaction + satDelta, 0, 100);
+  state.legitimacy = clamp(state.legitimacy - cfg.legitimacyPenaltyAtGreedy * swing, 0, 100);
   return extraIncome;
 }
 
@@ -4357,8 +4402,11 @@ function spyOn(state, aiId) {
 
 function updateIntel(state) {
   const cfg = CONFIG.intrigue;
+  // Spionagemeister hebt die Grundgenauigkeit dauerhaft an, auf die die
+  // Aufklärung nach einer gezielten Spionage-Aktion wieder abklingt.
+  const spionagemeisterFloor = clamp(cfg.baseIntelAccuracy + advisorEffectBonus(state, "spionagemeister"), 0, 1);
   for (const aiId in state.intel) {
-    state.intel[aiId].accuracy = clamp(state.intel[aiId].accuracy - cfg.spyAccuracyDecayPerYear, cfg.baseIntelAccuracy, 1);
+    state.intel[aiId].accuracy = clamp(state.intel[aiId].accuracy - cfg.spyAccuracyDecayPerYear, spionagemeisterFloor, 1);
     const trueStrength = estimateAiStrength(state.regions[aiId]);
     const spread = (1 - state.intel[aiId].accuracy) * 0.7;
     state.intel[aiId].rangeLow = Math.round(trueStrength * (1 - spread));
@@ -4403,16 +4451,38 @@ function generateAdvisorCandidate(role) {
   return c;
 }
 
+// Kosten, um ein Amt von currentLevel auf currentLevel+1 zu bringen (0 = Berufung
+// auf Stufe 1). Gleiches Muster wie bei Gebäude-Ausbaustufen (upgradeCost() in core.js).
+function advisorUpgradeCost(role, currentLevel) {
+  return Math.round(ADVISOR_ROLES[role].baseCost * Math.pow(CONFIG.advisors.upgradeCostMultiplier, currentLevel));
+}
+
 function hireAdvisor(state, role) {
-  const cfg = CONFIG.advisors;
   if (state.advisors[role]) return { ok: false, reason: "Dieses Amt ist bereits besetzt." };
-  if (state.treasury < cfg.hireCost) return { ok: false, reason: "Nicht genug Taler, um jemanden zu berufen." };
+  const cost = advisorUpgradeCost(role, 0);
+  if (state.treasury < cost) return { ok: false, reason: "Nicht genug Taler, um jemanden zu berufen." };
   const candidate = generateAdvisorCandidate(role);
   const cid = nextCharId();
   state.characters[cid] = candidate;
   state.advisors[role] = cid;
-  state.treasury -= cfg.hireCost;
+  state.advisorLevels[role] = 1;
+  state.treasury -= cost;
+  logLedger(state, `Berater berufen: ${ADVISOR_ROLES[role].name}`, -cost);
   addChronicle(state, `${candidate.name} wurde zum ${ADVISOR_ROLES[role].name} ernannt.`);
+  return { ok: true };
+}
+
+function upgradeAdvisor(state, role) {
+  if (!state.advisors[role]) return { ok: false, reason: "Dieses Amt ist nicht besetzt." };
+  const currentLevel = state.advisorLevels[role] || 1;
+  if (currentLevel >= CONFIG.advisors.maxLevel) return { ok: false, reason: "Höchste Stufe bereits erreicht." };
+  const cost = advisorUpgradeCost(role, currentLevel);
+  if (state.treasury < cost) return { ok: false, reason: "Nicht genug Taler für den Ausbau." };
+  state.treasury -= cost;
+  state.advisorLevels[role] = currentLevel + 1;
+  logLedger(state, `Berater ausgebaut: ${ADVISOR_ROLES[role].name} (Stufe ${currentLevel + 1})`, -cost);
+  const c = state.characters[state.advisors[role]];
+  addChronicle(state, `${c ? c.name : "Der Amtsinhaber"} wurde als ${ADVISOR_ROLES[role].name} auf Stufe ${currentLevel + 1} befördert.`);
   return { ok: true };
 }
 
@@ -4421,10 +4491,12 @@ function dismissAdvisor(state, role) {
   const c = state.characters[state.advisors[role]];
   addChronicle(state, `${c ? c.name : "Der Amtsinhaber"} wurde als ${ADVISOR_ROLES[role].name} entlassen.`);
   state.advisors[role] = null;
+  state.advisorLevels[role] = 0;
   return { ok: true };
 }
 
-// Normierter Bonus (0..~0.3) aus dem relevanten Stat des Beraters, falls besetzt
+// Bonus aus dem relevanten Stat des Beraters, falls besetzt — skaliert linear mit
+// der Ausbaustufe (§Original-Vertiefung: Stufe 3 wirkt dreimal so stark wie Stufe 1).
 
 function advisorEffectBonus(state, role) {
   const advisorId = state.advisors[role];
@@ -4432,11 +4504,13 @@ function advisorEffectBonus(state, role) {
   const advisor = state.characters[advisorId];
   if (!advisor || !advisor.alive) return 0;
   const cfg = CONFIG.advisors;
+  const level = state.advisorLevels[role] || 1;
   const statVal = advisor.stats[ADVISOR_ROLES[role].statKey];
-  if (role === "schatzmeister") return Math.min(cfg.schatzmeisterMaxBonus, statVal / 100);
-  if (role === "marschall") return statVal / cfg.marschallStrengthDivisor;
-  if (role === "diplomat") return statVal / cfg.diplomatRelationBonusDivisor;
-  if (role === "handelsberater") return statVal / cfg.handelsberaterProductionDivisor;
+  if (role === "schatzmeister") return Math.min(cfg.schatzmeisterMaxBonus * level, (statVal / 100) * level);
+  if (role === "marschall") return (statVal / cfg.marschallStrengthDivisor) * level;
+  if (role === "diplomat") return (statVal / cfg.diplomatRelationBonusDivisor) * level;
+  if (role === "handelsberater") return (statVal / cfg.handelsberaterProductionDivisor) * level;
+  if (role === "spionagemeister") return (statVal / cfg.spionagemeisterAccuracyDivisor) * level;
   return 0;
 }
 
@@ -4871,7 +4945,7 @@ function buildPlayerTerritoryArmy(state, territoryId) {
     ruler ? clamp(ruler.age, 20, 80) : 40
   );
   const marschallBonus = advisorEffectBonus(state, "marschall");
-  if (marschallBonus) commander.leadership = clamp(commander.leadership + marschallBonus * 100, 10, 99);
+  if (marschallBonus) commander.leadership = clamp(commander.leadership + marschallBonus * 15, 10, 99);
   return { commander, stacks };
 }
 
@@ -5114,10 +5188,10 @@ function advanceYear(state) {
   checkSoeldnerDesertion(state, state.treasury < 0);
   const r = state.regions.player;
 
-  // Geistlicher hebt die Zufriedenheit leicht
-  const geistlicherBonus = advisorEffectBonus(state, "geistlicher");
+  // Geistlicher hebt die Zufriedenheit — Stärke skaliert mit seiner Ausbaustufe
   if (state.advisors.geistlicher) {
-    for (const pid in r.population) r.population[pid].satisfaction = clamp(r.population[pid].satisfaction + CONFIG.advisors.geistlicherSatBonus * 0.5, 0, 100);
+    const geistlicherLevel = state.advisorLevels.geistlicher || 1;
+    for (const pid in r.population) r.population[pid].satisfaction = clamp(r.population[pid].satisfaction + CONFIG.advisors.geistlicherSatBonus * geistlicherLevel * 0.5, 0, 100);
   }
 
   // Legitimität erholt sich langsam, niedrige Legitimität drückt die Zufriedenheit (§45)
@@ -5219,8 +5293,12 @@ function applyMonthlyFinances(state) {
   upkeep = Math.round(upkeep / 12);
   state.treasury -= upkeep;
 
-  const advisorCount = Object.values(state.advisors).filter(Boolean).length;
-  const salaries = Math.round(advisorCount * CONFIG.advisors.yearlySalary / 12);
+  // Gehalt pro Amt skaliert mit der Ausbaustufe (ein Stufe-3-Berater kostet 3× so viel)
+  let advisorSalaryUnits = 0;
+  for (const role in state.advisors) {
+    if (state.advisors[role]) advisorSalaryUnits += state.advisorLevels[role] || 1;
+  }
+  const salaries = Math.round(advisorSalaryUnits * CONFIG.advisors.yearlySalary / 12);
   state.treasury -= salaries;
 
   let debtInterest = 0;
@@ -6116,7 +6194,7 @@ function buildPlayerBattleArmy(state, opts) {
   );
 
   const marschallBonus = advisorEffectBonus(state, "marschall");
-  if (marschallBonus) commander.leadership = clamp(commander.leadership + marschallBonus * 100, 10, 99);
+  if (marschallBonus) commander.leadership = clamp(commander.leadership + marschallBonus * 15, 10, 99);
 
   return createArmy(r.name, commander, stacks, { isAttacker: !opts.defending, isHomeTerritory: !!opts.defending });
 }
@@ -6393,7 +6471,7 @@ function syncSliders() {
   document.getElementById('taxVal').textContent = Math.round(state.regions.player.taxRate * 100) + '%';
   const gov = Math.round(state.regions.player.governanceStyle || 0);
   document.getElementById('governanceSlider').value = gov;
-  document.getElementById('governanceVal').textContent = gov < 25 ? 'Sehr fair' : gov < 50 ? 'Fair' : gov < 75 ? 'Streng' : 'Gierig';
+  document.getElementById('governanceVal').textContent = gov < 20 ? 'Sehr fair' : gov < 40 ? 'Fair' : gov <= 60 ? 'Ausgewogen' : gov < 80 ? 'Streng' : 'Gierig';
   const grain = Math.round((state.regions.player.extraGrainRate || 0) * 100);
   document.getElementById('grainSlider').value = grain;
   document.getElementById('grainVal').textContent = grain + '%';
@@ -6688,6 +6766,8 @@ function render() {
   document.getElementById('popTable').innerHTML = popHtml;
   document.getElementById('satBar').style.width = Math.round(r.satisfactionAvg) + '%';
 
+  updateGovernanceInfo();
+
   // Kornbilanz (§Original-Vertiefung): verfügbares Getreide vs. Grundbedarf,
   // tatsächlich abgegebene Menge, und die direkte Wirkung auf Geburten-/
   // Sterberate transparent machen (§83/§84)
@@ -6746,20 +6826,26 @@ function render() {
   if (currentPage === 'karte') renderMap();
   if (currentPage === 'militaer') renderMilitary();
 
-  // Berater
+  // Berater (§Original-Vertiefung: Ausbaustufen mit steigenden Kosten und spürbar
+  // stärkerem Effekt statt nur besetzt/unbesetzt)
   let advHtml = '';
   for (const role in ADVISOR_ROLES) {
     const roleInfo = ADVISOR_ROLES[role];
     const advisorId = state.advisors[role];
     if (advisorId && state.characters[advisorId] && state.characters[advisorId].alive) {
       const adv = state.characters[advisorId];
-      advHtml += `<div class="advisorSlot"><b>${roleInfo.name}</b>: ${adv.name} (${adv.stats[roleInfo.statKey]})<br>
-        <i>${roleInfo.desc}</i><br>
+      const level = state.advisorLevels[role] || 1;
+      const maxed = level >= CONFIG.advisors.maxLevel;
+      const upgradeCost = maxed ? null : advisorUpgradeCost(role, level);
+      const yearlyCost = CONFIG.advisors.yearlySalary * level;
+      advHtml += `<div class="advisorSlot"><b>${roleInfo.name}</b>: ${adv.name} (${roleInfo.statKey} ${adv.stats[roleInfo.statKey]}) — Stufe ${level}/${CONFIG.advisors.maxLevel}<br>
+        <i>${roleInfo.desc} Aktuelle Wirkung: ${advisorEffectLabel(role, level, adv.stats[roleInfo.statKey])}. Gehalt: ${yearlyCost} Taler/Jahr.</i><br>
+        ${maxed ? '' : `<button onclick="doUpgradeAdvisor('${role}')">Ausbauen auf Stufe ${level+1} (${upgradeCost} Taler)</button>`}
         <button onclick="doDismissAdvisor('${role}')">Entlassen</button></div>`;
     } else {
       advHtml += `<div class="advisorSlot"><b>${roleInfo.name}</b>: <i>unbesetzt</i><br>
         <i>${roleInfo.desc}</i><br>
-        <button onclick="doHireAdvisor('${role}')">Berufen (${CONFIG.advisors.hireCost} Taler)</button></div>`;
+        <button onclick="doHireAdvisor('${role}')">Berufen (${advisorUpgradeCost(role, 0)} Taler)</button></div>`;
     }
   }
   document.getElementById('advisorsPanel').innerHTML = advHtml;
@@ -7409,7 +7495,28 @@ function doInvestResearch(category) {
 function doHireAdvisor(role) {
   const result = hireAdvisor(state, role);
   if (!result.ok) { alert(result.reason); return; }
+  playBeep(440, 0.1);
   render();
+}
+
+function doUpgradeAdvisor(role) {
+  const result = upgradeAdvisor(state, role);
+  if (!result.ok) { alert(result.reason); return; }
+  playBeep(660, 0.12);
+  render();
+}
+
+// Rein informative Anzeige der aktuellen Beraterwirkung, damit der Effekt der
+// Ausbaustufe im Berater-Panel unmittelbar sichtbar ist (Nutzerwunsch).
+function advisorEffectLabel(role, level, statVal) {
+  const cfg = CONFIG.advisors;
+  if (role === 'schatzmeister') return `+${Math.round(Math.min(cfg.schatzmeisterMaxBonus * level, (statVal/100) * level) * 100)}% Steuereinnahmen`;
+  if (role === 'marschall') return `+${((statVal/cfg.marschallStrengthDivisor) * level).toFixed(1)} Armeestärke, stärkt den Kommandanten`;
+  if (role === 'diplomat') return `+${((statVal/cfg.diplomatRelationBonusDivisor) * level).toFixed(2)} Beziehungsgewinn je Aktion`;
+  if (role === 'handelsberater') return `+${Math.round((statVal/cfg.handelsberaterProductionDivisor) * level * 100)}% Produktion`;
+  if (role === 'spionagemeister') return `+${Math.round((statVal/cfg.spionagemeisterAccuracyDivisor) * level * 100)}% Aufklärungsgenauigkeit`;
+  if (role === 'geistlicher') return `+${(cfg.geistlicherSatBonus * level * 0.5).toFixed(1)} Zufriedenheit/Jahr`;
+  return '';
 }
 
 function doDismissAdvisor(role) {
@@ -7743,10 +7850,30 @@ function doTradeLand(action, hectares) {
   render();
 }
 
+// §Original-Justizregler: zeigt die tatsächliche jährliche Wirkung des
+// aktuellen Reglerstands, damit der Effekt sofort sicht- statt nur spürbar ist.
+function updateGovernanceInfo() {
+  const r = state.regions.player;
+  const val = clamp(r.governanceStyle || 0, 0, 100);
+  const swing = (val / 100 - 0.5) * 2;
+  const totalPop = Object.values(r.population).reduce((s, g) => s + g.count, 0);
+  const cfg = CONFIG.governance;
+  const extraIncome = Math.round(totalPop * cfg.incomeFactorAtGreedy * swing);
+  const satDelta = -cfg.satisfactionPenaltyAtGreedy * swing;
+  const legDelta = -cfg.legitimacyPenaltyAtGreedy * swing;
+  const fmt = (n, unit) => (n >= 0 ? '+' : '') + Math.round(n * 10) / 10 + unit;
+  document.getElementById('governanceInfo').innerHTML =
+    `<span data-tip="Ein beidseitiger Regler: 'Sehr fair' kostet Staatseinnahmen, hebt aber Zufriedenheit und Legitimität; 'Gierig' füllt die Kasse auf Kosten von Zufriedenheit und Legitimität.">` +
+    `Jährliche Wirkung: Staatskasse <b class="${extraIncome>=0?'goodgood':'goodbad'}">${fmt(extraIncome,' Taler')}</b> · ` +
+    `Zufriedenheit <b class="${satDelta>=0?'goodgood':'goodbad'}">${fmt(satDelta,'')}</b> · ` +
+    `Legitimität <b class="${legDelta>=0?'goodgood':'goodbad'}">${fmt(legDelta,'')}</b></span>`;
+}
+
 document.getElementById('governanceSlider').addEventListener('input', (e) => {
   const val = parseInt(e.target.value, 10);
   state.regions.player.governanceStyle = val;
-  document.getElementById('governanceVal').textContent = val < 25 ? 'Sehr fair' : val < 50 ? 'Fair' : val < 75 ? 'Streng' : 'Gierig';
+  document.getElementById('governanceVal').textContent = val < 20 ? 'Sehr fair' : val < 40 ? 'Fair' : val <= 60 ? 'Ausgewogen' : val < 80 ? 'Streng' : 'Gierig';
+  updateGovernanceInfo();
 });
 
 document.getElementById('grainSlider').addEventListener('input', (e) => {
@@ -7836,6 +7963,26 @@ function showLedger(report, yearCompleted, titleIndexBefore) {
   } else {
     otherTable.innerHTML = '';
     otherWrap.style.display = 'none';
+  }
+
+  // Bevölkerungsentwicklung (Nutzerwunsch): Geburten/Todesfälle/Wanderung ändern
+  // sich nur beim Jahreswechsel (12. Monat) — an anderen Monaten bleibt der
+  // Block ausgeblendet, weil sich seit dem letzten Jahreswechsel nichts geändert hat.
+  const popWrap = document.getElementById('ledger-pop-wrap');
+  if (yearCompleted) {
+    const pr = state.regions.player;
+    const summary = pr.lastPopSummary || { geburten: 0, todesfaelle: 0 };
+    const migration = pr.lastNetMigration || 0;
+    const totalPop = Object.values(pr.population).reduce((s, g) => s + g.count, 0);
+    document.getElementById('ledger-pop-births').innerHTML = `<span class="goodgood">+${summary.geburten.toLocaleString('de-DE')}</span>`;
+    document.getElementById('ledger-pop-deaths').innerHTML = `<span class="goodbad">−${summary.todesfaelle.toLocaleString('de-DE')}</span>`;
+    document.getElementById('ledger-pop-migration').innerHTML = migration === 0
+      ? '±0'
+      : `<span class="${migration > 0 ? 'goodgood' : 'goodbad'}">${migration > 0 ? '+' : ''}${migration.toLocaleString('de-DE')}</span>`;
+    document.getElementById('ledger-pop-total').textContent = totalPop.toLocaleString('de-DE');
+    popWrap.style.display = '';
+  } else {
+    popWrap.style.display = 'none';
   }
 
   document.getElementById('ledgerModal').style.display = 'flex';

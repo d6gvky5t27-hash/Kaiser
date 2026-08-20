@@ -45,7 +45,7 @@ Stand: nach Abschluss von MVP + Alpha + Beta (siehe ROADMAP.md).
 | 10 | Dynastiesystem | 🟡 | Heirat, Kinder, Altern, Tod, Erbfolge (inkl. Streit) funktionieren; fehlen: Krankheit/Verletzung, Affären, uneheliche Kinder, Freundschaften/Rivalitäten, Verschwörungen |
 | 11 | Adelstitel | ✅ | 10-stufige Leiter mit Mehrfachbedingungen (Bevölkerung, Wohlstand, Prestige) |
 | 12 | Kaiserwahl | ✅ | Implementiert: Kurfürstenstimmen (3 bekannt + 4 abstrakt), Bestechung, Sieg/Niederlage-Konsequenzen |
-| 42 | Berater | ✅ | 6 Ämter mit echten Gameplay-Effekten (Schatzmeister, Marschall, Diplomat, Spionagemeister, Geistlicher, Handelsberater) |
+| 42 | Berater | ✅ | 6 Ämter mit echten Gameplay-Effekten (Schatzmeister, Marschall, Diplomat, Spionagemeister, Geistlicher, Handelsberater); seit Schritt 40 je Rolle eigener Grundpreis und bis Stufe 3 ausbaubar, Wirkung skaliert linear mit Stufe |
 | 43 | Hof (politische Ebene) | 🟡 | Nur Berater-Ämter vorhanden; einfacher Adel ohne Ämter, keine Machtkämpfe um Positionen |
 | 44 | Prestige | ✅ | Vollständig implementiert, viele Quellen und Senken |
 | 45 | Legitimität | ✅ | Implementiert, beeinflusst Rebellion/Thronfolge/Zufriedenheit |
@@ -57,7 +57,7 @@ Stand: nach Abschluss von MVP + Alpha + Beta (siehe ROADMAP.md).
 | § | Thema | Status | Anmerkung |
 |---|---|---|---|
 | 13 | Bevölkerungsgruppen | ✅ | Alle 10 geforderten Gruppen umgesetzt (Bauern, Landarbeiter, Handwerker, Bürger, Händler, Adel, Geistliche, Soldaten, Tagelöhner, Arme), jede mit eigenem Warenbedarf |
-| 14 | Bevölkerungsentwicklung | ✅ | Geburten/Tode/Hunger/Seuche vorhanden; echte Migration zwischen allen 8 Regionen; Kornbilanz (verfügbares Getreide vs. Grundbedarf) wirkt jetzt zusätzlich direkt auf Geburten-/Sterberate (Überschuss hebt Geburten, echte Hungersnot hebt die Sterberate) und ist als eigenes Panel sichtbar |
+| 14 | Bevölkerungsentwicklung | ✅ | Geburten/Tode/Hunger/Seuche vorhanden; echte Migration zwischen allen 8 Regionen; Kornbilanz (verfügbares Getreide vs. Grundbedarf) wirkt jetzt zusätzlich direkt auf Geburten-/Sterberate (Überschuss hebt Geburten, echte Hungersnot hebt die Sterberate) und ist als eigenes Panel sichtbar; seit Schritt 40 zeigt das Kassenbuch am Jahresende zusätzlich Geburten/Todesfälle/Zu-Abwanderung des Jahres |
 | 15 | Wirtschaft (Angebot/Nachfrage) | ✅ | Vollständig implementiert und getestet |
 | 16 | Waren | ✅ | 23 Waren umgesetzt, inkl. Papier/Bücher/Schmuck/Seide/Glaswaren |
 | 17 | Produktionsketten | ✅ | 23 Ketten; zwei echte zweistufige Ketten (Holz→Papier→Bücher, Getreide→Mehl→Brot über eigene neue Gebäude Kornmühle/Bäckerei) |

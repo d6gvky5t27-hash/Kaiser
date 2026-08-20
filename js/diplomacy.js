@@ -351,8 +351,11 @@ function spyOn(state, aiId) {
 
 function updateIntel(state) {
   const cfg = CONFIG.intrigue;
+  // Spionagemeister hebt die Grundgenauigkeit dauerhaft an, auf die die
+  // Aufklärung nach einer gezielten Spionage-Aktion wieder abklingt.
+  const spionagemeisterFloor = clamp(cfg.baseIntelAccuracy + advisorEffectBonus(state, "spionagemeister"), 0, 1);
   for (const aiId in state.intel) {
-    state.intel[aiId].accuracy = clamp(state.intel[aiId].accuracy - cfg.spyAccuracyDecayPerYear, cfg.baseIntelAccuracy, 1);
+    state.intel[aiId].accuracy = clamp(state.intel[aiId].accuracy - cfg.spyAccuracyDecayPerYear, spionagemeisterFloor, 1);
     const trueStrength = estimateAiStrength(state.regions[aiId]);
     const spread = (1 - state.intel[aiId].accuracy) * 0.7;
     state.intel[aiId].rangeLow = Math.round(trueStrength * (1 - spread));

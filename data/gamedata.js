@@ -184,14 +184,23 @@ const CONFIG = {
                                   // Beziehung), nicht nur militärische Schwäche — reine Wirtschafts-Erststrategien
                                   // bleiben so sicher, solange die Beziehung gepflegt wird (Geschenke etc.)
   },
+  // Berater-Stufen (Nutzerwunsch: unterschiedliche Kosten je Amt + Stufe, spürbarer
+  // Effekt). Jedes Amt hat einen eigenen Grundpreis (ADVISOR_ROLES[role].baseCost,
+  // wichtigere Ämter wie Schatzmeister/Marschall kosten mehr als z.B. Geistlicher),
+  // eine Ausbaustufe 1-3 (wie bei Gebäuden: Kosten der nächsten Stufe = Grundpreis ×
+  // upgradeCostMultiplier^aktuelleStufe), und der Effekt UND das Jahresgehalt skalieren
+  // beide linear mit der Stufe — ein Stufe-3-Berater kostet spürbar mehr Unterhalt,
+  // wirkt aber auch dreimal so stark wie ein frisch berufener.
   advisors: {
-    hireCost: 150,
-    yearlySalary: 40,
-    schatzmeisterMaxBonus: 0.20,    // Steuereinnahmen bis zu +20 % je nach Verwaltungswert
-    marschallStrengthDivisor: 8,    // Militärstärkebonus = Marschall-Militärwert / diesem Wert
-    diplomatRelationBonusDivisor: 12, // zusätzlicher Beziehungsgewinn = Diplomatiewert / diesem Wert
-    handelsberaterProductionDivisor: 60, // Produktionsbonus = Handelswert / diesem Wert
-    geistlicherSatBonus: 3,
+    maxLevel: 3,
+    upgradeCostMultiplier: 1.8,
+    yearlySalary: 40,                // Grundgehalt pro Stufe (Stufe-2-Berater kostet 2×, Stufe-3 3×)
+    schatzmeisterMaxBonus: 0.20,     // Steuereinnahmen bis zu +20 % pro Stufe je nach Verwaltungswert
+    marschallStrengthDivisor: 8,     // Militärstärkebonus = Marschall-Militärwert / diesem Wert, pro Stufe
+    diplomatRelationBonusDivisor: 12, // zusätzlicher Beziehungsgewinn = Diplomatiewert / diesem Wert, pro Stufe
+    handelsberaterProductionDivisor: 60, // Produktionsbonus = Handelswert / diesem Wert, pro Stufe
+    spionagemeisterAccuracyDivisor: 40, // zusätzliche Aufklärungsgenauigkeit (Basiswert) = Intelligenzwert / diesem Wert, pro Stufe
+    geistlicherSatBonus: 3,          // Zufriedenheitsbonus pro Stufe
   },
   election: {
     triggerChancePerYear: 0.25,
@@ -348,10 +357,19 @@ const CONFIG = {
     migrationBonusFactor: 0.015,
   },
   // Regierungsstil "Sehr fair" bis "Gierig" — zusätzlicher Hebel neben der Steuer
+  // §Original-Justizregler: Nutzer-Feedback ("welchen Sinn macht der
+  // Regierungsstil?") — die Effekte waren im Verhältnis zu den übrigen
+  // Finanz-/Zufriedenheitsgrößen (siehe Steuerreform, Schritt 37) verschwindend
+  // klein und wirkten nur in eine Richtung (nur "gierig" hatte überhaupt einen
+  // Effekt, "sehr fair" unterschied sich kaum von der Mitte). Jetzt ein echter,
+  // beidseitiger Regler um die Mitte (Regler=50): "sehr fair" kostet spürbar
+  // Staatseinnahmen, hebt aber Zufriedenheit/Legitimität; "gierig" füllt die
+  // Kasse, kostet aber ebenso spürbar Zufriedenheit/Legitimität. Siehe
+  // applyGovernanceStyle() in politics.js.
   governance: {
-    incomeFactorAtGreedy: 0.03,      // Zusatzeinnahmen pro Bevölkerungseinheit bei Regler=100
-    satisfactionPenaltyAtGreedy: 8,  // Zufriedenheitsverlust bei Regler=100
-    legitimacyPenaltyAtGreedy: 1.5,  // Legitimitätsverlust/Jahr bei Regler=100
+    incomeFactorAtGreedy: 0.15,      // Zusatzeinnahmen pro Kopf bei vollem Ausschlag Richtung "gierig" (bzw. Verlust Richtung "sehr fair")
+    satisfactionPenaltyAtGreedy: 8,  // Zufriedenheitsverlust/-gewinn pro Jahr bei vollem Ausschlag
+    legitimacyPenaltyAtGreedy: 3,    // Legitimitätsverlust/-gewinn pro Jahr bei vollem Ausschlag
   },
   // §Original: vor einer Kriegserklärung werden die übrigen Herrscher gefragt,
   // ob sie unterstützen, den Gegner unterstützen, Durchmarsch gewähren oder neutral bleiben
@@ -1299,32 +1317,38 @@ const ADVISOR_ROLES = {
   "schatzmeister": {
     "name": "Schatzmeister",
     "statKey": "verwaltung",
-    "desc": "Erhöht die Steuereinnahmen."
+    "desc": "Erhöht die Steuereinnahmen.",
+    "baseCost": 220
   },
   "marschall": {
     "name": "Marschall",
     "statKey": "militaer",
-    "desc": "Stärkt die Armee."
+    "desc": "Stärkt die Armee.",
+    "baseCost": 220
   },
   "diplomat": {
     "name": "Diplomat",
     "statKey": "diplomatie",
-    "desc": "Verbessert diplomatische Erfolge."
+    "desc": "Verbessert diplomatische Erfolge.",
+    "baseCost": 160
   },
   "spionagemeister": {
     "name": "Spionagemeister",
     "statKey": "intelligenz",
-    "desc": "Grundlage für künftige Aufklärung (Beta)."
+    "desc": "Verbessert die Aufklärungsgenauigkeit über Nachbarregionen.",
+    "baseCost": 140
   },
   "geistlicher": {
     "name": "Geistlicher",
     "statKey": "charisma",
-    "desc": "Hebt die Zufriedenheit leicht."
+    "desc": "Hebt die Zufriedenheit.",
+    "baseCost": 120
   },
   "handelsberater": {
     "name": "Handelsberater",
     "statKey": "handel",
-    "desc": "Steigert die Produktion."
+    "desc": "Steigert die Produktion.",
+    "baseCost": 160
   }
 };
 

@@ -13,16 +13,38 @@ function generateAdvisorCandidate(role) {
   return c;
 }
 
+// Kosten, um ein Amt von currentLevel auf currentLevel+1 zu bringen (0 = Berufung
+// auf Stufe 1). Gleiches Muster wie bei Gebäude-Ausbaustufen (upgradeCost() in core.js).
+function advisorUpgradeCost(role, currentLevel) {
+  return Math.round(ADVISOR_ROLES[role].baseCost * Math.pow(CONFIG.advisors.upgradeCostMultiplier, currentLevel));
+}
+
 function hireAdvisor(state, role) {
-  const cfg = CONFIG.advisors;
   if (state.advisors[role]) return { ok: false, reason: "Dieses Amt ist bereits besetzt." };
-  if (state.treasury < cfg.hireCost) return { ok: false, reason: "Nicht genug Taler, um jemanden zu berufen." };
+  const cost = advisorUpgradeCost(role, 0);
+  if (state.treasury < cost) return { ok: false, reason: "Nicht genug Taler, um jemanden zu berufen." };
   const candidate = generateAdvisorCandidate(role);
   const cid = nextCharId();
   state.characters[cid] = candidate;
   state.advisors[role] = cid;
-  state.treasury -= cfg.hireCost;
+  state.advisorLevels[role] = 1;
+  state.treasury -= cost;
+  logLedger(state, `Berater berufen: ${ADVISOR_ROLES[role].name}`, -cost);
   addChronicle(state, `${candidate.name} wurde zum ${ADVISOR_ROLES[role].name} ernannt.`);
+  return { ok: true };
+}
+
+function upgradeAdvisor(state, role) {
+  if (!state.advisors[role]) return { ok: false, reason: "Dieses Amt ist nicht besetzt." };
+  const currentLevel = state.advisorLevels[role] || 1;
+  if (currentLevel >= CONFIG.advisors.maxLevel) return { ok: false, reason: "Höchste Stufe bereits erreicht." };
+  const cost = advisorUpgradeCost(role, currentLevel);
+  if (state.treasury < cost) return { ok: false, reason: "Nicht genug Taler für den Ausbau." };
+  state.treasury -= cost;
+  state.advisorLevels[role] = currentLevel + 1;
+  logLedger(state, `Berater ausgebaut: ${ADVISOR_ROLES[role].name} (Stufe ${currentLevel + 1})`, -cost);
+  const c = state.characters[state.advisors[role]];
+  addChronicle(state, `${c ? c.name : "Der Amtsinhaber"} wurde als ${ADVISOR_ROLES[role].name} auf Stufe ${currentLevel + 1} befördert.`);
   return { ok: true };
 }
 
@@ -31,10 +53,12 @@ function dismissAdvisor(state, role) {
   const c = state.characters[state.advisors[role]];
   addChronicle(state, `${c ? c.name : "Der Amtsinhaber"} wurde als ${ADVISOR_ROLES[role].name} entlassen.`);
   state.advisors[role] = null;
+  state.advisorLevels[role] = 0;
   return { ok: true };
 }
 
-// Normierter Bonus (0..~0.3) aus dem relevanten Stat des Beraters, falls besetzt
+// Bonus aus dem relevanten Stat des Beraters, falls besetzt — skaliert linear mit
+// der Ausbaustufe (§Original-Vertiefung: Stufe 3 wirkt dreimal so stark wie Stufe 1).
 
 function advisorEffectBonus(state, role) {
   const advisorId = state.advisors[role];
@@ -42,11 +66,13 @@ function advisorEffectBonus(state, role) {
   const advisor = state.characters[advisorId];
   if (!advisor || !advisor.alive) return 0;
   const cfg = CONFIG.advisors;
+  const level = state.advisorLevels[role] || 1;
   const statVal = advisor.stats[ADVISOR_ROLES[role].statKey];
-  if (role === "schatzmeister") return Math.min(cfg.schatzmeisterMaxBonus, statVal / 100);
-  if (role === "marschall") return statVal / cfg.marschallStrengthDivisor;
-  if (role === "diplomat") return statVal / cfg.diplomatRelationBonusDivisor;
-  if (role === "handelsberater") return statVal / cfg.handelsberaterProductionDivisor;
+  if (role === "schatzmeister") return Math.min(cfg.schatzmeisterMaxBonus * level, (statVal / 100) * level);
+  if (role === "marschall") return (statVal / cfg.marschallStrengthDivisor) * level;
+  if (role === "diplomat") return (statVal / cfg.diplomatRelationBonusDivisor) * level;
+  if (role === "handelsberater") return (statVal / cfg.handelsberaterProductionDivisor) * level;
+  if (role === "spionagemeister") return (statVal / cfg.spionagemeisterAccuracyDivisor) * level;
   return 0;
 }
 
