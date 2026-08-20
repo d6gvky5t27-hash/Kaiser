@@ -288,16 +288,16 @@
   }
   #titleUpBanner.show { opacity: 1; transform: translate(-50%, 0); }
   #titleUpBanner .sub { font-family: var(--font); font-size: var(--fs-body); margin-top: var(--sp-2); color: var(--ink); letter-spacing: 0; }
-  #eventModal, #birthModal, #ledgerModal {
+  #eventModal, #birthModal, #marriageModal, #ledgerModal {
     position: fixed; inset: 0; background: rgba(44,31,18,0.7);
     display: none; align-items: center; justify-content: center; z-index: 400;
   }
-  #eventBox, #birthBox, #ledgerBox {
+  #eventBox, #birthBox, #marriageBox, #ledgerBox {
     width: 540px; max-width: 92vw; background: var(--panel); border: 4px solid var(--ink); border-radius: var(--r-lg);
     box-shadow: 6px 6px 0 rgba(44,31,18,0.35); padding: var(--sp-4); font-size: var(--fs-md); color: var(--ink);
     line-height: 1.6;
   }
-  #eventBox h3, #birthBox h3, #ledgerBox h3 {
+  #eventBox h3, #birthBox h3, #marriageBox h3, #ledgerBox h3 {
     background: var(--accent); color:#fff6e2; margin: calc(var(--sp-4) * -1) calc(var(--sp-4) * -1) var(--sp-3) calc(var(--sp-4) * -1);
     padding: var(--sp-3); font-size: var(--fs-lg); font-weight: normal; font-family: var(--font-display); letter-spacing: 0.5px;
     border-radius: calc(var(--r-lg) - 4px) calc(var(--r-lg) - 4px) 0 0;
@@ -405,8 +405,9 @@
   </div>
   <div class="formRow"><label data-i18n="cc_dynasty">Dynastiename</label><input type="text" id="cc-dynasty" data-i18n-placeholder="cc_dynasty_placeholder" placeholder="z. B. von Kaisersberg" value="von Kaisersberg"></div>
   <div class="formRow"><label data-i18n="cc_region">Startregion</label>
-    <select id="cc-region"><option value="player" data-i18n="cc_region_only">Deine Provinz (einzige verfügbare Region in dieser Version)</option></select>
+    <select id="cc-region" onchange="updateRegionDescription()"></select>
   </div>
+  <div class="formRow"><label></label><span id="cc-region-desc" style="font-size:var(--fs-body); font-style:italic;"></span></div>
   <div class="formRow"><label data-i18n="cc_difficulty">Schwierigkeitsgrad</label>
     <select id="cc-difficulty">
       <option value="leicht" data-i18n="cc_diff_easy">Leicht — KI macht mehr Fehler</option>
@@ -637,16 +638,28 @@
   <div style="text-align:center; margin-top:var(--sp-3);"><button onclick="confirmBirthName()">Bestätigen</button></div>
 </div></div>
 
+<div id="marriageModal"><div id="marriageBox">
+  <h3>💍 Vermählung am Hof! 💍</h3>
+  <p id="marriage-text"></p>
+  <div style="text-align:center; margin-top:var(--sp-3);"><button onclick="closeMarriageAnnouncement()">Weiter</button></div>
+</div></div>
+
 <div id="ledgerModal"><div id="ledgerBox">
   <h3 id="ledger-title">Kassenbuch</h3>
   <table>
-    <tr><td>Steuereinnahmen</td><td id="ledger-tax"></td></tr>
+    <tr><td id="ledger-tax-label">Steuereinnahmen</td><td id="ledger-tax"></td></tr>
     <tr><td>Armee-Unterhalt</td><td id="ledger-upkeep"></td></tr>
     <tr><td>Berater-Gehälter</td><td id="ledger-salaries"></td></tr>
     <tr><td>Schuldzinsen</td><td id="ledger-interest"></td></tr>
     <tr><td>Vasallentribut</td><td id="ledger-tribute"></td></tr>
-    <tr class="ledgerTotal"><td>Veränderung diesen Monat</td><td id="ledger-net"></td></tr>
-    <tr><td>Staatskasse jetzt</td><td id="ledger-total"></td></tr>
+    <tr class="ledgerTotal"><td>Automatische Finanzen, Veränderung</td><td id="ledger-net"></td></tr>
+  </table>
+  <div id="ledger-other-wrap" style="display:none;">
+    <div class="subhead">Weitere Ein-/Ausgaben diesen Monat</div>
+    <table id="ledger-other-table"></table>
+  </div>
+  <table>
+    <tr class="ledgerTotal"><td>Staatskasse jetzt</td><td id="ledger-total"></td></tr>
   </table>
   <div style="text-align:center; margin-top:var(--sp-2);"><button onclick="closeLedger()">Weiter</button></div>
 </div></div>
@@ -742,6 +755,27 @@ const CONFIG = {
       frostChance: 0.06,        frostFactor: 0.75,        // kumulativ 0.22
       gutesJahrChance: 0.10,    gutesJahrFactor: 1.35,    // kumulativ 0.32
     },
+    // Kornlagerung (Korrektur einer Fehlkalibrierung): ohne Schwund/Kapazitätsgrenze
+    // sammelte sich überschüssiges Getreide unbegrenzt über Jahrzehnte an, da der
+    // Verbrauch stets exakt auf den Grundbedarf gedeckelt ist (siehe
+    // consumeAndUpdateSatisfaction) — das trieb das angezeigte Verhältnis
+    // (grainRatio) auf unrealistische Werte (teils >1000%). Jetzt begrenzt eine
+    // Lagerkapazität samt Schwund den Bestand auf ein plausibles Maß, und der
+    // bisher ungenutzte Kornspeicher-Gebäudetyp (§26) bekommt dadurch einen
+    // echten Zweck: mehr/höherstufige Kornspeicher erlauben eine größere,
+    // verlustarme Reserve.
+    grainStorageCapNeedMultiplier: 4.0, // ohne Kornspeicher: ca. 4 Jahresbedarfe verlustarm lagerbar (großzügiger Puffer dämpft Jahr-zu-Jahr-Schwankungen)
+    grainStartBufferMultiplier: 1.3,    // Startbestand des Spielers: ca. 1,3 Jahresbedarfe (gesunde Reserve, kein Vielfaches)
+    // grainSpoilageWithinCapRate bewusst klein: ein konstanter jährlicher Schwund
+    // selbst bei ausreichender Lagerkapazität erzwingt bei JEDER Region Dauer-
+    // Überschussproduktion nur um den Bestand zu halten — das begünstigt über
+    // 100 Spieljahre kumulativ Regionen mit leicht höherer Fruchtbarkeit
+    // (Schritt-13-Lehre: kleine, aber konstante Effekte potenzieren sich über
+    // viele Jahre). Ein kleiner Wert reicht für den realistischen Effekt, ohne
+    // KI-Regionen unangemessen unterschiedlich zu bestrafen (siehe KI-gegen-
+    // KI-Testsuite, §78).
+    grainSpoilageWithinCapRate: 0.03,   // milder Schwund selbst bei ordentlicher Lagerung
+    grainSpoilageAboveCapRate: 0.5,     // Getreide über der Lagerkapazität verdirbt größtenteils (Ungeziefer/Fäulnis)
   },
   population: {
     baseBirthRate: 0.018,
@@ -764,9 +798,15 @@ const CONFIG = {
     // grainRatio = verfügbares Getreide / Grundbedarf, siehe computeGrainBalance().
     // Bewusst moderat kalibriert, um keinen zweiten Bevölkerungskollaps-Pfad
     // neben dem bereits bestehenden satisfaction-basierten zu öffnen.
-    grainBirthBonusMax: 0.006,  // zusätzliche Geburtenrate bei grainRatio >= 2.0 (doppelter Bedarf gedeckt)
+    // Seit die Kornbilanz durch Lagerkapazität/Schwund (CONFIG.agriculture) real
+    // schwankt statt praktisch immer gesättigt (>>200%) zu sein, wirkt dieser
+    // Effekt jetzt auch tatsächlich unterscheidend zwischen Regionen (vorher de
+    // facto ein für alle gleicher Dauerbonus). Über 100 Spieljahre kann selbst
+    // ein kleiner, aber konsistenter Zinsvorteil exponentiell explodieren
+    // (Schritt-13-Lehre) — daher hier bewusst halbiert gegenüber dem alten Wert.
+    grainBirthBonusMax: 0.003,  // zusätzliche Geburtenrate bei grainRatio >= 2.0 (doppelter Bedarf gedeckt)
     grainFamineThreshold: 0.15, // unterhalb dieses Verhältnisses gilt es als echte Hungersnot
-    grainDeathBonusMax: 0.03,  // zusätzliche Sterberate bei grainRatio = 0 (kein Getreide mehr vorhanden)
+    grainDeathBonusMax: 0.015,  // zusätzliche Sterberate bei grainRatio = 0 (kein Getreide mehr vorhanden)
   },
   trade: {
     perCapitaDiffThreshold: 0.05,
@@ -799,7 +839,15 @@ const CONFIG = {
     aiGiftChance: 0.06, aiGiftRelationGain: 8,
   },
   state: {
-    treasuryTaxWealthFactor: 0.02,
+    // Kalibrierungsfund (Nutzer-Feedback: "Steuereinnahmen kommen mir sehr wenig
+    // vor"): der alte Wert (0.02) behandelte außerdem jede Bevölkerungsgruppe
+    // gleich — inzwischen fließt POP_GROUPS[pid].weight (bislang ungenutztes
+    // Datenfeld) als Wohlstands-/Steuerkraft-Gewicht ein (Adel zahlt anteilig
+    // mehr als Arme/Tagelöhner). Neu kalibriert, damit eine Startregion (~2.400
+    // Einwohner, 15% Steuersatz) auf ca. 90-100 Taler/Monat kommt — genug, um
+    // einen kleinen Hofstaat/Garnison tatsächlich zu tragen, statt wie zuvor
+    // nur ~1 Taler/Monat einzunehmen.
+    treasuryTaxWealthFactor: 3.0,
     passivePrestigePerYear: 1,
     defeatPopThreshold: 200,
     bankruptTreasuryThreshold: -3000,
@@ -2026,6 +2074,107 @@ const EXTRA_REGIONS = [
   }
 ];
 
+// ---------- Auswählbare Startregionen für das Jahr 1500 (§8-Vertiefung) ----------
+// Auf Nutzerwunsch: statt einer einzigen fiktiven "Deine Provinz" darf der
+// Spieler bei der Charaktererstellung aus real existierenden europäischen
+// Herrschaftsgebieten des Jahres 1500 wählen. Fruchtbarkeit/Bevölkerung/
+// Startkapital sind bewusst nur moderat unterschiedlich kalibriert (siehe
+// applyStartRegion() in core.js) — die eigentliche Weltkarte (ai1-ai7)
+// bleibt für alle Wahlmöglichkeiten identisch, nur die Identität und die
+// Startbedingungen der eigenen Provinz ändern sich. "player" bleibt die
+// namenlose Standardoption (unverändertes Verhalten, falls keine Region
+// gewählt wird — wichtig für Abwärtskompatibilität von Spielständen/Tests).
+const START_REGIONS = [
+  {
+    "id": "player",
+    "name": "Deine Provinz",
+    "fertility": 1.0,
+    "pop": 2400,
+    "treasuryMultiplier": 1.0,
+    "description": "Eine namenlose Provinz irgendwo im Reich — der klassische, neutrale Einstieg."
+  },
+  {
+    "id": "burgund",
+    "name": "Herzogtum Burgund",
+    "fertility": 1.05,
+    "pop": 2600,
+    "treasuryMultiplier": 1.3,
+    "description": "Reiche Tuchhandelsstädte in Flandern, prachtvoller Hof — aber zwischen Frankreich und dem Reich eingeklemmt."
+  },
+  {
+    "id": "england",
+    "name": "Königreich England",
+    "fertility": 1.0,
+    "pop": 2500,
+    "treasuryMultiplier": 1.0,
+    "description": "Frisch geeinte Tudor-Krone nach den Rosenkriegen, Wollhandel mit Flandern."
+  },
+  {
+    "id": "venedig",
+    "name": "Republik Venedig",
+    "fertility": 0.85,
+    "pop": 2200,
+    "treasuryMultiplier": 1.4,
+    "description": "Seemacht und Handelsknotenpunkt zum Orient — wenig eigenes Ackerland, dafür prall gefüllte Kassen."
+  },
+  {
+    "id": "mailand",
+    "name": "Herzogtum Mailand",
+    "fertility": 1.15,
+    "pop": 2700,
+    "treasuryMultiplier": 1.1,
+    "description": "Fruchtbare Po-Ebene und blühende Handwerkskunst — im Visier französischer und spanischer Ambitionen."
+  },
+  {
+    "id": "kastilien",
+    "name": "Krone Kastilien",
+    "fertility": 0.9,
+    "pop": 2400,
+    "treasuryMultiplier": 0.95,
+    "description": "Frisch geeint nach der Reconquista von 1492, karge Hochebenen, Aufbruch in eine neue Zeit."
+  },
+  {
+    "id": "portugal",
+    "name": "Königreich Portugal",
+    "fertility": 0.9,
+    "pop": 2000,
+    "treasuryMultiplier": 1.15,
+    "description": "Kleines Königreich am Atlantik — die Entdeckungsfahrten füllen langsam die Staatskasse."
+  },
+  {
+    "id": "polen",
+    "name": "Königreich Polen",
+    "fertility": 1.2,
+    "pop": 2800,
+    "treasuryMultiplier": 0.85,
+    "description": "Weite Kornkammern zwischen Ostsee und Steppe — doch Adel und Krone ringen um Macht."
+  },
+  {
+    "id": "ungarn",
+    "name": "Königreich Ungarn",
+    "fertility": 1.0,
+    "pop": 2500,
+    "treasuryMultiplier": 0.9,
+    "description": "Fruchtbare Theiß-Ebene, aber Grenzland gegen das vordringende Osmanische Reich."
+  },
+  {
+    "id": "schweiz",
+    "name": "Alte Eidgenossenschaft",
+    "fertility": 0.8,
+    "pop": 1900,
+    "treasuryMultiplier": 1.0,
+    "description": "Bündnis freier Bergkantone, karges Ackerland — doch gefürchtete Söldner als Exportgut."
+  },
+  {
+    "id": "bretagne",
+    "name": "Herzogtum Bretagne",
+    "fertility": 1.0,
+    "pop": 2100,
+    "treasuryMultiplier": 1.0,
+    "description": "Noch unabhängiges Herzogtum an der Atlantikküste, bald von Frankreich vereinnahmt."
+  }
+];
+
 // ---------- Localization-Grundstruktur (§80) ----------
 // Aktuell nur Deutsch befüllt; Architektur ist für weitere Sprachen vorbereitet.
 // Noch nicht die gesamte UI ist über STRINGS geführt (siehe DEVELOPMENT.md).
@@ -2286,7 +2435,7 @@ const EVENTS = [
     id: "kornspeicher_leer",
     title: "Die Kornspeicher sind leer",
     text: "Nach schlechten Ernten sind die Kornspeicher nahezu leer. Vor den Bäckereien bilden sich lange Schlangen.",
-    condition: (r) => (r.warehouse.getreide || 0) < 50 && r.population.arme.satisfaction < 40,
+    condition: (r) => (r.grainRatio !== undefined ? r.grainRatio : 1) < 0.5 && r.population.arme.satisfaction < 40,
     options: [
       { label: "Staatliche Reserven öffnen", apply: (r, s) => { r.warehouse.getreide = Math.max(0, (r.warehouse.getreide||0) - 40); r.population.arme.satisfaction += 15; } },
       { label: "Getreide importieren (-800 Taler)", apply: (r, s) => { s.treasury -= 800; r.warehouse.getreide = (r.warehouse.getreide||0) + 60; } },
@@ -2653,6 +2802,7 @@ function buildNewBuilding(state, region, type) {
   if (missing.length) return { ok: false, reason: `Fehlende Baustoffe: ${missing.join(", ")}.` };
 
   state.treasury -= b.cost;
+  logLedger(state, `Neubau: ${b.name}`, -b.cost);
   for (const gid in materials) region.warehouse[gid] -= materials[gid];
   region.buildings.push({ type, level: 1, plotIndex: plot });
   addChronicle(state, `Ein neues ${b.name} wurde in ${region.name} errichtet (Parzelle ${plot + 1}).`);
@@ -2667,6 +2817,7 @@ function upgradeBuildingAt(state, region, plotIndex) {
   const cost = upgradeCost(inst.type, inst.level);
   if (state.treasury < cost) return { ok: false, reason: "Nicht genug Taler für den Ausbau." };
   state.treasury -= cost;
+  logLedger(state, `Ausbau: ${b.name} (Stufe ${inst.level + 1})`, -cost);
   inst.level += 1;
   addChronicle(state, `${b.name} in ${region.name} wurde auf Stufe ${inst.level} ausgebaut.`);
   return { ok: true };
@@ -2704,7 +2855,16 @@ function makeRegion(name, isPlayer, fertility, startPop) {
   const warehouse = {};
   for (const gid in GOODS) warehouse[gid] = 0;
   Object.assign(warehouse, {
-    getreide: 300, gemuese: 80, fleisch: 40, fisch: 30, salz: 25,
+    // Getreide-Startbestand: beim Spieler unten proportional zur Startbevölkerung
+    // gesetzt (~1,3 Jahresbedarf), damit die Kornbilanz-Anzeige von Anfang an
+    // plausibel aussieht. KI-Regionen starten bewusst mit einem festen
+    // Referenzwert statt proportional zur eigenen (leicht unterschiedlichen)
+    // Fruchtbarkeit/Bevölkerung — sonst würde die anfängliche Kornmenge selbst
+    // schon einen kleinen Wachstumsvorsprung für fruchtbarere KI-Regionen
+    // schaffen, der sich über 100 Spieljahre zu einer unrealistischen Dominanz
+    // einzelner Regionen aufschaukelt (siehe KI-gegen-KI-Testsuite).
+    getreide: isPlayer ? 0 : 300,
+    gemuese: 80, fleisch: 40, fisch: 30, salz: 25,
     holz: 100, stein: 40, ton: 30, eisen: 20, kohle: 20, wolle: 40, leder: 15,
     bier: 50, wein: 15, werkzeuge: 10, waffen: 5, kleidung: 10, gewuerze: 3,
   });
@@ -2730,7 +2890,9 @@ function makeRegion(name, isPlayer, fertility, startPop) {
     priceNoise,             // Marktspekulation: jährliche Preisschwankung unabhängig von Angebot/Nachfrage
     commander: isPlayer ? null : generateCommander(name), // individueller KI-Hauptmann, überlebt mehrere Schlachten
   };
-  computeGrainBalance(region); // Kornbilanz-Anzeige ist schon vor dem ersten Jahreswechsel gefüllt
+  computeGrainBalance(region); // liefert grainNeed für die gerade erzeugte Startbevölkerung
+  if (isPlayer) region.warehouse.getreide = Math.round(region.grainNeed * CONFIG.agriculture.grainStartBufferMultiplier);
+  computeGrainBalance(region); // mit dem realistischen Startbestand neu berechnen (Kornbilanz-Anzeige ist so schon vor dem ersten Jahreswechsel gefüllt)
   return region;
 }
 
@@ -2750,21 +2912,27 @@ function newGame(options) {
   const capitalCfg = CONFIG.scenario.capital[options.startingCapital] || CONFIG.scenario.capital.normal;
   const stanceCfg = CONFIG.scenario.stance[options.diplomaticStance] || CONFIG.scenario.stance.neutral;
   const startRelation = clamp(CONFIG.diplomacy.startRelation + stanceCfg.relationOffset, -100, 100);
+  // Startregion (§8-Vertiefung): reale europäische Herrschaftsgebiete um 1500 zur
+  // Wahl, siehe START_REGIONS in gamedata.js. "player"/unbekannt = die
+  // ursprüngliche namenlose Provinz (unverändertes Verhalten).
+  const regionCfg = START_REGIONS.find(r => r.id === options.startRegion) || START_REGIONS[0];
 
   const state = {
     year: 1500,
     month: 1, // §Monatstakt: 1-12, ein Jahr vergeht erst nach dem 12. Monat vollständig (advanceMonth())
     lastMonthlyReport: null,
     pendingBirth: null, // Kind wurde geboren, wartet auf einen vom Spieler vergebenen Namen
+    pendingMarriage: null, // Herrscher hat geheiratet, wartet auf die Feier-Einblendung
+    ledgerLog: [], // Kassenbuch-Einzelposten seit dem letzten Monatswechsel (siehe logLedger())
     seed: seed,
     difficulty: difficultyKey,
-    treasury: Math.round(1500 * diffCfg.startTreasuryMultiplier * capitalCfg.treasuryMultiplier),
+    treasury: Math.round(1500 * diffCfg.startTreasuryMultiplier * capitalCfg.treasuryMultiplier * regionCfg.treasuryMultiplier),
     prestige: 10,
     titleIndex: 0,
     legitimacy: CONFIG.succession.legitimacyStart,
     chronicle: [],
     regions: {
-      player: makeRegion("Deine Provinz", true, 1.0, 2400),
+      player: makeRegion(regionCfg.name, true, regionCfg.fertility, regionCfg.pop),
       ai1: makeRegion("Mainau (Nachbar)", false, 1.05, 2850),
       ai2: makeRegion("Rheinfeld (Nachbar)", false, 0.95, 2750),
       ai3: makeRegion("Bergheim (Nachbar)", false, 1.0, 2800),
@@ -2825,6 +2993,15 @@ function newGame(options) {
 function addChronicle(state, text) {
   state.chronicle.unshift(`${state.year}: ${text}`);
   if (state.chronicle.length > 200) state.chronicle.pop();
+}
+
+// Kassenbuch-Einzelposten (§Original-Vertiefung: Nutzerwunsch nach vollständiger
+// Auflistung aller Ein-/Ausgaben, nicht nur der fünf monatlichen Sammelposten).
+// Jede spielerausgelöste Transaktion (Bau, Ausbau, Land-/Warenhandel, Kredite)
+// wird hier vermerkt und beim nächsten Kassenbuch-Fenster angezeigt und geleert.
+function logLedger(state, label, amount) {
+  if (!state.ledgerLog) state.ledgerLog = [];
+  state.ledgerLog.push({ label, amount: Math.round(amount) });
 }
 
 // ---------- Landwirtschaft (§18/§19) ----------
@@ -2927,6 +3104,30 @@ function computeGrainBalance(region) {
   region.grainNeed = need;
   region.grainAvailable = region.warehouse.getreide || 0;
   region.grainRatio = need > 0 ? region.grainAvailable / need : 1;
+  // Lagerkapazität ohne Kornspeicher ≈ 1 Jahresbedarf, jeder Kornspeicher-Level
+  // legt einen festen Betrag drauf (siehe applyGrainSpoilage für den Schwund).
+  region.grainStorageCap = need * CONFIG.agriculture.grainStorageCapNeedMultiplier
+    + buildingLevelSum(region, "kornspeicher") * (BUILDINGS.kornspeicher.value || 0);
+}
+
+// Jährlicher Schwund/Verderb des Getreidelagers (§Korrektur, siehe CONFIG.agriculture):
+// verhindert unbegrenztes Anwachsen des Lagerbestands, da der Verbrauch (siehe
+// consumeAndUpdateSatisfaction) nie mehr als den Grundbedarf abbaut. Wird am
+// Jahresende aufgerufen, NACH der Grundbedarf-/Kornausgabe-Verteilung, damit
+// Schwund nicht fälschlich als "ans Volk abgegeben" gezählt wird.
+function applyGrainSpoilage(region) {
+  const cfg = CONFIG.agriculture;
+  const stock = region.warehouse.getreide || 0;
+  const cap = region.grainStorageCap || 0;
+  let spoiled;
+  if (stock > cap) {
+    spoiled = (stock - cap) * cfg.grainSpoilageAboveCapRate + cap * cfg.grainSpoilageWithinCapRate;
+  } else {
+    spoiled = stock * cfg.grainSpoilageWithinCapRate;
+  }
+  spoiled = Math.min(spoiled, stock);
+  region.warehouse.getreide = Math.round(stock - spoiled);
+  region.grainSpoiled = Math.round(spoiled);
 }
 
 // ---------- Preisbildung (§15/§21) ----------
@@ -3097,6 +3298,7 @@ function upgradeInfrastructure(state, region) {
   }
   if (missing.length) return { ok: false, reason: `Fehlende Baustoffe: ${missing.join(", ")}.` };
   state.treasury -= cost;
+  logLedger(state, `Infrastrukturausbau (Stufe ${region.infrastructureLevel + 1})`, -cost);
   for (const gid in cfg.materialCostPerLevel) region.warehouse[gid] -= cfg.materialCostPerLevel[gid];
   region.infrastructureLevel += 1;
   addChronicle(state, `Straßen und Wege in ${region.name} wurden ausgebaut (Infrastrukturstufe ${region.infrastructureLevel}).`);
@@ -3113,6 +3315,7 @@ function takeLoan(state, amount) {
   if (amount <= 0) return { ok: false, reason: "Ungültiger Betrag." };
   state.treasury += amount;
   state.debt += amount;
+  logLedger(state, `Kredit aufgenommen`, amount);
   addChronicle(state, `Ein Kredit über ${amount} Taler wurde aufgenommen (Zinssatz ${(currentDebtInterestRate(state)*100).toFixed(1)}%).`);
   return { ok: true };
 }
@@ -3123,6 +3326,7 @@ function repayDebt(state, amount) {
   if (payable <= 0) return { ok: false, reason: "Keine Schulden oder keine Mittel zur Rückzahlung." };
   state.treasury -= payable;
   state.debt -= payable;
+  logLedger(state, `Schuldentilgung`, -payable);
   addChronicle(state, `${payable} Taler Schulden wurden zurückgezahlt.`);
   return { ok: true };
 }
@@ -3142,6 +3346,7 @@ function buyLand(state, region, hectares) {
   const cost = Math.round(hectares * state.landPrice);
   if (state.treasury < cost) return { ok: false, reason: "Nicht genug Taler für den Landkauf." };
   state.treasury -= cost;
+  logLedger(state, `Landkauf (${hectares} ha)`, -cost);
   region.land += hectares;
   addChronicle(state, `${hectares} Hektar Land wurden für ${cost} Taler erworben.`);
   return { ok: true };
@@ -3160,6 +3365,7 @@ function buyGoodFromMarket(state, region, gid, qty) {
   const cost = Math.round(price * qty * (1 + CONFIG.market.buyMarkupShare));
   if (state.treasury < cost) return { ok: false, reason: "Nicht genug Taler für diesen Einkauf." };
   state.treasury -= cost;
+  logLedger(state, `Markteinkauf: ${qty} ${GOODS[gid].name}`, -cost);
   region.warehouse[gid] = (region.warehouse[gid] || 0) + qty;
   addChronicle(state, `${qty} ${GOODS[gid].name} für ${cost} Taler auf dem Markt gekauft.`);
   return { ok: true, cost };
@@ -3174,6 +3380,7 @@ function sellGoodToMarket(state, region, gid, qty) {
   const proceeds = Math.round(price * qty * (1 - CONFIG.market.sellCommissionShare));
   region.warehouse[gid] -= qty;
   state.treasury += proceeds;
+  logLedger(state, `Marktverkauf: ${qty} ${GOODS[gid].name}`, proceeds);
   addChronicle(state, `${qty} ${GOODS[gid].name} für ${proceeds} Taler auf dem Markt verkauft.`);
   return { ok: true, proceeds };
 }
@@ -3207,6 +3414,7 @@ function exportGoodToRegion(state, targetId, gid, qty) {
   const targetPrice = currentGoodPrice(target, gid);
   const proceeds = Math.round(targetPrice * deliveredQty * (1 - transportCost));
   state.treasury += proceeds;
+  logLedger(state, `Export: ${qty} ${GOODS[gid].name} nach ${target.name}`, proceeds);
   target.warehouse[gid] = (target.warehouse[gid] || 0) + deliveredQty;
 
   if (lossShare > 0) {
@@ -3236,6 +3444,7 @@ function importGoodFromRegion(state, sourceId, gid, qty) {
 
   source.warehouse[gid] -= qty;
   state.treasury -= cost;
+  logLedger(state, `Import: ${qty} ${GOODS[gid].name} aus ${source.name}`, -cost);
   const lossShare = rollBanditRisk(state, sourceId);
   const deliveredQty = qty * (1 - lossShare);
   home.warehouse[gid] = (home.warehouse[gid] || 0) + deliveredQty;
@@ -3259,6 +3468,7 @@ function sellLand(state, region, hectares) {
   const proceeds = Math.round(hectares * state.landPrice * (1 - cfg.saleCommission));
   region.land -= hectares;
   state.treasury += proceeds;
+  logLedger(state, `Landverkauf (${hectares} ha)`, proceeds);
   addChronicle(state, `${hectares} Hektar Land wurden für ${proceeds} Taler verkauft (10 % Provision abgezogen).`);
   return { ok: true };
 }
@@ -3415,6 +3625,7 @@ function updateDynasty(state) {
     ruler.spouseId = sid;
     spouse.spouseId = state.rulerId;
     addChronicle(state, `${ruler.name} ${ruler.surname} vermählte sich mit ${spouse.name}.`);
+    state.pendingMarriage = sid;
   }
 
   // Geburt eines Kindes — der voreingestellte Zufallsname bleibt als Fallback
@@ -4506,6 +4717,7 @@ function advanceYear(state) {
     consumeAndUpdateSatisfaction(r, prices);
     applyExtraGrainDistribution(state, r); // §Original: freiwillige Kornverteilung
     r.grainDistributed = r.grainAvailable - (r.warehouse.getreide || 0); // tatsächlich ans Volk abgegeben (Grundbedarf + Kornausgabe)
+    applyGrainSpoilage(r); // Schwund/Verderb des Restbestands oberhalb der Lagerkapazität
     updatePopulation(r);
     if (r._manipulationYears > 0) r._manipulationYears -= 1; // §32 politische Manipulation klingt ab
     if (!r.isPlayer) aiRegionDevelops(r, state);
@@ -4611,12 +4823,24 @@ function applyMonthlyFinances(state) {
   const treasuryBefore = state.treasury;
   const r = state.regions.player;
 
+  // Steuerkraft je Gruppe unterscheidet sich (POP_GROUPS[pid].weight, §Original-
+  // Vertiefung: Adel/Händler/Bürger tragen anteilig mehr zur Steuerlast bei als
+  // Bauern, Tagelöhner oder Arme) statt wie zuvor pauschal pro Kopf.
   let totalWealth = 0;
-  for (const pid in r.population) totalWealth += r.population[pid].count * CONFIG.state.treasuryTaxWealthFactor;
+  const taxByGroup = {};
+  for (const pid in r.population) {
+    const w = r.population[pid].count * (POP_GROUPS[pid].weight || 1) * CONFIG.state.treasuryTaxWealthFactor;
+    totalWealth += w;
+    taxByGroup[pid] = w;
+  }
   const schatzmeisterBonus = advisorEffectBonus(state, "schatzmeister");
   const verwaltungTechBonus = techBonus(state, "verwaltung");
-  const taxIncome = Math.round(totalWealth * r.taxRate * (1 + schatzmeisterBonus + verwaltungTechBonus) / 12);
+  const taxMultiplier = r.taxRate * (1 + schatzmeisterBonus + verwaltungTechBonus) / 12;
+  const taxIncome = Math.round(totalWealth * taxMultiplier);
   state.treasury += taxIncome;
+  // Für die Kassenbuch-Aufschlüsselung: wie viel jede Gruppe monatlich beisteuert
+  const taxBreakdown = {};
+  for (const pid in taxByGroup) taxBreakdown[pid] = Math.round(taxByGroup[pid] * taxMultiplier);
 
   let upkeep = 0;
   for (const type in state.army) upkeep += state.army[type] * TROOP_TYPES[type].upkeep;
@@ -4644,10 +4868,18 @@ function applyMonthlyFinances(state) {
     vassalTribute += tribute;
   }
 
+  // Alle seit dem letzten Kassenbuch-Fenster einzeln erfassten Transaktionen
+  // (Bau/Ausbau, Land-/Warenhandel, Kredite, siehe logLedger()) werden hier
+  // mit ausgegeben und danach geleert — so listet das Kassenbuch wirklich
+  // alle Ein-/Ausgaben des Monats auf, nicht nur die fünf Sammelposten.
+  const otherEntries = state.ledgerLog || [];
+  state.ledgerLog = [];
+
   const report = {
     year: state.year, month: state.month,
     treasuryBefore, treasuryAfter: state.treasury,
     taxIncome, upkeep, salaries, debtInterest, vassalTribute,
+    taxBreakdown, otherEntries,
     net: state.treasury - treasuryBefore,
   };
   state.lastMonthlyReport = report;
@@ -5758,6 +5990,17 @@ function showCharCreation() {
   const traitsHtml = TRAITS.map(t =>
     `<span class="traitPick" data-trait="${t.id}" onclick="toggleTraitPick('${t.id}')">${t.name}</span>`).join('');
   document.getElementById('cc-traits').innerHTML = traitsHtml;
+
+  // Startregionen (§8-Vertiefung): reale europäische Herrschaftsgebiete um 1500
+  const regionSelect = document.getElementById('cc-region');
+  regionSelect.innerHTML = START_REGIONS.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+  updateRegionDescription();
+}
+
+function updateRegionDescription() {
+  const id = document.getElementById('cc-region').value;
+  const region = START_REGIONS.find(r => r.id === id) || START_REGIONS[0];
+  document.getElementById('cc-region-desc').textContent = region.description;
 }
 
 function toggleTraitPick(traitId) {
@@ -5806,6 +6049,7 @@ function startNewGameFromForm() {
   const victoryCondition = document.getElementById('cc-victory').value;
   const startingCapital = document.getElementById('cc-capital').value;
   const diplomaticStance = document.getElementById('cc-stance').value;
+  const startRegion = document.getElementById('cc-region').value;
   launchGame({
     rulerName: name || undefined,
     gender,
@@ -5814,6 +6058,7 @@ function startNewGameFromForm() {
     victoryCondition,
     startingCapital,
     diplomaticStance,
+    startRegion,
     chosenTraits: selectedTraits.length === 2 ? selectedTraits : undefined,
   });
 }
@@ -5823,7 +6068,8 @@ function startNewGameRandom() {
   const victoryCondition = document.getElementById('cc-victory') ? document.getElementById('cc-victory').value : 'kaiser';
   const startingCapital = document.getElementById('cc-capital') ? document.getElementById('cc-capital').value : 'normal';
   const diplomaticStance = document.getElementById('cc-stance') ? document.getElementById('cc-stance').value : 'neutral';
-  launchGame({ difficulty, victoryCondition, startingCapital, diplomaticStance });
+  const startRegion = document.getElementById('cc-region') ? document.getElementById('cc-region').value : 'player';
+  launchGame({ difficulty, victoryCondition, startingCapital, diplomaticStance, startRegion });
 }
 
 document.getElementById('titleLoadFile').addEventListener('change', (e) => {
@@ -6085,6 +6331,10 @@ function render() {
       `Grundbedarf: <b>${Math.round(r.grainNeed).toLocaleString('de-DE')}</b> · ` +
       `Verhältnis: <b class="${ratioClass}">${ratioPct}%</b></span>` +
       `<br>Ans Volk abgegeben (Grundbedarf + Kornausgabe): <b>${Math.round(r.grainDistributed || 0).toLocaleString('de-DE')}</b>` +
+      `<br><span data-tip="Ohne Kornspeicher passt ca. 1 Jahresbedarf verlustarm ins Lager. Mehr/größere Kornspeicher erhöhen die Kapazität. Was darüber hinaus gelagert wird, verdirbt größtenteils; selbst innerhalb der Kapazität geht ein kleiner Teil durch Schwund verloren (Ungeziefer, Fäulnis).">` +
+      `Lagerkapazität: <b>${Math.round(r.grainStorageCap || 0).toLocaleString('de-DE')}</b>` +
+      (r.grainSpoiled ? ` · Letzter Schwund: <b class="goodbad">−${Math.round(r.grainSpoiled).toLocaleString('de-DE')}</b>` : '') +
+      `</span>` +
       famineNote;
   }
 
@@ -7040,6 +7290,32 @@ function showLedger(report, yearCompleted, titleIndexBefore) {
   document.getElementById('ledger-tribute').textContent = '+' + Math.round(report.vassalTribute).toLocaleString('de-DE');
   document.getElementById('ledger-net').textContent = (report.net >= 0 ? '+' : '') + Math.round(report.net).toLocaleString('de-DE') + ' Taler';
   document.getElementById('ledger-total').textContent = Math.round(report.treasuryAfter).toLocaleString('de-DE') + ' Taler';
+
+  // §Original-Vertiefung: wer zahlt wieviel Steuern? (POP_GROUPS-Gewicht macht
+  // Adel/Händler/Bürger anteilig steuerkräftiger als Bauern/Arme/Tagelöhner)
+  const taxLabel = document.getElementById('ledger-tax-label');
+  if (report.taxBreakdown) {
+    const lines = Object.keys(report.taxBreakdown)
+      .sort((a, b) => report.taxBreakdown[b] - report.taxBreakdown[a])
+      .map(pid => `${POP_GROUPS[pid].name}: +${report.taxBreakdown[pid].toLocaleString('de-DE')}`);
+    taxLabel.setAttribute('data-tip', `Steuerkraft je Bevölkerungsgruppe diesen Monat:\n${lines.join('\n')}`);
+  }
+
+  // Alle sonstigen, spielerausgelösten Ein-/Ausgaben seit dem letzten
+  // Kassenbuch-Fenster (Bau, Ausbau, Land-/Warenhandel, Kredite, siehe logLedger())
+  const otherWrap = document.getElementById('ledger-other-wrap');
+  const otherTable = document.getElementById('ledger-other-table');
+  const entries = report.otherEntries || [];
+  if (entries.length) {
+    otherTable.innerHTML = entries.map(e =>
+      `<tr><td>${e.label}</td><td>${e.amount >= 0 ? '+' : ''}${e.amount.toLocaleString('de-DE')}</td></tr>`
+    ).join('');
+    otherWrap.style.display = '';
+  } else {
+    otherTable.innerHTML = '';
+    otherWrap.style.display = 'none';
+  }
+
   document.getElementById('ledgerModal').style.display = 'flex';
 }
 
@@ -7057,6 +7333,8 @@ function closeLedger() {
     playBeep(180, 0.2);
     alert(`⚔ ${state.regions[aiId].name} hat dir ohne Vorwarnung den Krieg erklärt! Bereite deine Verteidigung vor.`);
     openBattleSetup(aiId, true);
+  } else if (state.pendingMarriage) {
+    showMarriageAnnouncement(state.pendingMarriage);
   } else if (state.pendingBirth) {
     showBirthAnnouncement(state.pendingBirth);
   } else if (state.pendingEvent) {
@@ -7098,6 +7376,27 @@ function confirmBirthName() {
   state.pendingBirth = null;
   document.getElementById('birthModal').style.display = 'none';
   if (state.pendingEvent) showEvent(state.pendingEvent); else render();
+}
+
+// ---------- Vermählung des Herrschers (auf Nutzerwunsch: eigenes
+// Feier-Fenster statt nur einer Chronik-Zeile, analog zur Geburtsankündigung). ----------
+function showMarriageAnnouncement(spouseId) {
+  const spouse = state.characters[spouseId];
+  const ruler = state.characters[state.rulerId];
+  document.getElementById('marriage-text').innerHTML =
+    `${ruler.name} ${ruler.surname} hat sich mit <b>${spouse.name}</b> vermählt!<br>Der Hof feiert die Vermählung.`;
+  document.getElementById('marriageModal').style.display = 'flex';
+  playBeep(523, 0.1);
+  setTimeout(() => playBeep(659, 0.1), 120);
+  setTimeout(() => playBeep(784, 0.18), 240);
+}
+
+function closeMarriageAnnouncement() {
+  state.pendingMarriage = null;
+  document.getElementById('marriageModal').style.display = 'none';
+  if (state.pendingBirth) showBirthAnnouncement(state.pendingBirth);
+  else if (state.pendingEvent) showEvent(state.pendingEvent);
+  else render();
 }
 
 function showEvent(ev) {

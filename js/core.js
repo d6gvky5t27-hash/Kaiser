@@ -89,6 +89,7 @@ function buildNewBuilding(state, region, type) {
   if (missing.length) return { ok: false, reason: `Fehlende Baustoffe: ${missing.join(", ")}.` };
 
   state.treasury -= b.cost;
+  logLedger(state, `Neubau: ${b.name}`, -b.cost);
   for (const gid in materials) region.warehouse[gid] -= materials[gid];
   region.buildings.push({ type, level: 1, plotIndex: plot });
   addChronicle(state, `Ein neues ${b.name} wurde in ${region.name} errichtet (Parzelle ${plot + 1}).`);
@@ -103,6 +104,7 @@ function upgradeBuildingAt(state, region, plotIndex) {
   const cost = upgradeCost(inst.type, inst.level);
   if (state.treasury < cost) return { ok: false, reason: "Nicht genug Taler für den Ausbau." };
   state.treasury -= cost;
+  logLedger(state, `Ausbau: ${b.name} (Stufe ${inst.level + 1})`, -cost);
   inst.level += 1;
   addChronicle(state, `${b.name} in ${region.name} wurde auf Stufe ${inst.level} ausgebaut.`);
   return { ok: true };
@@ -140,7 +142,16 @@ function makeRegion(name, isPlayer, fertility, startPop) {
   const warehouse = {};
   for (const gid in GOODS) warehouse[gid] = 0;
   Object.assign(warehouse, {
-    getreide: 300, gemuese: 80, fleisch: 40, fisch: 30, salz: 25,
+    // Getreide-Startbestand: beim Spieler unten proportional zur Startbevölkerung
+    // gesetzt (~1,3 Jahresbedarf), damit die Kornbilanz-Anzeige von Anfang an
+    // plausibel aussieht. KI-Regionen starten bewusst mit einem festen
+    // Referenzwert statt proportional zur eigenen (leicht unterschiedlichen)
+    // Fruchtbarkeit/Bevölkerung — sonst würde die anfängliche Kornmenge selbst
+    // schon einen kleinen Wachstumsvorsprung für fruchtbarere KI-Regionen
+    // schaffen, der sich über 100 Spieljahre zu einer unrealistischen Dominanz
+    // einzelner Regionen aufschaukelt (siehe KI-gegen-KI-Testsuite).
+    getreide: isPlayer ? 0 : 300,
+    gemuese: 80, fleisch: 40, fisch: 30, salz: 25,
     holz: 100, stein: 40, ton: 30, eisen: 20, kohle: 20, wolle: 40, leder: 15,
     bier: 50, wein: 15, werkzeuge: 10, waffen: 5, kleidung: 10, gewuerze: 3,
   });
@@ -166,7 +177,9 @@ function makeRegion(name, isPlayer, fertility, startPop) {
     priceNoise,             // Marktspekulation: jährliche Preisschwankung unabhängig von Angebot/Nachfrage
     commander: isPlayer ? null : generateCommander(name), // individueller KI-Hauptmann, überlebt mehrere Schlachten
   };
-  computeGrainBalance(region); // Kornbilanz-Anzeige ist schon vor dem ersten Jahreswechsel gefüllt
+  computeGrainBalance(region); // liefert grainNeed für die gerade erzeugte Startbevölkerung
+  if (isPlayer) region.warehouse.getreide = Math.round(region.grainNeed * CONFIG.agriculture.grainStartBufferMultiplier);
+  computeGrainBalance(region); // mit dem realistischen Startbestand neu berechnen (Kornbilanz-Anzeige ist so schon vor dem ersten Jahreswechsel gefüllt)
   return region;
 }
 
@@ -186,21 +199,27 @@ function newGame(options) {
   const capitalCfg = CONFIG.scenario.capital[options.startingCapital] || CONFIG.scenario.capital.normal;
   const stanceCfg = CONFIG.scenario.stance[options.diplomaticStance] || CONFIG.scenario.stance.neutral;
   const startRelation = clamp(CONFIG.diplomacy.startRelation + stanceCfg.relationOffset, -100, 100);
+  // Startregion (§8-Vertiefung): reale europäische Herrschaftsgebiete um 1500 zur
+  // Wahl, siehe START_REGIONS in gamedata.js. "player"/unbekannt = die
+  // ursprüngliche namenlose Provinz (unverändertes Verhalten).
+  const regionCfg = START_REGIONS.find(r => r.id === options.startRegion) || START_REGIONS[0];
 
   const state = {
     year: 1500,
     month: 1, // §Monatstakt: 1-12, ein Jahr vergeht erst nach dem 12. Monat vollständig (advanceMonth())
     lastMonthlyReport: null,
     pendingBirth: null, // Kind wurde geboren, wartet auf einen vom Spieler vergebenen Namen
+    pendingMarriage: null, // Herrscher hat geheiratet, wartet auf die Feier-Einblendung
+    ledgerLog: [], // Kassenbuch-Einzelposten seit dem letzten Monatswechsel (siehe logLedger())
     seed: seed,
     difficulty: difficultyKey,
-    treasury: Math.round(1500 * diffCfg.startTreasuryMultiplier * capitalCfg.treasuryMultiplier),
+    treasury: Math.round(1500 * diffCfg.startTreasuryMultiplier * capitalCfg.treasuryMultiplier * regionCfg.treasuryMultiplier),
     prestige: 10,
     titleIndex: 0,
     legitimacy: CONFIG.succession.legitimacyStart,
     chronicle: [],
     regions: {
-      player: makeRegion("Deine Provinz", true, 1.0, 2400),
+      player: makeRegion(regionCfg.name, true, regionCfg.fertility, regionCfg.pop),
       ai1: makeRegion("Mainau (Nachbar)", false, 1.05, 2850),
       ai2: makeRegion("Rheinfeld (Nachbar)", false, 0.95, 2750),
       ai3: makeRegion("Bergheim (Nachbar)", false, 1.0, 2800),
@@ -261,6 +280,15 @@ function newGame(options) {
 function addChronicle(state, text) {
   state.chronicle.unshift(`${state.year}: ${text}`);
   if (state.chronicle.length > 200) state.chronicle.pop();
+}
+
+// Kassenbuch-Einzelposten (§Original-Vertiefung: Nutzerwunsch nach vollständiger
+// Auflistung aller Ein-/Ausgaben, nicht nur der fünf monatlichen Sammelposten).
+// Jede spielerausgelöste Transaktion (Bau, Ausbau, Land-/Warenhandel, Kredite)
+// wird hier vermerkt und beim nächsten Kassenbuch-Fenster angezeigt und geleert.
+function logLedger(state, label, amount) {
+  if (!state.ledgerLog) state.ledgerLog = [];
+  state.ledgerLog.push({ label, amount: Math.round(amount) });
 }
 
 // ---------- Landwirtschaft (§18/§19) ----------

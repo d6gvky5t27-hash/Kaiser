@@ -1616,3 +1616,88 @@ Test-Sandbox sind Google Fonts nicht erreichbar (Netzwerk-Policy), daher
 zeigen die Screenshots System-Font-Fallbacks statt der eigentlich
 vorgesehenen Comic-Schriften — im normalen Browser des Spielers lädt
 Google Fonts regulär und die Schrift wird wie geplant angezeigt.
+
+## 2026-08-20 – Schritt 37: Heiratsfenster, Kornbilanz-Fix, vollständiges Kassenbuch, Steuerreform, wählbare Startregionen
+
+Wieder ein Bündel aus fünf Nutzerwünschen nach weiterem Antesten.
+
+**1. Heirat öffnet jetzt ein Fenster.** Analog zur Geburtsankündigung: `updateDynasty()`
+setzt bei einer Vermählung `state.pendingMarriage`, ein neues `#marriageModal`
+(„💍 Vermählung am Hof! 💍“) zeigt Namen von Herrscher und Gemahl/Gemahlin mit
+kurzer Fanfare. Reiht sich vor der Geburtsankündigung in die bestehende
+Prioritätskette ein (beides kann im selben Jahr eintreten, da eine frische
+Heirat noch im selben Durchlauf eine Geburt auslösen kann).
+
+**2. Kornbilanz-Fehlkalibrierung behoben.** Ursachenanalyse: Verbrauch war
+schon immer exakt auf den Grundbedarf gedeckelt (`consumeAndUpdateSatisfaction`),
+aber es gab **keinerlei Obergrenze oder Schwund** für den Lagerbestand — jeder
+Produktionsüberschuss sammelte sich über Jahrzehnte unbegrenzt an (Startwert
+war zudem pauschal 300, unabhängig von der tatsächlichen Bevölkerungsgröße).
+Ergebnis: ein von Jahr 1 an absurdes Verhältnis (1273 % im gemeldeten Fall),
+das mit der Zeit nur weiter wuchs. Neu: `region.grainStorageCap` (≈4
+Jahresbedarfe ohne Lagerhaus) plus `applyGrainSpoilage()` — Getreide über der
+Kapazität verdirbt größtenteils, selbst darunter geht ein kleiner Teil durch
+Schwund verloren. Der bislang komplett ungenutzte Gebäudetyp „Kornspeicher“
+(`storage_boost`, existierte nur als totes Datenfeld) bekommt dadurch einen
+echten Zweck: mehr/höhere Kornspeicher erhöhen die Kapazität. Kalibrierungsfund
+(wieder die Schritt-13-Lehre): die KI-gegen-KI-Testsuite zeigte, dass eine
+CONSTANT auch nur leicht unterschiedliche Fruchtbarkeit zwischen KI-Regionen
+über 100 Jahre exponentiell zu Dominanz aufschaukelt, sobald Getreide
+tatsächlich (statt wie zuvor praktisch immer gesättigt) variiert. Gegenmaßnahmen:
+Geburts-/Sterbe-Bonus aus der Kornbilanz halbiert, der jährliche
+Basis-Schwund selbst innerhalb der Kapazität stark reduziert (0,08→0,03), und
+KI-Regionen starten bewusst mit einem festen Referenzwert statt einem zur
+eigenen Bevölkerung proportionalen (das hätte fruchtbareren Regionen einen
+unbeabsichtigten Frühstart verschafft) — der Spieler-Startwert bleibt
+proportional zur eigenen Bevölkerung, damit die Anzeige von Jahr 1 an plausibel
+aussieht. Ergebnis nach Kalibrierung: KI-Dominanz 46 % (Schwelle 50 %,
+vorher kurzzeitig 54-57 % während der Fehlersuche), 0/20 unkontrollierte
+Bevölkerungskollapse weiterhin.
+
+**3. Vollständiges Kassenbuch.** Neue `logLedger(state, label, amount)`-Funktion
+(core.js) protokolliert jede spielerausgelöste Transaktion einzeln:
+Gebäudebau/-ausbau, Infrastrukturausbau, Land-/Marktkauf/-verkauf, Import/
+Export zwischen Regionen, Kreditaufnahme/-tilgung. Das Kassenbuch-Fenster zeigt
+diese Posten jetzt zusätzlich zu den fünf monatlichen Sammelposten unter
+„Weitere Ein-/Ausgaben diesen Monat“, danach wird das Log geleert. Dazu ein
+Tooltip auf „Steuereinnahmen“ mit der Aufschlüsselung nach Bevölkerungsgruppe
+(siehe Punkt 4). Diplomatie-/Intrigen-Kosten (Geschenke, Bestechungen,
+Spionage) sind bewusst noch nicht einzeln erfasst — auf Wunsch in einer
+weiteren Runde ergänzbar.
+
+**4. Steuerreform.** Zwei Befunde: Erstens behandelte die Steuerformel jede
+Bevölkerungsgruppe identisch, obwohl `POP_GROUPS[pid].weight` (Adel=2,
+Bürger=1,4, Arme=0,5 usw.) als Datenfeld längst existierte — nur ungenutzt.
+Jetzt fließt dieses Gewicht direkt in die Steuerkraft jeder Gruppe ein (Adel/
+Händler/Bürger tragen anteilig mehr bei als Bauern/Tagelöhner/Arme). Zweitens
+war `treasuryTaxWealthFactor` mit 0,02 grob unterkalibriert — eine
+Startregion kam damit auf ca. 1 Taler/Monat, kaum spürbar und unfähig, auch
+nur eine kleine Garnison zu tragen. Neu kalibriert auf 3,0, damit eine
+Startregion (~2.400 Einwohner, 15 % Steuersatz) auf ca. 90-100 Taler/Monat
+kommt (verifiziert: 94 Taler im Test).
+
+**5. Wählbare Startregionen für 1500.** Neue Datentabelle `START_REGIONS`
+(gamedata.js) mit zehn real existierenden europäischen Herrschaftsgebieten um
+1500 plus der bisherigen namenlosen Standardoption: Herzogtum Burgund,
+Königreich England, Republik Venedig, Herzogtum Mailand, Krone Kastilien,
+Königreich Portugal, Königreich Polen, Königreich Ungarn, Alte Eidgenossenschaft,
+Herzogtum Bretagne — jede mit eigener Fruchtbarkeit, Startbevölkerung,
+Startkapital-Multiplikator und kurzer historischer Beschreibung (z. B. Venedig:
+hohe Handelseinnahmen, aber wenig Ackerland). Die „Startregion“-Auswahl in der
+Charaktererstellung war bereits als deaktiviertes UI-Element vorbereitet und
+wird jetzt dynamisch aus `START_REGIONS` befüllt; die gewählte Region bestimmt
+Name/Fruchtbarkeit/Bevölkerung/Startkapital der Spielerprovinz. Bewusste
+Vereinfachung: die Nachbarregionen (ai1-ai7) bleiben für jede Wahl identisch —
+eine vollständige, region-abhängige Nachbarschaftskarte wäre ein deutlich
+größeres, eigenständiges Vorhaben.
+
+**Getestet:** `node tests/battle_test.js`/`economy_test.js`/`ai_vs_ai_test.js`
+nach jeder Kalibrierungsrunde erneut geprüft (0/20 unkontrollierte
+Bevölkerungskollapse, KI-Dominanz 46 % unter der 50 %-Schwelle). Playwright:
+Heirat erzwungen → Fenster erscheint mit korrektem Text; Kornbilanz zeigt nach
+einem Jahr realistische Werte (z. B. 130-184 % statt drei- bis
+zwölfstelliger Prozentzahlen) inkl. sichtbarer Lagerkapazität/Schwund;
+Kassenbuch zeigt nach einem Gebäudekauf korrekt „Neubau: Bauernhof −200“
+unter „Weitere Ein-/Ausgaben“, Steuereinnahmen sind jetzt spürbar (+94 statt
++1); Startregion „Republik Venedig“ ausgewählt → Topbar/Zustand zeigen
+korrekt Name, Fruchtbarkeit 0,85, Bevölkerung 2.200, Startkapital 2.100 Taler.

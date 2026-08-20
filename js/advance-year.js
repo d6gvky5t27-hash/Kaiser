@@ -31,6 +31,7 @@ function advanceYear(state) {
     consumeAndUpdateSatisfaction(r, prices);
     applyExtraGrainDistribution(state, r); // §Original: freiwillige Kornverteilung
     r.grainDistributed = r.grainAvailable - (r.warehouse.getreide || 0); // tatsächlich ans Volk abgegeben (Grundbedarf + Kornausgabe)
+    applyGrainSpoilage(r); // Schwund/Verderb des Restbestands oberhalb der Lagerkapazität
     updatePopulation(r);
     if (r._manipulationYears > 0) r._manipulationYears -= 1; // §32 politische Manipulation klingt ab
     if (!r.isPlayer) aiRegionDevelops(r, state);
@@ -136,12 +137,24 @@ function applyMonthlyFinances(state) {
   const treasuryBefore = state.treasury;
   const r = state.regions.player;
 
+  // Steuerkraft je Gruppe unterscheidet sich (POP_GROUPS[pid].weight, §Original-
+  // Vertiefung: Adel/Händler/Bürger tragen anteilig mehr zur Steuerlast bei als
+  // Bauern, Tagelöhner oder Arme) statt wie zuvor pauschal pro Kopf.
   let totalWealth = 0;
-  for (const pid in r.population) totalWealth += r.population[pid].count * CONFIG.state.treasuryTaxWealthFactor;
+  const taxByGroup = {};
+  for (const pid in r.population) {
+    const w = r.population[pid].count * (POP_GROUPS[pid].weight || 1) * CONFIG.state.treasuryTaxWealthFactor;
+    totalWealth += w;
+    taxByGroup[pid] = w;
+  }
   const schatzmeisterBonus = advisorEffectBonus(state, "schatzmeister");
   const verwaltungTechBonus = techBonus(state, "verwaltung");
-  const taxIncome = Math.round(totalWealth * r.taxRate * (1 + schatzmeisterBonus + verwaltungTechBonus) / 12);
+  const taxMultiplier = r.taxRate * (1 + schatzmeisterBonus + verwaltungTechBonus) / 12;
+  const taxIncome = Math.round(totalWealth * taxMultiplier);
   state.treasury += taxIncome;
+  // Für die Kassenbuch-Aufschlüsselung: wie viel jede Gruppe monatlich beisteuert
+  const taxBreakdown = {};
+  for (const pid in taxByGroup) taxBreakdown[pid] = Math.round(taxByGroup[pid] * taxMultiplier);
 
   let upkeep = 0;
   for (const type in state.army) upkeep += state.army[type] * TROOP_TYPES[type].upkeep;
@@ -169,10 +182,18 @@ function applyMonthlyFinances(state) {
     vassalTribute += tribute;
   }
 
+  // Alle seit dem letzten Kassenbuch-Fenster einzeln erfassten Transaktionen
+  // (Bau/Ausbau, Land-/Warenhandel, Kredite, siehe logLedger()) werden hier
+  // mit ausgegeben und danach geleert — so listet das Kassenbuch wirklich
+  // alle Ein-/Ausgaben des Monats auf, nicht nur die fünf Sammelposten.
+  const otherEntries = state.ledgerLog || [];
+  state.ledgerLog = [];
+
   const report = {
     year: state.year, month: state.month,
     treasuryBefore, treasuryAfter: state.treasury,
     taxIncome, upkeep, salaries, debtInterest, vassalTribute,
+    taxBreakdown, otherEntries,
     net: state.treasury - treasuryBefore,
   };
   state.lastMonthlyReport = report;

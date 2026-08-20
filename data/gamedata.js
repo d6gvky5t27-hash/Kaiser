@@ -22,6 +22,27 @@ const CONFIG = {
       frostChance: 0.06,        frostFactor: 0.75,        // kumulativ 0.22
       gutesJahrChance: 0.10,    gutesJahrFactor: 1.35,    // kumulativ 0.32
     },
+    // Kornlagerung (Korrektur einer Fehlkalibrierung): ohne Schwund/Kapazitätsgrenze
+    // sammelte sich überschüssiges Getreide unbegrenzt über Jahrzehnte an, da der
+    // Verbrauch stets exakt auf den Grundbedarf gedeckelt ist (siehe
+    // consumeAndUpdateSatisfaction) — das trieb das angezeigte Verhältnis
+    // (grainRatio) auf unrealistische Werte (teils >1000%). Jetzt begrenzt eine
+    // Lagerkapazität samt Schwund den Bestand auf ein plausibles Maß, und der
+    // bisher ungenutzte Kornspeicher-Gebäudetyp (§26) bekommt dadurch einen
+    // echten Zweck: mehr/höherstufige Kornspeicher erlauben eine größere,
+    // verlustarme Reserve.
+    grainStorageCapNeedMultiplier: 4.0, // ohne Kornspeicher: ca. 4 Jahresbedarfe verlustarm lagerbar (großzügiger Puffer dämpft Jahr-zu-Jahr-Schwankungen)
+    grainStartBufferMultiplier: 1.3,    // Startbestand des Spielers: ca. 1,3 Jahresbedarfe (gesunde Reserve, kein Vielfaches)
+    // grainSpoilageWithinCapRate bewusst klein: ein konstanter jährlicher Schwund
+    // selbst bei ausreichender Lagerkapazität erzwingt bei JEDER Region Dauer-
+    // Überschussproduktion nur um den Bestand zu halten — das begünstigt über
+    // 100 Spieljahre kumulativ Regionen mit leicht höherer Fruchtbarkeit
+    // (Schritt-13-Lehre: kleine, aber konstante Effekte potenzieren sich über
+    // viele Jahre). Ein kleiner Wert reicht für den realistischen Effekt, ohne
+    // KI-Regionen unangemessen unterschiedlich zu bestrafen (siehe KI-gegen-
+    // KI-Testsuite, §78).
+    grainSpoilageWithinCapRate: 0.03,   // milder Schwund selbst bei ordentlicher Lagerung
+    grainSpoilageAboveCapRate: 0.5,     // Getreide über der Lagerkapazität verdirbt größtenteils (Ungeziefer/Fäulnis)
   },
   population: {
     baseBirthRate: 0.018,
@@ -44,9 +65,15 @@ const CONFIG = {
     // grainRatio = verfügbares Getreide / Grundbedarf, siehe computeGrainBalance().
     // Bewusst moderat kalibriert, um keinen zweiten Bevölkerungskollaps-Pfad
     // neben dem bereits bestehenden satisfaction-basierten zu öffnen.
-    grainBirthBonusMax: 0.006,  // zusätzliche Geburtenrate bei grainRatio >= 2.0 (doppelter Bedarf gedeckt)
+    // Seit die Kornbilanz durch Lagerkapazität/Schwund (CONFIG.agriculture) real
+    // schwankt statt praktisch immer gesättigt (>>200%) zu sein, wirkt dieser
+    // Effekt jetzt auch tatsächlich unterscheidend zwischen Regionen (vorher de
+    // facto ein für alle gleicher Dauerbonus). Über 100 Spieljahre kann selbst
+    // ein kleiner, aber konsistenter Zinsvorteil exponentiell explodieren
+    // (Schritt-13-Lehre) — daher hier bewusst halbiert gegenüber dem alten Wert.
+    grainBirthBonusMax: 0.003,  // zusätzliche Geburtenrate bei grainRatio >= 2.0 (doppelter Bedarf gedeckt)
     grainFamineThreshold: 0.15, // unterhalb dieses Verhältnisses gilt es als echte Hungersnot
-    grainDeathBonusMax: 0.03,  // zusätzliche Sterberate bei grainRatio = 0 (kein Getreide mehr vorhanden)
+    grainDeathBonusMax: 0.015,  // zusätzliche Sterberate bei grainRatio = 0 (kein Getreide mehr vorhanden)
   },
   trade: {
     perCapitaDiffThreshold: 0.05,
@@ -79,7 +106,15 @@ const CONFIG = {
     aiGiftChance: 0.06, aiGiftRelationGain: 8,
   },
   state: {
-    treasuryTaxWealthFactor: 0.02,
+    // Kalibrierungsfund (Nutzer-Feedback: "Steuereinnahmen kommen mir sehr wenig
+    // vor"): der alte Wert (0.02) behandelte außerdem jede Bevölkerungsgruppe
+    // gleich — inzwischen fließt POP_GROUPS[pid].weight (bislang ungenutztes
+    // Datenfeld) als Wohlstands-/Steuerkraft-Gewicht ein (Adel zahlt anteilig
+    // mehr als Arme/Tagelöhner). Neu kalibriert, damit eine Startregion (~2.400
+    // Einwohner, 15% Steuersatz) auf ca. 90-100 Taler/Monat kommt — genug, um
+    // einen kleinen Hofstaat/Garnison tatsächlich zu tragen, statt wie zuvor
+    // nur ~1 Taler/Monat einzunehmen.
+    treasuryTaxWealthFactor: 3.0,
     passivePrestigePerYear: 1,
     defeatPopThreshold: 200,
     bankruptTreasuryThreshold: -3000,
@@ -1306,6 +1341,107 @@ const EXTRA_REGIONS = [
   }
 ];
 
+// ---------- Auswählbare Startregionen für das Jahr 1500 (§8-Vertiefung) ----------
+// Auf Nutzerwunsch: statt einer einzigen fiktiven "Deine Provinz" darf der
+// Spieler bei der Charaktererstellung aus real existierenden europäischen
+// Herrschaftsgebieten des Jahres 1500 wählen. Fruchtbarkeit/Bevölkerung/
+// Startkapital sind bewusst nur moderat unterschiedlich kalibriert (siehe
+// applyStartRegion() in core.js) — die eigentliche Weltkarte (ai1-ai7)
+// bleibt für alle Wahlmöglichkeiten identisch, nur die Identität und die
+// Startbedingungen der eigenen Provinz ändern sich. "player" bleibt die
+// namenlose Standardoption (unverändertes Verhalten, falls keine Region
+// gewählt wird — wichtig für Abwärtskompatibilität von Spielständen/Tests).
+const START_REGIONS = [
+  {
+    "id": "player",
+    "name": "Deine Provinz",
+    "fertility": 1.0,
+    "pop": 2400,
+    "treasuryMultiplier": 1.0,
+    "description": "Eine namenlose Provinz irgendwo im Reich — der klassische, neutrale Einstieg."
+  },
+  {
+    "id": "burgund",
+    "name": "Herzogtum Burgund",
+    "fertility": 1.05,
+    "pop": 2600,
+    "treasuryMultiplier": 1.3,
+    "description": "Reiche Tuchhandelsstädte in Flandern, prachtvoller Hof — aber zwischen Frankreich und dem Reich eingeklemmt."
+  },
+  {
+    "id": "england",
+    "name": "Königreich England",
+    "fertility": 1.0,
+    "pop": 2500,
+    "treasuryMultiplier": 1.0,
+    "description": "Frisch geeinte Tudor-Krone nach den Rosenkriegen, Wollhandel mit Flandern."
+  },
+  {
+    "id": "venedig",
+    "name": "Republik Venedig",
+    "fertility": 0.85,
+    "pop": 2200,
+    "treasuryMultiplier": 1.4,
+    "description": "Seemacht und Handelsknotenpunkt zum Orient — wenig eigenes Ackerland, dafür prall gefüllte Kassen."
+  },
+  {
+    "id": "mailand",
+    "name": "Herzogtum Mailand",
+    "fertility": 1.15,
+    "pop": 2700,
+    "treasuryMultiplier": 1.1,
+    "description": "Fruchtbare Po-Ebene und blühende Handwerkskunst — im Visier französischer und spanischer Ambitionen."
+  },
+  {
+    "id": "kastilien",
+    "name": "Krone Kastilien",
+    "fertility": 0.9,
+    "pop": 2400,
+    "treasuryMultiplier": 0.95,
+    "description": "Frisch geeint nach der Reconquista von 1492, karge Hochebenen, Aufbruch in eine neue Zeit."
+  },
+  {
+    "id": "portugal",
+    "name": "Königreich Portugal",
+    "fertility": 0.9,
+    "pop": 2000,
+    "treasuryMultiplier": 1.15,
+    "description": "Kleines Königreich am Atlantik — die Entdeckungsfahrten füllen langsam die Staatskasse."
+  },
+  {
+    "id": "polen",
+    "name": "Königreich Polen",
+    "fertility": 1.2,
+    "pop": 2800,
+    "treasuryMultiplier": 0.85,
+    "description": "Weite Kornkammern zwischen Ostsee und Steppe — doch Adel und Krone ringen um Macht."
+  },
+  {
+    "id": "ungarn",
+    "name": "Königreich Ungarn",
+    "fertility": 1.0,
+    "pop": 2500,
+    "treasuryMultiplier": 0.9,
+    "description": "Fruchtbare Theiß-Ebene, aber Grenzland gegen das vordringende Osmanische Reich."
+  },
+  {
+    "id": "schweiz",
+    "name": "Alte Eidgenossenschaft",
+    "fertility": 0.8,
+    "pop": 1900,
+    "treasuryMultiplier": 1.0,
+    "description": "Bündnis freier Bergkantone, karges Ackerland — doch gefürchtete Söldner als Exportgut."
+  },
+  {
+    "id": "bretagne",
+    "name": "Herzogtum Bretagne",
+    "fertility": 1.0,
+    "pop": 2100,
+    "treasuryMultiplier": 1.0,
+    "description": "Noch unabhängiges Herzogtum an der Atlantikküste, bald von Frankreich vereinnahmt."
+  }
+];
+
 // ---------- Localization-Grundstruktur (§80) ----------
 // Aktuell nur Deutsch befüllt; Architektur ist für weitere Sprachen vorbereitet.
 // Noch nicht die gesamte UI ist über STRINGS geführt (siehe DEVELOPMENT.md).
@@ -1566,7 +1702,7 @@ const EVENTS = [
     id: "kornspeicher_leer",
     title: "Die Kornspeicher sind leer",
     text: "Nach schlechten Ernten sind die Kornspeicher nahezu leer. Vor den Bäckereien bilden sich lange Schlangen.",
-    condition: (r) => (r.warehouse.getreide || 0) < 50 && r.population.arme.satisfaction < 40,
+    condition: (r) => (r.grainRatio !== undefined ? r.grainRatio : 1) < 0.5 && r.population.arme.satisfaction < 40,
     options: [
       { label: "Staatliche Reserven öffnen", apply: (r, s) => { r.warehouse.getreide = Math.max(0, (r.warehouse.getreide||0) - 40); r.population.arme.satisfaction += 15; } },
       { label: "Getreide importieren (-800 Taler)", apply: (r, s) => { s.treasury -= 800; r.warehouse.getreide = (r.warehouse.getreide||0) + 60; } },

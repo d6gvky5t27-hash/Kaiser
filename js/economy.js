@@ -71,6 +71,30 @@ function computeGrainBalance(region) {
   region.grainNeed = need;
   region.grainAvailable = region.warehouse.getreide || 0;
   region.grainRatio = need > 0 ? region.grainAvailable / need : 1;
+  // Lagerkapazität ohne Kornspeicher ≈ 1 Jahresbedarf, jeder Kornspeicher-Level
+  // legt einen festen Betrag drauf (siehe applyGrainSpoilage für den Schwund).
+  region.grainStorageCap = need * CONFIG.agriculture.grainStorageCapNeedMultiplier
+    + buildingLevelSum(region, "kornspeicher") * (BUILDINGS.kornspeicher.value || 0);
+}
+
+// Jährlicher Schwund/Verderb des Getreidelagers (§Korrektur, siehe CONFIG.agriculture):
+// verhindert unbegrenztes Anwachsen des Lagerbestands, da der Verbrauch (siehe
+// consumeAndUpdateSatisfaction) nie mehr als den Grundbedarf abbaut. Wird am
+// Jahresende aufgerufen, NACH der Grundbedarf-/Kornausgabe-Verteilung, damit
+// Schwund nicht fälschlich als "ans Volk abgegeben" gezählt wird.
+function applyGrainSpoilage(region) {
+  const cfg = CONFIG.agriculture;
+  const stock = region.warehouse.getreide || 0;
+  const cap = region.grainStorageCap || 0;
+  let spoiled;
+  if (stock > cap) {
+    spoiled = (stock - cap) * cfg.grainSpoilageAboveCapRate + cap * cfg.grainSpoilageWithinCapRate;
+  } else {
+    spoiled = stock * cfg.grainSpoilageWithinCapRate;
+  }
+  spoiled = Math.min(spoiled, stock);
+  region.warehouse.getreide = Math.round(stock - spoiled);
+  region.grainSpoiled = Math.round(spoiled);
 }
 
 // ---------- Preisbildung (§15/§21) ----------
@@ -241,6 +265,7 @@ function upgradeInfrastructure(state, region) {
   }
   if (missing.length) return { ok: false, reason: `Fehlende Baustoffe: ${missing.join(", ")}.` };
   state.treasury -= cost;
+  logLedger(state, `Infrastrukturausbau (Stufe ${region.infrastructureLevel + 1})`, -cost);
   for (const gid in cfg.materialCostPerLevel) region.warehouse[gid] -= cfg.materialCostPerLevel[gid];
   region.infrastructureLevel += 1;
   addChronicle(state, `Straßen und Wege in ${region.name} wurden ausgebaut (Infrastrukturstufe ${region.infrastructureLevel}).`);
@@ -257,6 +282,7 @@ function takeLoan(state, amount) {
   if (amount <= 0) return { ok: false, reason: "Ungültiger Betrag." };
   state.treasury += amount;
   state.debt += amount;
+  logLedger(state, `Kredit aufgenommen`, amount);
   addChronicle(state, `Ein Kredit über ${amount} Taler wurde aufgenommen (Zinssatz ${(currentDebtInterestRate(state)*100).toFixed(1)}%).`);
   return { ok: true };
 }
@@ -267,6 +293,7 @@ function repayDebt(state, amount) {
   if (payable <= 0) return { ok: false, reason: "Keine Schulden oder keine Mittel zur Rückzahlung." };
   state.treasury -= payable;
   state.debt -= payable;
+  logLedger(state, `Schuldentilgung`, -payable);
   addChronicle(state, `${payable} Taler Schulden wurden zurückgezahlt.`);
   return { ok: true };
 }
@@ -286,6 +313,7 @@ function buyLand(state, region, hectares) {
   const cost = Math.round(hectares * state.landPrice);
   if (state.treasury < cost) return { ok: false, reason: "Nicht genug Taler für den Landkauf." };
   state.treasury -= cost;
+  logLedger(state, `Landkauf (${hectares} ha)`, -cost);
   region.land += hectares;
   addChronicle(state, `${hectares} Hektar Land wurden für ${cost} Taler erworben.`);
   return { ok: true };
@@ -304,6 +332,7 @@ function buyGoodFromMarket(state, region, gid, qty) {
   const cost = Math.round(price * qty * (1 + CONFIG.market.buyMarkupShare));
   if (state.treasury < cost) return { ok: false, reason: "Nicht genug Taler für diesen Einkauf." };
   state.treasury -= cost;
+  logLedger(state, `Markteinkauf: ${qty} ${GOODS[gid].name}`, -cost);
   region.warehouse[gid] = (region.warehouse[gid] || 0) + qty;
   addChronicle(state, `${qty} ${GOODS[gid].name} für ${cost} Taler auf dem Markt gekauft.`);
   return { ok: true, cost };
@@ -318,6 +347,7 @@ function sellGoodToMarket(state, region, gid, qty) {
   const proceeds = Math.round(price * qty * (1 - CONFIG.market.sellCommissionShare));
   region.warehouse[gid] -= qty;
   state.treasury += proceeds;
+  logLedger(state, `Marktverkauf: ${qty} ${GOODS[gid].name}`, proceeds);
   addChronicle(state, `${qty} ${GOODS[gid].name} für ${proceeds} Taler auf dem Markt verkauft.`);
   return { ok: true, proceeds };
 }
@@ -351,6 +381,7 @@ function exportGoodToRegion(state, targetId, gid, qty) {
   const targetPrice = currentGoodPrice(target, gid);
   const proceeds = Math.round(targetPrice * deliveredQty * (1 - transportCost));
   state.treasury += proceeds;
+  logLedger(state, `Export: ${qty} ${GOODS[gid].name} nach ${target.name}`, proceeds);
   target.warehouse[gid] = (target.warehouse[gid] || 0) + deliveredQty;
 
   if (lossShare > 0) {
@@ -380,6 +411,7 @@ function importGoodFromRegion(state, sourceId, gid, qty) {
 
   source.warehouse[gid] -= qty;
   state.treasury -= cost;
+  logLedger(state, `Import: ${qty} ${GOODS[gid].name} aus ${source.name}`, -cost);
   const lossShare = rollBanditRisk(state, sourceId);
   const deliveredQty = qty * (1 - lossShare);
   home.warehouse[gid] = (home.warehouse[gid] || 0) + deliveredQty;
@@ -403,6 +435,7 @@ function sellLand(state, region, hectares) {
   const proceeds = Math.round(hectares * state.landPrice * (1 - cfg.saleCommission));
   region.land -= hectares;
   state.treasury += proceeds;
+  logLedger(state, `Landverkauf (${hectares} ha)`, proceeds);
   addChronicle(state, `${hectares} Hektar Land wurden für ${proceeds} Taler verkauft (10 % Provision abgezogen).`);
   return { ok: true };
 }

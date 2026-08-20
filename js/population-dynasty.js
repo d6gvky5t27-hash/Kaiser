@@ -99,6 +99,7 @@ function updateDynasty(state) {
     ruler.spouseId = sid;
     spouse.spouseId = state.rulerId;
     addChronicle(state, `${ruler.name} ${ruler.surname} vermählte sich mit ${spouse.name}.`);
+    state.pendingMarriage = sid;
   }
 
   // Geburt eines Kindes — der voreingestellte Zufallsname bleibt als Fallback

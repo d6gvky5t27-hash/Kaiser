@@ -40,7 +40,7 @@ Stand: nach Abschluss von MVP + Alpha + Beta (siehe ROADMAP.md).
 
 | § | Thema | Status | Anmerkung |
 |---|---|---|---|
-| 8 | Spielstart/Charaktererstellung | 🟡 | Erstellungsbildschirm mit Name/Geschlecht/Dynastiename/Schwierigkeit/2 Traits umgesetzt; Wappen und mehrere Startregionen fehlen weiterhin (nur 1 Region spielbar) |
+| 8 | Spielstart/Charaktererstellung | 🟡 | Erstellungsbildschirm mit Name/Geschlecht/Dynastiename/Schwierigkeit/2 Traits umgesetzt; seit Schritt 37 zusätzlich 10 wählbare, real existierende Startregionen um 1500 (`START_REGIONS`) statt nur einer namenlosen Provinz; ein Wappen-Editor fehlt weiterhin |
 | 9 | Charaktersystem | 🟡 | 6 Werte (Int/Dip/Verw/Mil/Han/Cha) statt vollständiger Liste (fehlen: Intrige, Bildung, Religion, Loyalität, Ehrgeiz, Moral); 10 Traits statt ~20 aus der Spec |
 | 10 | Dynastiesystem | 🟡 | Heirat, Kinder, Altern, Tod, Erbfolge (inkl. Streit) funktionieren; fehlen: Krankheit/Verletzung, Affären, uneheliche Kinder, Freundschaften/Rivalitäten, Verschwörungen |
 | 11 | Adelstitel | ✅ | 10-stufige Leiter mit Mehrfachbedingungen (Bevölkerung, Wohlstand, Prestige) |
