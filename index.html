@@ -4,103 +4,123 @@
 <meta charset="UTF-8">
 <title>KAISERREICH – Aufstieg einer Dynastie</title>
 <style>
-  @import url('https://fonts.cdnfonts.com/css/press-start-2p');
+  @import url('https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Baloo+2:wght@500;600;700;800&display=swap');
   :root {
-    --bg: #14171f;
-    --panel: #d8cba8;
-    --panel-dark: #2b2f3a;
-    --ink: #1c1c1c;
-    --accent: #7a2222;
-    --accent2: #1f4b3f;
-    --gold: #b8963e;
-    --blue: #23344d;
+    /* ---- Comic-Mittelalter-Farbschema: warmes Pergament + kräftige,
+       verspielte Akzentfarben statt der bisherigen düsteren Retro-Palette.
+       Variablennamen bewusst unverändert (werden an vielen Stellen per
+       var(--x) auch in JS-generierten Inline-Styles referenziert). ---- */
+    --bg: #e8d9ae;
+    --panel: #fff6e2;
+    --panel-dark: #2c1f12;
+    --ink: #2c1f12;
+    --accent: #d64a3a;
+    --accent2: #3f8b5c;
+    --gold: #f0a83c;
+    --blue: #4a86c8;
+    --purple: #7a4fa3;
 
-    /* ---- Design-System: Typografie-Skala (ein Font überall, feste Stufen) ----
-       Stufen gegenüber der ursprünglichen Fassung angehoben: der Pixel-Font
-       braucht bei Fließtext/Tabellen mehr Größe, um lesbar zu bleiben
-       (Lesbarkeits-Überarbeitung, Farbschema/Optik bewusst unverändert). */
-    --font: 'Press Start 2P', monospace;
+    /* ---- Design-System: Typografie-Skala ---- */
+    --font-display: 'Luckiest Guy', 'Arial Black', 'Segoe UI', sans-serif; /* Titel, Buttons, Tabs */
+    --font: 'Baloo 2', 'Segoe UI', system-ui, sans-serif;                 /* Fließtext */
     --fs-micro: 13px;  /* Badges, Fußnoten, Tags */
     --fs-body: 15px;   /* Standardtext in Panels, Tabellen, Buttons */
     --fs-md: 17px;     /* Zwischenüberschriften, betonte Werte */
     --fs-lg: 19px;     /* Panel-Titel-Leisten */
     --fs-xl: 21px;     /* Topbar, große Banner */
     --fs-h1: 28px;     /* Bildschirm-Überschriften (Charaktererstellung) */
-    --fs-logo: 38px;   /* Startbildschirm-Logo */
+    --fs-logo: 40px;   /* Startbildschirm-Logo */
 
-    /* ---- Design-System: Abstands-Skala (etwas großzügiger für mehr
-       Luft/größere Klickflächen) ---- */
+    /* ---- Design-System: Abstands-Skala ---- */
     --sp-1: 5px;
     --sp-2: 8px;
     --sp-3: 10px;
     --sp-4: 14px;
     --sp-5: 22px;
+
+    /* ---- Rundungen fürs Comic-Look (statt harter Pixel-Kanten) ---- */
+    --r-sm: 10px;
+    --r-md: 14px;
+    --r-lg: 20px;
   }
   * { box-sizing: border-box; font-family: var(--font); }
   body {
     margin: 0; min-height: 100vh;
-    background: var(--bg);
+    background:
+      radial-gradient(circle, rgba(44,31,18,0.09) 1.4px, transparent 1.4px) 0 0/16px 16px,
+      var(--bg);
     display: flex; align-items: center; justify-content: center;
     font-family: var(--font);
     font-size: var(--fs-body);
-    image-rendering: pixelated;
   }
   #frame {
     width: 960px; background: var(--blue);
-    border: 6px solid #0a0c11;
-    box-shadow: 0 0 0 2px #4a5570 inset, 0 0 40px rgba(0,0,0,0.6);
-    padding: var(--sp-3);
+    border: 5px solid var(--ink); border-radius: var(--r-lg);
+    box-shadow: 8px 8px 0 rgba(44,31,18,0.3);
+    padding: var(--sp-4);
   }
   #topbar {
     display: flex; justify-content: space-between;
     background: var(--panel-dark); color: var(--gold);
-    padding: var(--sp-3) var(--sp-4); font-size: var(--fs-md); border: 3px solid #0a0c11;
-    margin-bottom: var(--sp-3); letter-spacing: 1px;
+    padding: var(--sp-3) var(--sp-4); font-size: var(--fs-md); border: 3px solid var(--ink);
+    border-radius: var(--r-md); margin-bottom: var(--sp-3);
   }
+  #tb-title { font-family: var(--font-display); letter-spacing: 0.5px; }
   #main { display: flex; gap: var(--sp-3); }
   .panel {
     background: var(--panel); color: var(--ink);
     font-size: var(--fs-body); line-height: 1.6;
-    border: 3px solid #0a0c11; padding: var(--sp-3);
-    box-shadow: 3px 3px 0 #0a0c11;
+    border: 3px solid var(--ink); border-radius: var(--r-md); padding: var(--sp-3);
+    box-shadow: 5px 5px 0 rgba(44,31,18,0.28);
   }
   #left { width: 40%; }
   #right { width: 60%; }
   .panel > .title:first-child,
   h2.title {
-    background: var(--accent); color: #f2e6c9; margin: calc(var(--sp-3) * -1) calc(var(--sp-3) * -1) var(--sp-3) calc(var(--sp-3) * -1);
-    padding: var(--sp-2) var(--sp-3); font-size: var(--fs-lg); letter-spacing: 1px; font-weight: normal;
+    background: var(--accent); color: #fff6e2; margin: calc(var(--sp-3) * -1) calc(var(--sp-3) * -1) var(--sp-3) calc(var(--sp-3) * -1);
+    padding: var(--sp-2) var(--sp-3); font-size: var(--fs-lg); font-weight: normal;
+    font-family: var(--font-display); letter-spacing: 0.5px;
+    border-radius: calc(var(--r-md) - 3px) calc(var(--r-md) - 3px) 0 0;
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.2);
   }
   h2.title + * { margin-top: 0; }
-  .panel h2.title:not(:first-child) { margin-top: var(--sp-4); }
+  .panel h2.title:not(:first-child) { margin-top: var(--sp-4); border-radius: var(--r-sm); }
   .subhead {
-    font-size: var(--fs-md); color: var(--accent); letter-spacing: 0.5px;
-    margin: var(--sp-3) 0 var(--sp-2); border-bottom: 2px solid #0a0c1133; padding-bottom: 2px;
+    font-size: var(--fs-md); color: var(--purple); font-family: var(--font-display); letter-spacing: 0.5px;
+    margin: var(--sp-3) 0 var(--sp-2); border-bottom: 2px dashed #2c1f1833; padding-bottom: 4px;
   }
-  table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); line-height: 1.5; }
+  .courtHead { display: flex; align-items: flex-start; gap: var(--sp-3); margin-bottom: var(--sp-1); }
+  .rulerAvatar {
+    width: 52px; height: 52px; border-radius: 50%; background: var(--gold); border: 3px solid var(--ink);
+    display: flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0;
+    box-shadow: 2px 2px 0 rgba(44,31,18,0.3);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); line-height: 1.5; border-radius: var(--r-sm); overflow: hidden; }
   td, th { padding: 5px 6px; text-align: left; }
-  tr:nth-child(even) { background: rgba(0,0,0,0.06); }
-  .bar { background: #00000022; height: 8px; width: 100%; position: relative; border: 1px solid #0a0c11; }
+  th { color: var(--purple); font-weight: 700; }
+  tr:nth-child(even) { background: rgba(44,31,18,0.06); }
+  .bar { background: rgba(44,31,18,0.12); height: 9px; width: 100%; position: relative; border: 1px solid var(--ink); border-radius: 6px; overflow: hidden; }
   .bar > div { height: 100%; background: var(--accent2); }
-  .relbar { background: #00000022; height: 7px; width: 100%; border: 1px solid #0a0c11; position: relative; }
+  .relbar { background: rgba(44,31,18,0.12); height: 8px; width: 100%; border: 1px solid var(--ink); border-radius: 6px; position: relative; overflow: hidden; }
   .relbar > div { height: 100%; }
-  .diploBlock { border: 2px solid #0a0c11; padding: var(--sp-2); margin-bottom: var(--sp-2); background: rgba(0,0,0,0.04); }
-  .treatyTag { display:inline-block; font-size: var(--fs-micro); padding:3px 6px; margin:2px 4px 2px 0; border:1px solid #0a0c11; background:#b8963e33; }
+  .diploBlock { border: 2.5px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-2); margin-bottom: var(--sp-2); background: rgba(44,31,18,0.04); }
+  .treatyTag { display:inline-block; font-size: var(--fs-micro); padding:3px 8px; margin:2px 4px 2px 0; border:1px solid var(--ink); border-radius: 999px; background:#f0a83c33; }
   .dipbtn { font-size: var(--fs-micro); padding: 6px 8px; margin: 3px 3px 0 0; }
-  #pagetabs { display:flex; flex-wrap:wrap; gap: var(--sp-1); margin-bottom: var(--sp-3); }
+  #pagetabs { display:flex; flex-wrap:wrap; gap: var(--sp-2); margin-bottom: var(--sp-3); }
   .pagetab { flex: 1 1 auto; text-align: center; }
   .pagetab {
-    font-family: var(--font); font-size: var(--fs-body); background: var(--panel-dark); color: #d8cba8;
-    border: 2px solid #0a0c11; padding: var(--sp-2) var(--sp-4); cursor: pointer;
+    font-family: var(--font-display); font-size: var(--fs-body); background: var(--panel); color: var(--ink);
+    border: 3px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-4); cursor: pointer;
+    box-shadow: 3px 3px 0 rgba(44,31,18,0.25); letter-spacing: 0.5px;
   }
-  .pagetab.active { background: var(--gold); color: #1c1c1c; }
+  .pagetab.active { background: var(--gold); color: var(--ink); }
 
   /* Landschafts-Karte im Siedler-Stil: Holzrahmen, Wege zwischen Gebäuden, Naturdeko */
   #mapFrame {
-    padding: var(--sp-4); margin-bottom: var(--sp-3); border-radius: 8px;
+    padding: var(--sp-4); margin-bottom: var(--sp-3); border-radius: var(--r-md);
     background:
       repeating-linear-gradient(90deg, #6b4423 0px, #7a5230 6px, #5c3a1a 10px, #6b4423 14px);
-    border: 3px solid #3a2410; box-shadow: 3px 3px 0 #0a0c11, inset 0 0 0 2px #4a2f16;
+    border: 3px solid var(--ink); box-shadow: 5px 5px 0 rgba(44,31,18,0.28), inset 0 0 0 2px #4a2f16;
     position: relative;
   }
   #mapFrame::before, #mapFrame::after,
@@ -115,14 +135,13 @@
     background:
       repeating-linear-gradient(45deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 3px, transparent 3px, transparent 6px),
       linear-gradient(to bottom, #3a5a2d 0%, #2f4a24 45%, #24391c 75%, #1a2a13 100%);
-    border: 3px solid #0a0c11; border-radius: 4px; overflow: hidden;
-    image-rendering: pixelated;
+    border: 3px solid var(--ink); border-radius: var(--r-sm); overflow: hidden;
   }
   #mapTerrain svg.riverLayer { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
   #mapTerrain svg.pathLayer { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index: 1; }
   .capitalMarker {
     position: absolute; left: 10%; top: 14%; transform: translate(-50%,-50%);
-    filter: drop-shadow(2px 2px 0 #0a0c11); pointer-events: none; z-index: 3;
+    filter: drop-shadow(2px 2px 0 var(--ink)); pointer-events: none; z-index: 3;
   }
   .terrainDecor {
     position: absolute; pointer-events: none; transform: translate(-50%,-50%);
@@ -130,206 +149,211 @@
   }
   .plot {
     position: absolute; transform: translate(-50%,-50%);
-    width: 58px; height: 62px; border: 3px solid #0a0c11; border-radius: 3px;
+    width: 58px; height: 62px; border: 3px solid var(--ink); border-radius: var(--r-sm);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    cursor:pointer; font-size: var(--fs-body); box-shadow: 2px 2px 0 #0a0c11; transition: transform 0.1s;
+    cursor:pointer; font-size: var(--fs-body); box-shadow: 3px 3px 0 rgba(44,31,18,0.3); transition: transform 0.1s;
   }
   .plot::before {
     content: ""; position: absolute; bottom: -6px; width: 70%; height: 8px; border-radius: 50%;
-    background: rgba(0,0,0,0.35); z-index: -1;
+    background: rgba(0,0,0,0.3); z-index: -1;
   }
   .plot:hover { transform: translate(-50%,-50%) scale(1.15); z-index: 5; }
-  .plot.selected { outline: 2px solid #f2e6c9; outline-offset: 2px; z-index: 4; }
-  .plot.empty { background: #6b8f5a; color:#1c2e14; }
-  .plot.empty:hover { background: #7fa46c; }
+  .plot.selected { outline: 3px solid var(--purple); outline-offset: 2px; z-index: 4; }
+  .plot.empty { background: #7fbf74; color:#1c2e14; }
+  .plot.empty:hover { background: #92cf87; }
   .plot.filled { background: var(--panel); color: var(--ink); }
-  .plot.filled:hover { background: #c9bb92; }
+  .plot.filled:hover { background: #ffe9bd; }
   .plot .plotIconWrap { line-height: 0; }
-  .plot .emptyPlus { font-size: var(--fs-h1); font-weight:bold; }
+  .plot .emptyPlus { font-size: var(--fs-h1); font-family: var(--font-display); }
   .plot .lvlDots { display:flex; gap:2px; margin-top:var(--sp-1); }
-  .plot .lvlDots span { width:5px; height:5px; background:#0a0c1155; border:1px solid #0a0c11; }
+  .plot .lvlDots span { width:5px; height:5px; border-radius:50%; background:#2c1f1855; border:1px solid var(--ink); }
   .plot .lvlDots span.filled { background: var(--gold); }
 
   #mapLegend {
     display:grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-1) var(--sp-4);
-    font-size: var(--fs-body); border: 2px solid #0a0c11; padding: var(--sp-3); margin-bottom: var(--sp-4);
-    background: rgba(0,0,0,0.04);
+    font-size: var(--fs-body); border: 2.5px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-3); margin-bottom: var(--sp-4);
+    background: rgba(44,31,18,0.04);
   }
   #mapLegend .legendItem { display:flex; align-items:center; gap:6px; }
   #mapLegend .legendIcon {
     display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px;
-    background: var(--panel); border: 2px solid #0a0c11; flex-shrink:0; line-height:0;
+    background: var(--panel); border: 2px solid var(--ink); border-radius: 8px; flex-shrink:0; line-height:0;
   }
   #mapLegend .legendIcon svg { width:20px; height:20px; }
   #plotDetail {
-    border: 3px solid #0a0c11; padding: var(--sp-3); background: rgba(0,0,0,0.05); font-size: var(--fs-body); min-height: 60px;
+    border: 3px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-3); background: rgba(44,31,18,0.05); font-size: var(--fs-body); min-height: 60px;
   }
   #plotDetail button { margin-top: var(--sp-2); }
-  .advisorSlot { border: 2px solid #0a0c11; padding: var(--sp-1); margin-bottom: var(--sp-1); background: rgba(0,0,0,0.04); }
+  .advisorSlot { border: 2.5px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-1); margin-bottom: var(--sp-1); background: rgba(44,31,18,0.04); }
   .advisorSlot button { font-size: var(--fs-micro); padding: 2px 4px; }
   /* §84 Tooltip-Prinzip: reines CSS-Tooltip, kein JS nötig, robust überall */
-  [data-tip] { position: relative; cursor: help; border-bottom: 1px dotted #7a2222; }
+  [data-tip] { position: relative; cursor: help; border-bottom: 2px dotted var(--accent); }
   [data-tip]:hover::after {
     content: attr(data-tip);
     position: absolute; left: 0; top: 100%; margin-top:var(--sp-1);
-    background: #0a0c11; color: #f2e6c9; border: 2px solid #b8963e;
+    background: var(--panel-dark); color: #fff6e2; border: 2px solid var(--gold); border-radius: var(--r-sm);
     padding: var(--sp-2) var(--sp-2); font-size: var(--fs-body); white-space: pre-line; width: max-content;
-    max-width: 220px; z-index: 100; box-shadow: 3px 3px 0 rgba(0,0,0,0.5);
+    max-width: 220px; z-index: 100; box-shadow: 3px 3px 0 rgba(0,0,0,0.4);
     font-family: var(--font); line-height: 1.6;
   }
   button {
-    font-family: var(--font); font-size: var(--fs-body); background: var(--gold); color: #1c1c1c;
-    border: 2px solid #0a0c11; padding: var(--sp-2) var(--sp-3); cursor: pointer; margin: 3px 3px 3px 0;
-    box-shadow: 2px 2px 0 #0a0c11; min-height: 36px;
+    font-family: var(--font-display); font-size: var(--fs-body); background: var(--gold); color: var(--ink);
+    border: 3px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); cursor: pointer; margin: 3px 3px 3px 0;
+    box-shadow: 3px 3px 0 rgba(44,31,18,0.3); min-height: 36px; letter-spacing: 0.3px;
   }
-  button:hover { background: #d1af52; }
+  button:hover { background: #f5bb60; }
   button:active { transform: translate(2px,2px); box-shadow: none; }
   /* Sichtbarer Fokusring für Tastaturbedienung (nur bei Tastaturfokus, nicht bei Mausklick) */
   button:focus-visible, .pagetab:focus-visible, input:focus-visible, select:focus-visible {
-    outline: 3px solid #f2e6c9; outline-offset: 2px;
+    outline: 3px solid var(--purple); outline-offset: 2px;
   }
   #menubar { margin-top: var(--sp-3); display: flex; flex-wrap: wrap; gap: var(--sp-1); align-items:center; }
   #chronicle { max-height: 180px; overflow-y: auto; font-size: var(--fs-body); line-height: 1.7; }
-  .settingsRow { display:flex; gap: var(--sp-4); align-items:center; font-size: var(--fs-body); color:#d8cba8; }
+  .settingsRow { display:flex; gap: var(--sp-4); align-items:center; font-size: var(--fs-body); color:#fff6e2; }
   .settingsRow label { display:flex; align-items:center; gap:3px; cursor:pointer; }
 
   /* Start-/Charaktererstellungsbildschirm (§8/§89) */
   #titleScreen, #charCreation {
-    width: 960px; background: var(--blue); border: 6px solid #0a0c11;
-    box-shadow: 0 0 0 2px #4a5570 inset, 0 0 40px rgba(0,0,0,0.6);
-    padding: var(--sp-5); text-align: center; color: #f2e6c9;
+    width: 960px; background: var(--blue); border: 5px solid var(--ink); border-radius: var(--r-lg);
+    box-shadow: 8px 8px 0 rgba(44,31,18,0.3);
+    padding: var(--sp-5); text-align: center; color: #fff6e2;
   }
   #titleScreen h1 {
-    font-size: var(--fs-logo); color: var(--gold); letter-spacing: 4px; margin-bottom: var(--sp-1);
-    text-shadow: 3px 3px 0 #0a0c11; font-weight: normal;
+    font-family: var(--font-display); font-size: var(--fs-logo); color: var(--gold); letter-spacing: 2px; margin-bottom: var(--sp-1);
+    text-shadow: 3px 3px 0 rgba(44,31,18,0.5); font-weight: normal;
   }
-  #titleScreen h2 { font-size: var(--fs-lg); color: #d8cba8; letter-spacing: 3px; margin-bottom: var(--sp-5); font-weight: normal; }
+  #titleScreen h2 { font-family: var(--font-display); font-size: var(--fs-lg); color: #fff6e2; letter-spacing: 1px; margin-bottom: var(--sp-5); font-weight: normal; }
   #titleScreen .cityArt {
     display: flex; justify-content: center; margin-bottom: var(--sp-4);
-    filter: drop-shadow(3px 3px 0 #0a0c11);
+    filter: drop-shadow(3px 3px 0 rgba(44,31,18,0.4));
   }
   .titleMenuBtn {
     display: block; width: 320px; margin: var(--sp-2) auto; padding: var(--sp-3); font-size: var(--fs-md);
-    background: var(--panel); color: var(--ink); border: 3px solid #0a0c11;
-    box-shadow: 3px 3px 0 #0a0c11; cursor: pointer; font-family: var(--font);
+    background: var(--panel); color: var(--ink); border: 3px solid var(--ink); border-radius: var(--r-md);
+    box-shadow: 4px 4px 0 rgba(44,31,18,0.3); cursor: pointer; font-family: var(--font-display); letter-spacing: 0.5px;
   }
-  .titleMenuBtn:hover { background: #c9bb92; }
+  .titleMenuBtn:hover { background: #ffe9bd; }
   .titleMenuBtn:disabled { opacity: 0.4; cursor: not-allowed; }
 
   /* Intro-Sequenz (§90): kurzer Text-Vorspann vor dem Titelbildschirm */
   #introScreen {
-    width: 960px; background: #0a0c11; border: 6px solid #0a0c11;
-    box-shadow: 0 0 0 2px #4a5570 inset, 0 0 40px rgba(0,0,0,0.6);
-    padding: calc(var(--sp-5) * 3) var(--sp-5); text-align: center; color: #d8cba8;
+    width: 960px; background: var(--panel-dark); border: 5px solid var(--ink); border-radius: var(--r-lg);
+    box-shadow: 8px 8px 0 rgba(44,31,18,0.3);
+    padding: calc(var(--sp-5) * 3) var(--sp-5); text-align: center; color: #f0e6cf;
     min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center;
     cursor: pointer;
   }
   #introScreen p {
-    font-size: var(--fs-md); letter-spacing: 1px; margin: var(--sp-3) 0; opacity: 0;
+    font-size: var(--fs-md); letter-spacing: 0.5px; margin: var(--sp-3) 0; opacity: 0;
     animation: introFadeIn 2s ease forwards;
   }
   #introScreen .introSkip {
-    margin-top: var(--sp-5); font-size: var(--fs-body); color: #8a8264; letter-spacing: 1px;
+    margin-top: var(--sp-5); font-size: var(--fs-body); color: #b8ab88; letter-spacing: 0.5px;
   }
   @keyframes introFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
   #charCreation { text-align: left; }
-  #charCreation h2 { text-align:center; color: var(--gold); letter-spacing:2px; margin-bottom: var(--sp-5); font-weight: normal; }
+  #charCreation h2 { text-align:center; font-family: var(--font-display); color: var(--gold); letter-spacing:1px; margin-bottom: var(--sp-5); font-weight: normal; }
   .formRow { display:flex; align-items:center; gap: var(--sp-4); margin-bottom: var(--sp-4); font-size: var(--fs-md); }
   .formRow label { width: 240px; flex: 0 0 240px; overflow-wrap: break-word; }
   .formRow input[type=text], .formRow select {
     font-family: var(--font); font-size: var(--fs-md); padding: var(--sp-2); background: var(--panel);
-    border: 2px solid #0a0c11; flex: 1;
+    border: 2.5px solid var(--ink); border-radius: var(--r-sm); flex: 1;
   }
-  .traitPick { display:inline-block; margin: 2px; padding: var(--sp-1) var(--sp-3); border: 2px solid #0a0c11; cursor: pointer; font-size: var(--fs-body); background: var(--panel-dark); color: #d8cba8; }
-  .traitPick.selected { background: var(--gold); color: #1c1c1c; }
+  .traitPick { display:inline-block; margin: 2px; padding: var(--sp-1) var(--sp-3); border: 2.5px solid var(--ink); border-radius: 999px; cursor: pointer; font-size: var(--fs-body); background: var(--panel-dark); color: #f0e6cf; }
+  .traitPick.selected { background: var(--gold); color: var(--ink); }
   #frame.crt { position: relative; }
   #frame.crt::after {
-    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 50;
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 50; border-radius: var(--r-lg);
     background: repeating-linear-gradient(
       to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 1px, rgba(0,0,0,0.12) 2px, rgba(0,0,0,0.12) 3px
     );
     mix-blend-mode: multiply;
   }
   #electionBanner {
-    display:none; background: var(--accent); color:#f2e6c9; border:3px solid #0a0c11;
+    display:none; background: var(--accent); color:#fff6e2; border:3px solid var(--ink); border-radius: var(--r-md);
     padding: var(--sp-3); margin-bottom: var(--sp-3); font-size: var(--fs-body);
   }
+  #electionBanner b { font-family: var(--font-display); letter-spacing: 0.5px; }
   #electionBanner button { margin-top: var(--sp-2); }
   /* Titel-Aufstieg (§101-Feedback): kurze, nicht-blockierende Feier-Einblendung,
      damit Fortschritt (Baron, Graf, ...) sicht- und hörbar wird statt nur als
      Chronik-Zeile unterzugehen. */
   #titleUpBanner {
     position: fixed; top: 16%; left: 50%; transform: translate(-50%, -16px);
-    background: var(--gold); color: #1c1c1c; border: 3px solid #0a0c11;
-    padding: var(--sp-4) var(--sp-5); box-shadow: 4px 4px 0 #0a0c11;
-    font-size: var(--fs-lg); text-align: center; z-index: 500; letter-spacing: 1px;
+    background: var(--gold); color: var(--ink); border: 3px solid var(--ink); border-radius: var(--r-md);
+    padding: var(--sp-4) var(--sp-5); box-shadow: 5px 5px 0 rgba(44,31,18,0.35);
+    font-family: var(--font-display); font-size: var(--fs-lg); text-align: center; z-index: 500; letter-spacing: 0.5px;
     opacity: 0; pointer-events: none; transition: opacity 0.5s ease, transform 0.5s ease;
     max-width: 80%;
   }
   #titleUpBanner.show { opacity: 1; transform: translate(-50%, 0); }
-  #titleUpBanner .sub { font-size: var(--fs-body); margin-top: var(--sp-2); color: #3a2f10; letter-spacing: 0; }
+  #titleUpBanner .sub { font-family: var(--font); font-size: var(--fs-body); margin-top: var(--sp-2); color: var(--ink); letter-spacing: 0; }
   #eventModal, #birthModal, #ledgerModal {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    position: fixed; inset: 0; background: rgba(44,31,18,0.7);
     display: none; align-items: center; justify-content: center; z-index: 400;
   }
   #eventBox, #birthBox, #ledgerBox {
-    width: 540px; max-width: 92vw; background: var(--panel); border: 4px solid #0a0c11;
-    box-shadow: 4px 4px 0 #0a0c11; padding: var(--sp-4); font-size: var(--fs-md); color: var(--ink);
+    width: 540px; max-width: 92vw; background: var(--panel); border: 4px solid var(--ink); border-radius: var(--r-lg);
+    box-shadow: 6px 6px 0 rgba(44,31,18,0.35); padding: var(--sp-4); font-size: var(--fs-md); color: var(--ink);
     line-height: 1.6;
   }
-  #eventBox h3, #birthBox h3, #ledgerBox h3 { background: var(--accent); color:#f2e6c9; margin: calc(var(--sp-4) * -1) calc(var(--sp-4) * -1) var(--sp-3) calc(var(--sp-4) * -1); padding: var(--sp-3); font-size: var(--fs-lg); font-weight: normal; }
-  #birthBox input[type=text] { font-family: var(--font); font-size: var(--fs-md); padding: var(--sp-2); background: var(--panel-dark); color: var(--ink); border: 2px solid #0a0c11; width: 100%; box-sizing: border-box; margin: var(--sp-2) 0; }
+  #eventBox h3, #birthBox h3, #ledgerBox h3 {
+    background: var(--accent); color:#fff6e2; margin: calc(var(--sp-4) * -1) calc(var(--sp-4) * -1) var(--sp-3) calc(var(--sp-4) * -1);
+    padding: var(--sp-3); font-size: var(--fs-lg); font-weight: normal; font-family: var(--font-display); letter-spacing: 0.5px;
+    border-radius: calc(var(--r-lg) - 4px) calc(var(--r-lg) - 4px) 0 0;
+  }
+  #birthBox input[type=text] { font-family: var(--font); font-size: var(--fs-md); padding: var(--sp-2); background: var(--panel); color: var(--ink); border: 2.5px solid var(--ink); border-radius: var(--r-sm); width: 100%; box-sizing: border-box; margin: var(--sp-2) 0; }
   #ledgerBox table { width: 100%; border-collapse: collapse; margin: var(--sp-2) 0; }
-  #ledgerBox td { padding: 2px 0; }
+  #ledgerBox td { padding: 3px 0; }
   #ledgerBox td:last-child { text-align: right; }
-  #ledgerBox tr.ledgerTotal td { border-top: 2px solid #0a0c11; font-weight: bold; padding-top: var(--sp-1); }
+  #ledgerBox tr.ledgerTotal td { border-top: 2px solid var(--ink); font-weight: bold; padding-top: var(--sp-1); }
   .slider-row { display:flex; align-items:center; gap: var(--sp-2); margin: var(--sp-2) 0; }
-  input[type=range] { width: 120px; }
+  input[type=range] { width: 120px; accent-color: var(--accent2); }
   .goodgood { color: var(--accent2); }
   .goodbad { color: var(--accent); }
   #gameover {
-    position: fixed; inset:0; background: rgba(0,0,0,0.9); display:none;
-    align-items:center; justify-content:center; color:#f2e6c9; font-size:var(--fs-xl);
+    position: fixed; inset:0; background: rgba(44,31,18,0.92); display:none;
+    align-items:center; justify-content:center; color:#fff6e2; font-size:var(--fs-xl);
     text-align:center; line-height: 2;
   }
 
   /* Kampfbildschirm-Overlay: nutzt dieselben Tokens/Panel-Bausteine wie das Hauptspiel */
   #btOverlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none;
+    position: fixed; inset: 0; background: rgba(44,31,18,0.8); display: none;
     align-items: center; justify-content: center; z-index: 200;
   }
   #btFrame {
     width: 900px; max-height: 90vh; overflow-y: auto; background: var(--blue);
-    border: 6px solid #0a0c11; box-shadow: 0 0 0 2px #4a5570 inset, 0 0 40px rgba(0,0,0,0.6);
-    padding: var(--sp-3); color: #f2e6c9;
+    border: 5px solid var(--ink); border-radius: var(--r-lg); box-shadow: 8px 8px 0 rgba(44,31,18,0.3);
+    padding: var(--sp-3); color: #fff6e2;
   }
-  #btTitleBar { text-align: center; }
+  #btTitleBar { text-align: center; font-family: var(--font-display); letter-spacing: 0.5px; }
   #btBattlefield {
     display: flex; justify-content: space-between; align-items: center; background: #3a5a2d;
-    border: 3px solid #0a0c11; padding: var(--sp-4); margin-bottom: var(--sp-3); min-height: 120px; position: relative;
+    border: 3px solid var(--ink); border-radius: var(--r-md); padding: var(--sp-4); margin-bottom: var(--sp-3); min-height: 120px; position: relative;
   }
   #btBattlefield::before {
     content: "SCHLACHTFELD"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    color: rgba(255,255,255,0.15); font-size: var(--fs-md); letter-spacing: 3px;
+    color: rgba(255,255,255,0.18); font-family: var(--font-display); font-size: var(--fs-md); letter-spacing: 3px;
   }
   .btArmySide { display: flex; flex-direction: column; gap: var(--sp-1); width: 44%; z-index: 1; }
   .btArmySide.right { align-items: flex-end; text-align: right; }
   .btUnitRow { display: flex; gap: var(--sp-1); flex-wrap: wrap; }
   .btUnitRow.right { justify-content: flex-end; }
   .btUnitBlock {
-    background: var(--panel); color: var(--ink); border: 2px solid #0a0c11; padding: var(--sp-1) var(--sp-2);
-    font-size: var(--fs-micro); text-align: center; box-shadow: 1px 1px 0 #0a0c11; min-width: 58px;
+    background: var(--panel); color: var(--ink); border: 2px solid var(--ink); border-radius: 8px; padding: var(--sp-1) var(--sp-2);
+    font-size: var(--fs-micro); text-align: center; box-shadow: 2px 2px 0 rgba(44,31,18,0.3); min-width: 58px;
   }
   .btUnitBlock .cnt { font-weight: bold; }
-  .btMoraleBar { width: 100%; height: 5px; background: #00000033; border: 1px solid #0a0c11; margin-top: 2px; }
+  .btMoraleBar { width: 100%; height: 5px; background: rgba(0,0,0,0.25); border: 1px solid var(--ink); border-radius: 4px; margin-top: 2px; overflow: hidden; }
   .btMoraleBar > div { height: 100%; background: var(--accent2); }
   #btMessageBanner {
-    background: var(--accent); color: #f2e6c9; text-align: center; padding: var(--sp-3);
-    font-size: var(--fs-md); letter-spacing: 1px; margin-bottom: var(--sp-3); min-height: 20px;
-    border: 2px solid #0a0c11;
+    background: var(--accent); color: #fff6e2; text-align: center; padding: var(--sp-3);
+    font-family: var(--font-display); font-size: var(--fs-md); letter-spacing: 0.5px; margin-bottom: var(--sp-3); min-height: 20px;
+    border: 2px solid var(--ink); border-radius: var(--r-sm);
   }
   #btDecisionBox {
-    background: var(--panel-dark); padding: var(--sp-3); margin-bottom: var(--sp-3);
+    background: var(--panel-dark); padding: var(--sp-3); margin-bottom: var(--sp-3); border-radius: var(--r-sm);
     border: 2px solid var(--gold); display: none;
   }
 </style>
@@ -6019,9 +6043,12 @@ function render() {
   if (ruler) {
     const spouse = ruler.spouseId ? state.characters[ruler.spouseId] : null;
     const children = ruler.childrenIds.map(id => state.characters[id]).filter(c => c && c.alive);
-    let courtHtml = `<b>${ruler.name} ${ruler.surname}</b> (${ruler.gender === 'm' ? 'Herrscher' : 'Herrscherin'}), ${ruler.age} Jahre<br>`;
+    const rulerEmoji = ruler.gender === 'm' ? '🤴' : '👸';
+    let courtHtml = `<div class="courtHead"><div class="rulerAvatar">${rulerEmoji}</div><div style="flex:1;">`;
+    courtHtml += `<b>${ruler.name} ${ruler.surname}</b> (${ruler.gender === 'm' ? 'Herrscher' : 'Herrscherin'}), ${ruler.age} Jahre<br>`;
     courtHtml += `Gesundheit: ${Math.round(ruler.health)}/100<br>`;
     courtHtml += `Eigenschaften: ${ruler.traits.map(t => TRAITS.find(x=>x.id===t)?.name).join(', ') || '–'}<br>`;
+    courtHtml += `</div></div>`;
     courtHtml += `Werte: Intelligenz ${ruler.stats.intelligenz} · Diplomatie ${ruler.stats.diplomatie} · Verwaltung ${ruler.stats.verwaltung} · Militär ${ruler.stats.militaer} · Handel ${ruler.stats.handel} · Charisma ${ruler.stats.charisma}<br>`;
     courtHtml += spouse ? `Gemahlin/Gemahl: ${spouse.name}<br>` : `<i>unverheiratet</i><br>`;
     courtHtml += children.length ? `Kinder: ${children.map(c => `${c.name} (${c.age})`).join(', ')}` : `<i>keine Kinder</i>`;

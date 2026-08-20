@@ -1572,3 +1572,47 @@ korrekt in `state.characters`. Landeroberung separat per Node-Skript
 verifiziert: 300 Hektar wandern bei einem simulierten Sieg vom KI- zum
 Spielerkonto, Chronik-Eintrag stimmt, und im Grenzfall (Verteidiger nahe am
 Minimum) wird das 1000-Hektar-Minimum korrekt eingehalten statt unterschritten.
+
+## 2026-08-20 – Schritt 36: Komplettes Comic-Redesign (Mittelalter-Look statt 80er-Retro)
+
+Auf Nutzerwunsch: "das sieht alles so nach 1985 aus, es muss moderner werden."
+Nach zwei präsentierten Zwischenschritten (erst eine reine Lesbarkeits-
+Überarbeitung der Retro-Optik, dann drei Mockup-Vorschläge — komplett modern,
+Neo-Retro, Comic) hat sich der Nutzer für den **Comic-Look** entschieden.
+
+**Umsetzung:** Das komplette `<style>`-Element in `index.html` wurde
+überarbeitet — alle CSS-Variablennamen (`--bg`, `--panel`, `--panel-dark`,
+`--ink`, `--accent`, `--accent2`, `--gold`, `--blue`) blieben bewusst
+unverändert, nur ihre Werte wurden auf eine warme Pergament-Palette mit
+kräftigen Comicfarben (Rot, Grün, Gold, Himmelblau, neu: Lila) umgestellt —
+dadurch übernehmen auch alle ~40 Stellen, an denen JS-generierte Inline-Styles
+`var(--accent)` &co. referenzieren, automatisch die neue Palette, ohne dass
+ein einziger Script-Block angefasst werden musste. Der Pixel-Font (Press
+Start 2P) wurde ersetzt durch zwei neue Rollen: `--font-display` (Luckiest
+Guy, für Titel/Buttons/Tabs/Panel-Köpfe) und `--font` (Baloo 2, für
+Fließtext) — mit soliden System-Font-Fallbacks, falls Google Fonts beim
+Spieler nicht lädt. Durchgehend wurden harte Pixel-Kanten durch abgerundete
+Ecken ersetzt (neue Tokens `--r-sm/--r-md/--r-lg`), harte Schlagschatten
+durch weichere Comic-Offset-Schatten, und der Seitenhintergrund bekam ein
+dezentes Halbton-Punktraster (Comic-Druck-Optik). Neu: ein Herrscher-Avatar
+(🤴/👸 je nach Geschlecht) im Hof-Panel als kleines illustratives Element.
+
+**Nebenbefund behoben:** Das Namensfeld im Geburts-Fenster
+(`#birthBox input[type=text]`) hatte einen alten Kontrast-Bug — dunkler Text
+auf dunklem Hintergrund (`--panel-dark`/`--ink` fast identisch dunkel), der
+das Feld de facto unlesbar machte. Beim Reskin auf helle Pergament-Farbe
+korrigiert.
+
+**Bewusst nicht angetastet:** Spielstruktur, Simulationslogik, alle 13
+Modul-Quelldateien — reine CSS-/eine-Zeile-JS-Änderung (Avatar-Wrapper im
+Hof-Panel-Rendering). Kein Rebuild des Skript-Bundles nötig, da die Module
+selbst unverändert blieben.
+
+**Getestet:** Playwright-Durchlauf durch alle Hauptbildschirme (Titel,
+Charaktererstellung, alle 6 Tabs, Kassenbuch-Modal, Geburts-Modal,
+Kriegserklärung → Formationswahl → volles Schlachtfeld mit Truppenblöcken)
+— keine Layout-Überläufe, keine Konsolenfehler. Hinweis: In der
+Test-Sandbox sind Google Fonts nicht erreichbar (Netzwerk-Policy), daher
+zeigen die Screenshots System-Font-Fallbacks statt der eigentlich
+vorgesehenen Comic-Schriften — im normalen Browser des Spielers lädt
+Google Fonts regulär und die Schrift wird wie geplant angezeigt.
