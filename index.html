@@ -288,16 +288,16 @@
   }
   #titleUpBanner.show { opacity: 1; transform: translate(-50%, 0); }
   #titleUpBanner .sub { font-family: var(--font); font-size: var(--fs-body); margin-top: var(--sp-2); color: var(--ink); letter-spacing: 0; }
-  #eventModal, #birthModal, #marriageModal, #ledgerModal {
+  #eventModal, #birthModal, #marriageModal, #ledgerModal, #advisorCandidatesModal, #characterDebugModal {
     position: fixed; inset: 0; background: rgba(44,31,18,0.7);
     display: none; align-items: center; justify-content: center; z-index: 400;
   }
-  #eventBox, #birthBox, #marriageBox, #ledgerBox {
+  #eventBox, #birthBox, #marriageBox, #ledgerBox, #advisorCandidatesBox, #characterDebugBox {
     width: 540px; max-width: 92vw; background: var(--panel); border: 4px solid var(--ink); border-radius: var(--r-lg);
     box-shadow: 6px 6px 0 rgba(44,31,18,0.35); padding: var(--sp-4); font-size: var(--fs-md); color: var(--ink);
-    line-height: 1.6;
+    line-height: 1.6; max-height: 88vh; overflow-y: auto;
   }
-  #eventBox h3, #birthBox h3, #marriageBox h3, #ledgerBox h3 {
+  #eventBox h3, #birthBox h3, #marriageBox h3, #ledgerBox h3, #advisorCandidatesBox h3, #characterDebugBox h3 {
     background: var(--accent); color:#fff6e2; margin: calc(var(--sp-4) * -1) calc(var(--sp-4) * -1) var(--sp-3) calc(var(--sp-4) * -1);
     padding: var(--sp-3); font-size: var(--fs-lg); font-weight: normal; font-family: var(--font-display); letter-spacing: 0.5px;
     border-radius: calc(var(--r-lg) - 4px) calc(var(--r-lg) - 4px) 0 0;
@@ -651,6 +651,12 @@
       <button onclick="doShowAiDecision('ai3')">Bergheim</button>
       <div id="aiDecisionOutput" style="margin-top:var(--sp-2); white-space:pre-line; border:2px solid #0a0c11; padding:6px; background:rgba(0,0,0,0.05);"></div>
     </div>
+    <div style="margin-top:var(--sp-2);">
+      <b>Charakter-Inspektor (§Character-Core-Punkt 58-62 — technische Ansicht):</b>
+      <select id="debugCharacterSelect"></select>
+      <button onclick="doShowCharacterDebug()">Anzeigen</button>
+      <div id="characterDebugOutput" style="margin-top:var(--sp-2); white-space:pre-line; border:2px solid #0a0c11; padding:6px; background:rgba(0,0,0,0.05);"></div>
+    </div>
   </div>
 </div>
 
@@ -673,6 +679,10 @@
   <p id="marriage-text"></p>
   <div style="text-align:center; margin-top:var(--sp-3);"><button onclick="closeMarriageAnnouncement()">Weiter</button></div>
 </div></div>
+
+<div id="advisorCandidatesModal"><div id="advisorCandidatesBox"></div></div>
+
+<div id="characterDebugModal"><div id="characterDebugBox"></div></div>
 
 <div id="ledgerModal"><div id="ledgerBox">
   <h3 id="ledger-title">Kassenbuch</h3>
@@ -988,6 +998,7 @@ const CONFIG = {
     handelsberaterProductionDivisor: 60, // Produktionsbonus = Handelswert / diesem Wert, pro Stufe
     spionagemeisterAccuracyDivisor: 40, // zusätzliche Aufklärungsgenauigkeit (Basiswert) = Intelligenzwert / diesem Wert, pro Stufe
     geistlicherSatBonus: 3,          // Zufriedenheitsbonus pro Stufe
+    tenureBonusPerLevel: 0.15,       // §Phase-3 Character Core: Amtserfahrungsbonus statt reiner ×Stufe-Skalierung (Stufe 3 = +30% statt +200%) — die eigentliche Wirkung kommt jetzt primär aus Skill/Traits/Loyalität des Beraters (advisorEffectBonus() in js/military.js)
   },
   election: {
     triggerChancePerYear: 0.25,
@@ -2100,10 +2111,19 @@ const FORMATIONS = {
 };
 
 // ---------- Berater (§42) ----------
+// §Phase-3-Punkt 6: statKey von schatzmeister/spionagemeister auf die neuen
+// Skills "finanzen"/"intrige" umgestellt, die exakt für diese beiden Ämter
+// beschrieben sind ("Finanzen beeinflusst Schatzmeisterwirkung", "Intrige
+// beeinflusst später Spionage"). Kein bestehender Balancewert geändert —
+// finanzen/intrige sind brandneue, bislang nirgends verwendete Felder ohne
+// eigene Kalibrierungshistorie (§Punkt 29/73: "neue Charakterwerte separat
+// kalibrieren"), derselbe Wertebereich (3-17) wie zuvor. Die anderen 4
+// Rollen (militaer/diplomatie/charisma/handel) passten bereits zur
+// Skill-Beschreibung und bleiben unverändert.
 const ADVISOR_ROLES = {
   "schatzmeister": {
     "name": "Schatzmeister",
-    "statKey": "verwaltung",
+    "statKey": "finanzen",
     "desc": "Erhöht die Steuereinnahmen.",
     "baseCost": 220
   },
@@ -2121,7 +2141,7 @@ const ADVISOR_ROLES = {
   },
   "spionagemeister": {
     "name": "Spionagemeister",
-    "statKey": "intelligenz",
+    "statKey": "intrige",
     "desc": "Verbessert die Aufklärungsgenauigkeit über Nachbarregionen.",
     "baseCost": 140
   },
@@ -2516,17 +2536,60 @@ const TITLES = [
 const MALE_NAMES = ["Friedrich","Wilhelm","Heinrich","Konrad","Albrecht","Ludwig","Otto","Rudolf","Gottfried","Sigismund","Bernhard","Eberhard"];
 const FEMALE_NAMES = ["Adelheid","Mathilde","Elisabeth","Kunigunde","Irmgard","Hedwig","Agnes","Gertrud","Luitgard","Ottilie","Beatrix","Ida"];
 
+// ---------- Traits (Phase 3: Character Core) ----------
+// Datengetrieben (§Phase-3-Punkt 7/9): jeder Trait trägt seine Wirkung
+// direkt als `effects`-Objekt, gelesen über die bereits bestehende, generische
+// `traitEffectSum(character, key)` (js/population-dynasty.js) — keine
+// if(trait === "...")-Ketten nötig, auch nicht für die neuen Systeme
+// (Loyalität/Beraterwirkung/Ansprüche/Beziehungen), die einfach neue
+// `key`s abfragen. Bestehende 10 Traits bleiben inhaltlich unverändert
+// (ihre bisherigen effects-Schlüssel prestigeGain/treasuryDrain/
+// satisfactionBonus/productionBonus bleiben exakt gleich gewichtet) —
+// vier von ihnen (ehrgeizig/großzügig/geizig/grausam) bekommen zusätzlich
+// neue, rein additive Phase-3-Schlüssel (siehe unten), die nichts an der
+// bisherigen Wirkung ändern, nur neue hinzufügen. 12 neue Traits ergänzt
+// (§Punkt 8: "12-16 neue Traits"), aus der empfohlenen Liste.
+//
+// Neue effects-Schlüssel (Phase 3, additiv zu den bisherigen vier):
+//   loyaltyMod        — flacher Bonus/Malus auf die Loyalitätsformel
+//   claimAggression    — erhöht/senkt, wie stark ein eigener Anspruch die
+//                        Loyalität drückt bzw. Rivalität begünstigt
+//   advisorEffectMod   — Bonus/Malus (Anteil, z.B. 0.08 = +8%) auf die
+//                        Wirkung, wenn dieser Charakter ein Amt bekleidet
+//   relationshipMod    — flacher Bonus, den ANDERE für die Beziehung ZU
+//                        diesem Charakter erhalten (Charisma-artig)
 const TRAITS = [
-  { id: "ehrgeizig",     name: "ehrgeizig",     effects: { prestigeGain: 0.15 } },
-  { id: "grosszuegig",   name: "großzügig",     effects: { satisfactionBonus: 5, treasuryDrain: 0.05 } },
-  { id: "geizig",        name: "geizig",        effects: { treasuryDrain: -0.05, satisfactionBonus: -5 } },
+  { id: "ehrgeizig",     name: "ehrgeizig",     effects: { prestigeGain: 0.15, loyaltyMod: -10, claimAggression: 15 } },
+  { id: "grosszuegig",   name: "großzügig",     effects: { satisfactionBonus: 5, treasuryDrain: 0.05, loyaltyMod: 5 } },
+  { id: "geizig",        name: "geizig",        effects: { treasuryDrain: -0.05, satisfactionBonus: -5, loyaltyMod: -5 } },
   { id: "gerecht",       name: "gerecht",       effects: { satisfactionBonus: 8 } },
-  { id: "grausam",       name: "grausam",       effects: { satisfactionBonus: -10, prestigeGain: 0.05 } },
+  { id: "grausam",       name: "grausam",       effects: { satisfactionBonus: -10, prestigeGain: 0.05, loyaltyMod: -8 } },
   { id: "fleissig",      name: "fleißig",       effects: { productionBonus: 0.05 } },
   { id: "faul",          name: "faul",          effects: { productionBonus: -0.05 } },
   { id: "diplomatisch",  name: "diplomatisch",  effects: { prestigeGain: 0.05 } },
   { id: "fromm",         name: "fromm",         effects: { satisfactionBonus: 4 } },
   { id: "verschwenderisch", name: "verschwenderisch", effects: { treasuryDrain: 0.1 } },
+  // --- neu in Phase 3 ---
+  { id: "loyal",         name: "loyal",         effects: { loyaltyMod: 15 } },
+  { id: "barmherzig",    name: "barmherzig",    effects: { loyaltyMod: 5 } },
+  { id: "mutig",         name: "mutig",         effects: { claimAggression: 5 } },
+  { id: "feige",         name: "feige",         effects: { loyaltyMod: 10, claimAggression: -10 } },
+  { id: "intelligent",   name: "intelligent",   effects: { advisorEffectMod: 0.08 } },
+  { id: "naiv",          name: "naiv",          effects: { advisorEffectMod: -0.05, loyaltyMod: 5 } },
+  { id: "charismatisch", name: "charismatisch", effects: { relationshipMod: 5 } },
+  { id: "paranoid",      name: "paranoid",      effects: { loyaltyMod: -10 } },
+  { id: "arrogant",      name: "arrogant",      effects: { loyaltyMod: -8, claimAggression: 8 } },
+  { id: "bescheiden",    name: "bescheiden",    effects: { loyaltyMod: 8, claimAggression: -10 } },
+  { id: "korrupt",       name: "korrupt",       effects: { advisorEffectMod: -0.1 } },
+  { id: "rachsuechtig",  name: "rachsüchtig",   effects: { claimAggression: 10 } },
+];
+
+// §Punkt 75: offensichtlich widersprüchliche Kombinationen vermeiden (nicht
+// überkomplizieren — nur die drei explizit genannten Beispielpaare).
+const CONTRADICTORY_TRAIT_PAIRS = [
+  ["mutig", "feige"],
+  ["grosszuegig", "geizig"],
+  ["bescheiden", "arrogant"],
 ];
 
 function randomTraits(count) {
@@ -2534,13 +2597,43 @@ function randomTraits(count) {
   const picked = [];
   for (let i = 0; i < count && pool.length; i++) {
     const idx = Math.floor(rnd() * pool.length);
-    picked.push(pool.splice(idx, 1)[0].id);
+    const chosen = pool.splice(idx, 1)[0];
+    // Widersprüchliches Gegenstück aus dem verbleibenden Pool entfernen,
+    // damit derselbe Charakter es nicht ebenfalls ziehen kann.
+    for (const pair of CONTRADICTORY_TRAIT_PAIRS) {
+      if (pair.includes(chosen.id)) {
+        const otherId = pair[0] === chosen.id ? pair[1] : pair[0];
+        const otherIdx = pool.findIndex(t => t.id === otherId);
+        if (otherIdx !== -1) pool.splice(otherIdx, 1);
+      }
+    }
+    picked.push(chosen.id);
   }
   return picked;
 }
 
 function randomStat() { return 3 + Math.floor(rnd() * 15); } // 3-17
 
+// ---------- Adelshäuser für Beraterkandidaten (Phase 3, §Punkt 25/39) ----------
+// Kleine, deterministisch wählbare Pool historisch plausibler Namen für
+// Berater, die nicht aus der eigenen Dynastie stammen — macht
+// "Hauszugehörigkeit" als Beziehungs-/Rivalitätsquelle sinnvoll nutzbar.
+const NOBLE_HOUSES = ["von Berg", "von Moers", "von der Mark", "von Jülich", "von Cleve", "von Limburg", "von Sayn", "von Waldeck"];
+
+function randomNobleHouse() { return NOBLE_HOUSES[Math.floor(rnd() * NOBLE_HOUSES.length)]; }
+
+// createCharacter() bleibt das EINE zentrale Charaktermodell (§Phase-3-Punkt 2:
+// kein zweites paralleles Modell) — um Skills/Traits/Claims/Beziehungen/
+// Loyalität/Rivalen erweitert, statt dupliziert. `stats` behält bewusst
+// seinen bisherigen Wertebereich (3-17) und seine bisherigen 6 Schlüssel
+// unverändert (jede bestehende Formel, die z.B. `stats.militaer` liest,
+// bleibt dadurch exakt gleich kalibriert) — `finanzen`/`intrige` sind rein
+// additive NEUE Schlüssel für die von Phase 3 geforderten Skills
+// "Finanzen"/"Intrige", die es vorher nicht gab. Kein Rescaling auf 0-100
+// (§Phase-3-Punkt 6 nennt das nur als Vorzugsbereich, §Punkt 4 erlaubt
+// ausdrücklich eine sinnvolle Anpassung an die bestehende Architektur statt
+// einer erzwungenen Komplettmigration — ein Rescaling hätte hingegen JEDE
+// bestehende, bereits kalibrierte Formel verändert, die `stats.*` nutzt).
 function createCharacter(gender, age, surname) {
   const pool = gender === "m" ? MALE_NAMES : FEMALE_NAMES;
   const name = pool[Math.floor(rnd() * pool.length)];
@@ -2551,11 +2644,18 @@ function createCharacter(gender, age, surname) {
     stats: {
       intelligenz: randomStat(), diplomatie: randomStat(), verwaltung: randomStat(),
       militaer: randomStat(), handel: randomStat(), charisma: randomStat(),
+      finanzen: randomStat(), intrige: randomStat(),
     },
     traits: randomTraits(2),
     spouseId: null,
     childrenIds: [],
     parentId: null,
+    // --- Phase 3: Character Core ---
+    claims: [],          // { titleId, strength: "weak"|"strong"|"primary", reason, inheritedFrom }
+    relationships: {},   // targetId -> { total, modifiers: [{source, value}] }, siehe js/characters.js
+    loyalty: 50,          // getrennt von "Beziehung" (§Punkt 16), siehe computeLoyalty()
+    advisorRole: null,
+    rivalIds: [],
   };
 }
 
@@ -3137,7 +3237,7 @@ function logLedger(state, label, amount) {
 
 // ---------- Landwirtschaft (§18/§19) ----------
 
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 
 function serializeSave(state) {
   return JSON.stringify({
@@ -3148,8 +3248,34 @@ function serializeSave(state) {
   }, null, 0);
 }
 
+// §Character-Core-Punkt 44/45: neue Charakterfelder (Skills finanzen/
+// intrige, claims, relationships, loyalty, advisorRole, rivalIds,
+// pendingAdvisorSelection) bekommen beim Laden eines Spielstands aus
+// Version 2 feste, unmittelbar plausible Defaultwerte statt eines harten
+// Ladefehlers. Bewusst FESTE statt gewürfelte Werte (kein randomStat()
+// hier) — Migration läuft vor dem RNG-Wiederherstellen weiter unten, ein
+// rnd()-Aufruf an dieser Stelle würde den deterministischen Zufallsstrom
+// des geladenen Spielstands verfälschen.
+function migrateSaveV2ToV3(parsed) {
+  for (const id in parsed.state.characters) {
+    const c = parsed.state.characters[id];
+    if (c.stats && c.stats.finanzen === undefined) c.stats.finanzen = 10;
+    if (c.stats && c.stats.intrige === undefined) c.stats.intrige = 10;
+    if (!c.claims) c.claims = [];
+    if (!c.relationships) c.relationships = {};
+    if (c.loyalty === undefined) c.loyalty = 50;
+    if (c.advisorRole === undefined) c.advisorRole = null;
+    if (!c.rivalIds) c.rivalIds = [];
+    if (c.salaryDemand === undefined) c.salaryDemand = null;
+  }
+  if (parsed.state.pendingAdvisorSelection === undefined) parsed.state.pendingAdvisorSelection = null;
+  parsed.saveVersion = 3;
+  return parsed;
+}
+
 function deserializeSave(json) {
-  const parsed = JSON.parse(json);
+  let parsed = JSON.parse(json);
+  if (parsed.saveVersion === 2) parsed = migrateSaveV2ToV3(parsed);
   if (parsed.saveVersion !== SAVE_VERSION) {
     throw new Error("Inkompatible Spielstand-Version: " + parsed.saveVersion);
   }
@@ -3737,6 +3863,19 @@ function traitEffectSum(character, key) {
   return sum;
 }
 
+// Gemeinsame Sterbewahrscheinlichkeits-Formel für den Herrscher UND (seit
+// Phase 3) Berater — §Character-Core-Punkt 30: "wenn bereits Alters-/
+// Todessystem existiert: integrieren, keine zweite Alterungslogik bauen".
+// Reiner Formelbaustein ohne RNG-Verbrauch (der rnd()-Aufruf bleibt beim
+// jeweiligen Aufrufer) — verhält sich für den Herrscher exakt wie zuvor.
+function rollDeathChance(character) {
+  const cfg = CONFIG.dynasty;
+  let deathChance = cfg.deathBaseChance;
+  if (character.age > cfg.deathAgeThreshold) deathChance += (character.age - cfg.deathAgeThreshold) * cfg.deathAgeFactor;
+  if (character.health < cfg.deathLowHealthThreshold) deathChance += cfg.deathLowHealthBonus;
+  return deathChance;
+}
+
 function updateDynasty(state) {
   const ruler = state.characters[state.rulerId];
   if (!ruler || !ruler.alive) return;
@@ -3780,10 +3919,7 @@ function updateDynasty(state) {
   }
 
   // Sterbewahrscheinlichkeit
-  let deathChance = cfg.deathBaseChance;
-  if (ruler.age > cfg.deathAgeThreshold) deathChance += (ruler.age - cfg.deathAgeThreshold) * cfg.deathAgeFactor;
-  if (ruler.health < cfg.deathLowHealthThreshold) deathChance += cfg.deathLowHealthBonus;
-  if (rnd() < deathChance) {
+  if (rnd() < rollDeathChance(ruler)) {
     ruler.alive = false;
     addChronicle(state, `${ruler.name} ${ruler.surname} verstarb im Alter von ${ruler.age} Jahren.`);
     handleSuccession(state);
@@ -3823,8 +3959,42 @@ function handleSuccession(state) {
     }
   }
 
+  // §Character-Core-Punkt 22: bestehendes Erbfolge-Ergebnis (ältestes
+  // lebendes Kind erbt) bleibt unverändert. Zusätzlich (neu, Phase 3):
+  // übergangene Geschwister bekommen einen dauerhaften, nachvollziehbaren
+  // Groll (Anspruch wird auf "strong" angehoben und NICHT von
+  // updateClaims() wieder auf "weak" zurückgestuft, siehe js/characters.js)
+  // statt einfach zu verschwinden — die Grundlage für spätere
+  // Erbfolgekrisen-Eventketten (Phase 5+), noch OHNE automatischen
+  // Bürgerkrieg (§Punkt 22 ausdrücklich: "noch keinen vollständigen
+  // Bürgerkrieg automatisch auslösen").
+  for (const passedOver of heirs.slice(1)) {
+    const passedOverId = Object.keys(state.characters).find(id => state.characters[id] === passedOver);
+    if (!passedOverId) continue;
+    setClaim(passedOver, "player", "strong", "succession_passed_over");
+    addPersistentRelationshipModifier(passedOver, heirId, "erbfolge_uebergangen", -25);
+  }
+
   state.rulerId = heirId;
   addChronicle(state, `${heir.name} ${heir.surname} tritt im Alter von ${heir.age} Jahren die Nachfolge an.`);
+
+  // §Character-Core-Punkt 30: Berater können durch den Herrscherwechsel ihr
+  // Amt verlieren — abhängig von ihrer (zuletzt gegenüber dem alten
+  // Herrscher berechneten) Loyalität. Niedrige Loyalität = höheres Risiko,
+  // vom neuen Herrscher nicht übernommen zu werden.
+  for (const role in state.advisors) {
+    const advId = state.advisors[role];
+    if (!advId) continue;
+    const adv = state.characters[advId];
+    if (!adv || !adv.alive) continue;
+    const dismissChance = clamp((50 - adv.loyalty) / 100, 0, 0.4);
+    if (rnd() < dismissChance) {
+      addChronicle(state, `${adv.name} ${adv.surname || ""} verlor mit dem Herrscherwechsel das Amt des ${ADVISOR_ROLES[role].name}.`.replace(/\s+/g, " "));
+      state.advisors[role] = null;
+      state.advisorLevels[role] = 0;
+      adv.advisorRole = null;
+    }
+  }
 }
 
 // ---------- Diplomatie (§29/§30) ----------
@@ -3891,6 +4061,217 @@ function applyInterRegionalMigration(state) {
 }
 
 // ---------- Regierungsstil: "Sehr fair" bis "Gierig" (§Original-Justizregler) ----------
+
+// ============================================================
+// CHARACTERS — Phase 3 "Character Core": Beziehungen, Loyalität,
+// dynastische Ansprüche (Claims), Rivalitäten. Erweitert das bestehende
+// Charaktermodell (state.characters, createCharacter() in data/gamedata.js)
+// additiv — KEIN zweites paralleles Modell (§Phase-3-Punkt 2).
+//
+// Persistente vs. strukturelle Beziehungsgründe: die meisten Modifikatoren
+// (Geschwister/Ehepartner/gleiches Haus/Charisma) werden jedes Jahr NEU aus
+// dem aktuellen Zustand berechnet (rein deterministisch, kein RNG, immer
+// konsistent — kein Risiko einer stillen Divergenz). Drei Gründe sind
+// dagegen echte, einmalige Ereignisse und werden dauerhaft auf dem
+// Charakter gespeichert (PERSISTENT_MODIFIER_SOURCES unten): Amt
+// verweigert, bei der Erbfolge übergangen, Rivalität — diese verschwinden
+// nicht wieder, wenn sich der strukturelle Zustand ändert.
+// ============================================================
+
+const PERSISTENT_MODIFIER_SOURCES = new Set(["amt_verweigert", "erbfolge_uebergangen", "rivalitaet"]);
+
+function addPersistentRelationshipModifier(character, targetId, source, value) {
+  if (!character.relationships[targetId]) character.relationships[targetId] = { total: 0, modifiers: [] };
+  const mods = character.relationships[targetId].modifiers;
+  if (mods.some(m => m.source === source)) return; // nicht duplizieren
+  mods.push({ source, value });
+}
+
+// Berechnet, wie `fromId` über `toId` denkt — kombiniert die dauerhaft
+// gespeicherten Ereignis-Modifikatoren (siehe oben) mit frisch berechneten
+// strukturellen Modifikatoren, klammert auf -100..100. Schreibt NICHT in
+// state — reiner Leseweg, siehe refreshCharacterRelationships() für die
+// Stelle, die das Ergebnis tatsächlich zurück in relationships[] speichert.
+function computeRelationshipBreakdown(state, fromId, toId) {
+  if (fromId === toId) return { modifiers: [], total: 0 };
+  const from = state.characters[fromId];
+  const to = state.characters[toId];
+  if (!from || !to) return { modifiers: [], total: 0 };
+
+  const modifiers = [];
+  const stored = from.relationships[toId];
+  if (stored) {
+    for (const m of stored.modifiers) {
+      if (PERSISTENT_MODIFIER_SOURCES.has(m.source)) modifiers.push(m);
+    }
+  }
+
+  if (from.parentId === toId || to.parentId === fromId) modifiers.push({ source: "eltern_kind", value: 15 });
+  if (from.parentId && from.parentId === to.parentId) modifiers.push({ source: "geschwister", value: 15 });
+  if (from.spouseId === toId) modifiers.push({ source: "ehepartner", value: 25 });
+  if (from.surname && from.surname === to.surname) modifiers.push({ source: "gleiches_haus", value: 5 });
+  if (from.advisorRole && toId === state.rulerId) modifiers.push({ source: "amt_innehat", value: 10 });
+  const charismaBonus = traitEffectSum(to, "relationshipMod");
+  if (charismaBonus) modifiers.push({ source: "charisma", value: charismaBonus });
+
+  const total = clamp(modifiers.reduce((s, m) => s + m.value, 0), -100, 100);
+  return { modifiers, total };
+}
+
+// Schreibt das Ergebnis von computeRelationshipBreakdown() zurück in
+// character.relationships[targetId] (für Debug-UI/Kassenbuch-artige
+// Aufschlüsselung und als Cache für computeLoyalty()).
+function refreshRelationship(state, fromId, toId) {
+  const from = state.characters[fromId];
+  if (!from) return;
+  const breakdown = computeRelationshipBreakdown(state, fromId, toId);
+  from.relationships[toId] = breakdown;
+}
+
+// Nur für die wichtigen Charaktere (§Punkt 5/42: nicht jeden Einwohner) —
+// Herrscher, Ehepartner, Kinder, Geschwister des Herrschers, aktuelle
+// Berater. Historische (tote) Charaktere werden nicht mehr aktualisiert,
+// bleiben aber für die Genealogie erhalten (§Punkt 41).
+function getImportantCharacterIds(state) {
+  const ids = new Set();
+  const ruler = state.characters[state.rulerId];
+  if (ruler) {
+    ids.add(state.rulerId);
+    if (ruler.spouseId) ids.add(ruler.spouseId);
+    for (const cid of ruler.childrenIds) ids.add(cid);
+    if (ruler.parentId) {
+      for (const id in state.characters) {
+        if (state.characters[id].parentId === ruler.parentId) ids.add(id);
+      }
+    }
+  }
+  for (const role in state.advisors) {
+    if (state.advisors[role]) ids.add(state.advisors[role]);
+  }
+  return [...ids].filter(id => state.characters[id] && state.characters[id].alive);
+}
+
+// ---------- Loyalität (§Punkt 16/17: getrennt von "Beziehung") ----------
+// "Beziehung": mag die Person den Herrscher? "Loyalität": bleibt sie ihm
+// politisch treu? Ein Charakter kann eine gute Beziehung, aber wegen eines
+// starken eigenen Anspruchs trotzdem niedrige Loyalität haben.
+function computeLoyalty(state, characterId) {
+  if (characterId === state.rulerId) return 100; // der Herrscher ist sich selbst treu
+  const c = state.characters[characterId];
+  if (!c) return 50;
+  const rel = computeRelationshipBreakdown(state, characterId, state.rulerId);
+
+  let loyalty = 50;
+  loyalty += rel.total * 0.3;
+  loyalty += traitEffectSum(c, "loyaltyMod");
+  if (c.advisorRole) loyalty += 8;
+  loyalty += (state.legitimacy - 50) * 0.1;
+
+  const relevantClaim = c.claims.find(cl => cl.titleId === "player" && cl.strength !== "none");
+  if (relevantClaim) {
+    const claimBase = { weak: 4, strong: 12, primary: 20 }[relevantClaim.strength] || 0;
+    const aggression = traitEffectSum(c, "claimAggression");
+    loyalty -= claimBase + aggression * 0.5;
+  }
+
+  return Math.round(clamp(loyalty, 0, 100));
+}
+
+// ---------- Dynastische Ansprüche (§Punkt 18-20) ----------
+// Vereinfacht auf den einzigen Titel, der im Spiel mechanisch existiert
+// (die Nachfolge der eigenen Provinz, titleId "player") statt eines vollen
+// Mehrtitel-Anspruchsgraphen — §Punkt 19: "Spielbarkeit ist wichtiger als
+// perfektes mittelalterliches Erbrecht".
+function setClaim(character, titleId, strength, reason) {
+  const existing = character.claims.find(c => c.titleId === titleId);
+  if (existing) { existing.strength = strength; existing.reason = reason; }
+  else character.claims.push({ titleId, strength, reason, inheritedFrom: null });
+}
+
+// Läuft jährlich, rein deterministisch (kein RNG) — leitet Ansprüche direkt
+// aus der aktuellen Familienstruktur ab. Ansprüche mit reason
+// "succession_passed_over" (siehe handleSuccession() in
+// population-dynasty.js) werden NICHT wieder auf "weak" heruntergestuft,
+// da sie ein historisches, dauerhaftes Ereignis abbilden.
+function updateClaims(state) {
+  const ruler = state.characters[state.rulerId];
+  if (!ruler) return;
+  const livingChildren = ruler.childrenIds
+    .map(id => state.characters[id])
+    .filter(c => c && c.alive)
+    .sort((a, b) => b.age - a.age);
+  livingChildren.forEach((c, idx) => {
+    setClaim(c, "player", idx === 0 ? "primary" : "strong", idx === 0 ? "eldest_child" : "child");
+  });
+  if (ruler.parentId) {
+    for (const id in state.characters) {
+      const sib = state.characters[id];
+      if (!sib.alive || sib === ruler || sib.parentId !== ruler.parentId) continue;
+      const existing = sib.claims.find(cl => cl.titleId === "player");
+      if (!existing) setClaim(sib, "player", "weak", "sibling_of_ruler");
+    }
+  }
+}
+
+// ---------- Rivalitäten (§Punkt 31-34) ----------
+// Bewusst selten (§Punkt 33): nur bei klaren, engen Zuständen — schlechte
+// Beziehung UND (starker eigener Anspruch ODER ehrgeiziger/rachsüchtiger/
+// arroganter Charakterzug). Keine große zufällige Rivalitätenflut.
+function addRivalry(state, aId, bId) {
+  const a = state.characters[aId], b = state.characters[bId];
+  if (!a || !b) return;
+  if (!a.rivalIds.includes(bId)) a.rivalIds.push(bId);
+  if (!b.rivalIds.includes(aId)) b.rivalIds.push(aId);
+  addPersistentRelationshipModifier(a, bId, "rivalitaet", -30);
+  addPersistentRelationshipModifier(b, aId, "rivalitaet", -30);
+  refreshRelationship(state, aId, bId);
+  refreshRelationship(state, bId, aId);
+  addChronicle(state, `${a.name} ${a.surname || ""} gilt nun als Rivale von ${b.name} ${b.surname || ""}.`.replace(/\s+/g, " ").trim());
+}
+
+function updateRivalries(state) {
+  const rulerId = state.rulerId;
+  const ruler = state.characters[rulerId];
+  if (!ruler) return;
+  for (const id of getImportantCharacterIds(state)) {
+    if (id === rulerId) continue;
+    const c = state.characters[id];
+    if (c.rivalIds.includes(rulerId)) continue; // bereits Rivalen
+    const rel = computeRelationshipBreakdown(state, id, rulerId);
+    const hasStrongClaim = c.claims.some(cl => cl.titleId === "player" && (cl.strength === "strong" || cl.strength === "primary"));
+    const isAmbitious = traitEffectSum(c, "claimAggression") > 0;
+    // Zwei Pfade zur Rivalität (§Punkt 32/34): ein echter Groll allein
+    // reicht (unabhängig von Anspruch/Trait), ODER ein ehrgeiziger
+    // Charakter mit starkem eigenem Anspruch braucht nur eine bereits
+    // spürbar angespannte (nicht zwingend tief negative) Beziehung —
+    // die familiäre Grundsympathie (Geschwister/gleiches Haus, meist
+    // +20) allein soll keine Rivalität mit einem ambitionierten
+    // Thronanwärter verhindern, siehe Beispiel in §Punkt 9.
+    const grievancePath = rel.total <= -25;
+    const ambitionPath = isAmbitious && hasStrongClaim && rel.total < 15;
+    if (grievancePath || ambitionPath) addRivalry(state, id, rulerId);
+  }
+}
+
+// ---------- Jahresschritt (§Punkt 89: in einen bestehenden advanceYear()-
+// Teilschritt integrieren, keine neue God-Function, advanceYear() selbst
+// bleibt unverändert bei 6 Zeilen — siehe js/advance-year.js) ----------
+function updateCharacterCore(state) {
+  const importantIds = getImportantCharacterIds(state);
+  for (const id of importantIds) {
+    for (const otherId of importantIds) {
+      if (id !== otherId) refreshRelationship(state, id, otherId);
+    }
+    if (id !== state.rulerId) refreshRelationship(state, id, state.rulerId);
+  }
+  updateClaims(state);
+  for (const id of importantIds) {
+    if (id === state.rulerId) continue;
+    state.characters[id].loyalty = computeLoyalty(state, id);
+  }
+  updateRivalries(state);
+  checkAdvisorDeaths(state);
+}
 
 // ============================================================
 // POLITICS — Titel-Aufstieg, Kaiserwahl, Regierungsstil, Religion,
@@ -4453,10 +4834,40 @@ function rollWarAllies(state, targetId) {
 // sie sind harmlos und ihre Entfernung war nicht Teil dieses Schritts.
 // ============================================================
 
+// §Character-Core-Punkt 25/26: ein einzelner Kandidat pro Vakanz wurde
+// durch eine echte Auswahl von 2-4 unterschiedlichen Personen ersetzt.
+// generateAdvisorCandidate() (ein Kandidat) bleibt als Baustein erhalten.
 function generateAdvisorCandidate(role) {
-  const c = createCharacter(rnd() < 0.5 ? "m" : "f", 28 + Math.floor(rnd()*30), "");
+  const gender = rnd() < 0.5 ? "m" : "f";
+  const age = 28 + Math.floor(rnd() * 30);
+  const c = createCharacter(gender, age, randomNobleHouse());
   c.advisorRole = role;
+  // Gehaltsforderung streut moderat um den bereits kalibrierten baseCost
+  // (§Punkt 25) — im Mittel über viele Kandidaten identisch zum bisherigen
+  // Fixpreis, keine stille Gesamtkostenverschiebung.
+  c.salaryDemand = Math.round(ADVISOR_ROLES[role].baseCost * (0.85 + rnd() * 0.3));
   return c;
+}
+
+// Mischt gelegentlich einen lebenden, erwachsenen, amtslosen Geschwisterteil
+// des Herrschers in den Kandidatenpool (§Punkt 1, das Wilhelm-Beispiel) —
+// wird er nicht gewählt, entsteht daraus eine echte, nachvollziehbare
+// "Amt verweigert"-Beziehungsspannung (siehe confirmAdvisorSelection unten).
+function generateAdvisorCandidates(state, role) {
+  const count = 2 + Math.floor(rnd() * 3); // 2-4
+  const candidates = [];
+  const ruler = state.characters[state.rulerId];
+  if (ruler && ruler.parentId && rnd() < 0.4) {
+    for (const id in state.characters) {
+      const c = state.characters[id];
+      if (c.alive && c.parentId === ruler.parentId && c !== ruler && c.age >= 18 && !c.advisorRole) {
+        candidates.push({ existingId: id });
+        break;
+      }
+    }
+  }
+  while (candidates.length < count) candidates.push({ generated: generateAdvisorCandidate(role) });
+  return candidates;
 }
 
 // Kosten, um ein Amt von currentLevel auf currentLevel+1 zu bringen (0 = Berufung
@@ -4465,18 +4876,47 @@ function advisorUpgradeCost(role, currentLevel) {
   return Math.round(ADVISOR_ROLES[role].baseCost * Math.pow(CONFIG.advisors.upgradeCostMultiplier, currentLevel));
 }
 
-function hireAdvisor(state, role) {
+// Öffnet die Kandidatenauswahl für ein vakantes Amt (Kosten werden erst bei
+// confirmAdvisorSelection() tatsächlich abgebucht).
+function openAdvisorSelection(state, role) {
   if (state.advisors[role]) return { ok: false, reason: "Dieses Amt ist bereits besetzt." };
   const cost = advisorUpgradeCost(role, 0);
   if (state.treasury < cost) return { ok: false, reason: "Nicht genug Taler, um jemanden zu berufen." };
-  const candidate = generateAdvisorCandidate(role);
-  const cid = nextCharId();
-  state.characters[cid] = candidate;
-  state.advisors[role] = cid;
-  state.advisorLevels[role] = 1;
-  state.treasury -= cost;
-  logLedger(state, `Berater berufen: ${ADVISOR_ROLES[role].name}`, -cost);
-  addChronicle(state, `${candidate.name} wurde zum ${ADVISOR_ROLES[role].name} ernannt.`);
+  state.pendingAdvisorSelection = { role, cost, candidates: generateAdvisorCandidates(state, role) };
+  return { ok: true };
+}
+
+function confirmAdvisorSelection(state, candidateIndex) {
+  const sel = state.pendingAdvisorSelection;
+  if (!sel) return { ok: false, reason: "Keine Kandidatenauswahl offen." };
+  const chosen = sel.candidates[candidateIndex];
+  if (!chosen) return { ok: false, reason: "Ungültige Auswahl." };
+  if (state.treasury < sel.cost) return { ok: false, reason: "Nicht genug Taler, um jemanden zu berufen." };
+
+  let cid, character;
+  if (chosen.existingId) {
+    cid = chosen.existingId;
+    character = state.characters[cid];
+  } else {
+    character = chosen.generated;
+    cid = nextCharId();
+    state.characters[cid] = character;
+  }
+  character.advisorRole = sel.role;
+  state.advisors[sel.role] = cid;
+  state.advisorLevels[sel.role] = 1;
+  state.treasury -= sel.cost;
+  logLedger(state, `Berater berufen: ${ADVISOR_ROLES[sel.role].name}`, -sel.cost);
+  addChronicle(state, `${character.name} ${character.surname || ""} wurde zum ${ADVISOR_ROLES[sel.role].name} ernannt.`.replace(/\s+/g, " "));
+
+  for (const other of sel.candidates) {
+    if (other === chosen || !other.existingId) continue;
+    const rejected = state.characters[other.existingId];
+    addPersistentRelationshipModifier(rejected, state.rulerId, "amt_verweigert", -20);
+    refreshRelationship(state, other.existingId, state.rulerId);
+    addChronicle(state, `${rejected.name} ${rejected.surname || ""} wurde bei der Vergabe des Amtes ${ADVISOR_ROLES[sel.role].name} übergangen.`.replace(/\s+/g, " "));
+  }
+  state.pendingAdvisorSelection = null;
   return { ok: true };
 }
 
@@ -4498,14 +4938,40 @@ function dismissAdvisor(state, role) {
   if (!state.advisors[role]) return { ok: false, reason: "Dieses Amt ist nicht besetzt." };
   const c = state.characters[state.advisors[role]];
   addChronicle(state, `${c ? c.name : "Der Amtsinhaber"} wurde als ${ADVISOR_ROLES[role].name} entlassen.`);
+  if (c) c.advisorRole = null;
   state.advisors[role] = null;
   state.advisorLevels[role] = 0;
   return { ok: true };
 }
 
-// Bonus aus dem relevanten Stat des Beraters, falls besetzt — skaliert linear mit
-// der Ausbaustufe (§Original-Vertiefung: Stufe 3 wirkt dreimal so stark wie Stufe 1).
+// §Character-Core-Punkt 30: Berater altern (bereits über die gemeinsame
+// Alterungsschleife in updateDynasty()) und sterben jetzt auch — dieselbe
+// Sterbewahrscheinlichkeits-Formel wie beim Herrscher (rollDeathChance() in
+// js/population-dynasty.js), keine zweite Alterungslogik. Tod macht das
+// Amt frei (§Punkt 41).
+function checkAdvisorDeaths(state) {
+  for (const role in state.advisors) {
+    const advId = state.advisors[role];
+    if (!advId) continue;
+    const adv = state.characters[advId];
+    if (!adv || !adv.alive) continue;
+    if (rnd() < rollDeathChance(adv)) {
+      adv.alive = false;
+      adv.advisorRole = null;
+      addChronicle(state, `${adv.name} ${adv.surname || ""}, ${ADVISOR_ROLES[role].name}, ist verstorben.`.replace(/\s+/g, " "));
+      state.advisors[role] = null;
+      state.advisorLevels[role] = 0;
+    }
+  }
+}
 
+// §Character-Core-Punkt 27: Beraterwirkung entsteht primär aus Skill,
+// Charaktereigenschaften und Loyalität — NICHT mehr aus "Stufe 3 = dreifache
+// Wirkung" (die bisherige reine ×level-Skalierung). Das bestehende
+// Ausbausystem (upgradeAdvisor(), baseCost, Ausbaukosten) bleibt technisch
+// vollständig erhalten (§Punkt 28/29: kein harter Cut) — die Stufe wirkt
+// jetzt als moderater Amtserfahrungsbonus (`tenureFactor`, per CONFIG neu
+// und separat kalibriert) statt als alleiniger linearer Multiplikator.
 function advisorEffectBonus(state, role) {
   const advisorId = state.advisors[role];
   if (!advisorId) return 0;
@@ -4514,11 +4980,15 @@ function advisorEffectBonus(state, role) {
   const cfg = CONFIG.advisors;
   const level = state.advisorLevels[role] || 1;
   const statVal = advisor.stats[ADVISOR_ROLES[role].statKey];
-  if (role === "schatzmeister") return Math.min(cfg.schatzmeisterMaxBonus * level, (statVal / 100) * level);
-  if (role === "marschall") return (statVal / cfg.marschallStrengthDivisor) * level;
-  if (role === "diplomat") return (statVal / cfg.diplomatRelationBonusDivisor) * level;
-  if (role === "handelsberater") return (statVal / cfg.handelsberaterProductionDivisor) * level;
-  if (role === "spionagemeister") return (statVal / cfg.spionagemeisterAccuracyDivisor) * level;
+  const tenureFactor = 1 + (level - 1) * cfg.tenureBonusPerLevel;
+  const traitFactor = 1 + traitEffectSum(advisor, "advisorEffectMod");
+  const loyaltyFactor = 0.7 + (advisor.loyalty / 100) * 0.3; // 0.7x (Loyalität 0) .. 1.0x (Loyalität 100)
+  const multiplier = tenureFactor * traitFactor * loyaltyFactor;
+  if (role === "schatzmeister") return Math.min(cfg.schatzmeisterMaxBonus * multiplier, (statVal / 100) * multiplier);
+  if (role === "marschall") return (statVal / cfg.marschallStrengthDivisor) * multiplier;
+  if (role === "diplomat") return (statVal / cfg.diplomatRelationBonusDivisor) * multiplier;
+  if (role === "handelsberater") return (statVal / cfg.handelsberaterProductionDivisor) * multiplier;
+  if (role === "spionagemeister") return (statVal / cfg.spionagemeisterAccuracyDivisor) * multiplier;
   return 0;
 }
 
@@ -5167,6 +5637,11 @@ function applyRulerAndDynastyEffects(state) {
   }
 
   updateDynasty(state);
+  // §Character-Core-Punkt 89: EIN Aufruf statt advanceYear() wieder
+  // aufzublasen — Beziehungen/Loyalität/Ansprüche/Rivalitäten/Berater-Tod
+  // laufen NACH updateDynasty(), damit eine in diesem Jahr eingetretene
+  // Erbfolge bereits mit dem neuen Herrscher berücksichtigt wird.
+  updateCharacterCore(state);
   const ruler = state.characters[state.rulerId];
   const prestigeGain = 1 + (ruler ? traitEffectSum(ruler, "prestigeGain") : 0);
   state.prestige += prestigeGain;
@@ -6615,8 +7090,63 @@ document.getElementById('langSelect').addEventListener('change', (e) => setLocal
 document.getElementById('langSelectTitle').addEventListener('change', (e) => setLocale(e.target.value));
 document.getElementById('debugToggle').addEventListener('change', (e) => {
   document.getElementById('debugPanel').style.display = e.target.checked ? 'block' : 'none';
-  if (e.target.checked) populateDebugEventSelect();
+  if (e.target.checked) { populateDebugEventSelect(); populateCharacterDebugSelect(); }
 });
+
+// §Character-Core-Punkt 58-62: technischer Charakter-Inspektor — zeigt für
+// den ausgewählten Charakter ID/Alter/Haus/Familie/Skills/Traits/Claims/
+// Beziehung zum Herrscher (mit Einzelgründen, §Punkt 59)/Loyalität/Rivalen.
+// Keine Blackbox (§Punkt 62).
+function populateCharacterDebugSelect() {
+  const sel = document.getElementById('debugCharacterSelect');
+  if (!state) return;
+  const entries = Object.keys(state.characters).map(id => {
+    const c = state.characters[id];
+    return { id, label: `${c.alive ? '' : '✝ '}${c.name} ${c.surname || ''} (${id})${id === state.rulerId ? ' — Herrscher' : ''}` };
+  });
+  sel.innerHTML = entries.map(e => `<option value="${e.id}">${e.label}</option>`).join('');
+}
+
+function doShowCharacterDebug() {
+  const id = document.getElementById('debugCharacterSelect').value;
+  const c = state.characters[id];
+  const out = document.getElementById('characterDebugOutput');
+  if (!c) { out.textContent = 'Kein Charakter ausgewählt.'; return; }
+  const traitNames = c.traits.map(tid => (TRAITS.find(t => t.id === tid) || {}).name || tid).join(', ') || '–';
+  const claimLines = c.claims.length
+    ? c.claims.map(cl => `  ${cl.titleId}: ${cl.strength} (${cl.reason})`).join('\n')
+    : '  keine';
+  let relLines = '  (Herrscher selbst)';
+  if (id !== state.rulerId) {
+    const rel = computeRelationshipBreakdown(state, id, state.rulerId);
+    const modLines = rel.modifiers.length
+      ? rel.modifiers.map(m => `    ${m.source}: ${m.value >= 0 ? '+' : ''}${m.value}`).join('\n')
+      : '    (keine)';
+    relLines = `  Base: 0\n${modLines}\n  Gesamt: ${rel.total}`;
+  }
+  const rivalNames = c.rivalIds.map(rid => state.characters[rid] ? `${state.characters[rid].name} ${state.characters[rid].surname || ''}` : rid).join(', ') || 'keine';
+  out.textContent =
+`ID: ${id}
+Name: ${c.name} ${c.surname || ''}${c.alive ? '' : ' (verstorben)'}
+Alter: ${c.age} · Gesundheit: ${Math.round(c.health)}
+Eltern-ID: ${c.parentId || '–'} · Ehepartner-ID: ${c.spouseId || '–'} · Kinder: ${c.childrenIds.length}
+Amt: ${c.advisorRole ? ADVISOR_ROLES[c.advisorRole].name : '–'}
+
+SKILLS
+Verwaltung ${c.stats.verwaltung} · Diplomatie ${c.stats.diplomatie} · Militär ${c.stats.militaer}
+Intrige ${c.stats.intrige} · Finanzen ${c.stats.finanzen} · Charisma ${c.stats.charisma}
+
+TRAITS: ${traitNames}
+
+CLAIMS
+${claimLines}
+
+BEZIEHUNG ZUM HERRSCHER
+${relLines}
+
+LOYALITÄT: ${id === state.rulerId ? '100 (Herrscher)' : c.loyalty}
+RIVALEN: ${rivalNames}`;
+}
 
 function populateDebugEventSelect() {
   const sel = document.getElementById('debugEventSelect');
@@ -6772,8 +7302,9 @@ function render() {
   if (currentPage === 'karte') renderMap();
   if (currentPage === 'militaer') renderMilitary();
 
-  // Berater (§Original-Vertiefung: Ausbaustufen mit steigenden Kosten und spürbar
-  // stärkerem Effekt statt nur besetzt/unbesetzt)
+  // Berater (§Character-Core: echte Personen statt reiner Stufenzahlen —
+  // Wirkung kommt primär aus Skill/Traits/Loyalität, das Ausbausystem bleibt
+  // als moderater Amtserfahrungsbonus erhalten)
   let advHtml = '';
   for (const role in ADVISOR_ROLES) {
     const roleInfo = ADVISOR_ROLES[role];
@@ -6784,14 +7315,16 @@ function render() {
       const maxed = level >= CONFIG.advisors.maxLevel;
       const upgradeCost = maxed ? null : advisorUpgradeCost(role, level);
       const yearlyCost = CONFIG.advisors.yearlySalary * level;
-      advHtml += `<div class="advisorSlot"><b>${roleInfo.name}</b>: ${adv.name} (${roleInfo.statKey} ${adv.stats[roleInfo.statKey]}) — Stufe ${level}/${CONFIG.advisors.maxLevel}<br>
-        <i>${roleInfo.desc} Aktuelle Wirkung: ${advisorEffectLabel(role, level, adv.stats[roleInfo.statKey])}. Gehalt: ${yearlyCost} Taler/Jahr.</i><br>
+      const traitNames = adv.traits.map(tid => (TRAITS.find(t => t.id === tid) || {}).name || tid).join(', ');
+      advHtml += `<div class="advisorSlot"><b>${roleInfo.name}</b>: ${adv.name} ${adv.surname || ''} (${adv.age} Jahre) — Stufe ${level}/${CONFIG.advisors.maxLevel}<br>
+        <i>${roleInfo.statKey} ${adv.stats[roleInfo.statKey]} · Eigenschaften: ${traitNames || '–'} · Loyalität ${adv.loyalty}</i><br>
+        <i>${roleInfo.desc} Aktuelle Wirkung: ${advisorEffectLabel(role, adv)}. Gehalt: ${yearlyCost} Taler/Jahr.</i><br>
         ${maxed ? '' : `<button onclick="doUpgradeAdvisor('${role}')">Ausbauen auf Stufe ${level+1} (${upgradeCost} Taler)</button>`}
         <button onclick="doDismissAdvisor('${role}')">Entlassen</button></div>`;
     } else {
       advHtml += `<div class="advisorSlot"><b>${roleInfo.name}</b>: <i>unbesetzt</i><br>
         <i>${roleInfo.desc}</i><br>
-        <button onclick="doHireAdvisor('${role}')">Berufen (${advisorUpgradeCost(role, 0)} Taler)</button></div>`;
+        <button onclick="doOpenAdvisorSelection('${role}')">Kandidaten anhören (${advisorUpgradeCost(role, 0)} Taler)</button></div>`;
     }
   }
   document.getElementById('advisorsPanel').innerHTML = advHtml;
@@ -7413,10 +7946,37 @@ function doInvestResearch(category) {
   render();
 }
 
-function doHireAdvisor(role) {
-  const result = hireAdvisor(state, role);
+// §Character-Core-Punkt 25/26: statt eines automatisch zugewiesenen
+// Kandidaten öffnet dies eine Auswahl aus 2-4 echten Personen (Modal, siehe
+// showAdvisorCandidates()/#advisorCandidatesModal).
+function doOpenAdvisorSelection(role) {
+  const result = openAdvisorSelection(state, role);
+  if (!result.ok) { alert(result.reason); return; }
+  showAdvisorCandidates();
+}
+
+function showAdvisorCandidates() {
+  const sel = state.pendingAdvisorSelection;
+  if (!sel) return;
+  const roleInfo = ADVISOR_ROLES[sel.role];
+  let html = `<h3>⚖ Kandidaten für das Amt: ${roleInfo.name}</h3>`;
+  sel.candidates.forEach((cand, idx) => {
+    const c = cand.existingId ? state.characters[cand.existingId] : cand.generated;
+    const traitNames = c.traits.map(tid => (TRAITS.find(t => t.id === tid) || {}).name || tid).join(', ');
+    const originLabel = cand.existingId ? 'Geschwister des Herrschers' : `Haus ${c.surname}`;
+    html += `<div class="advisorSlot"><b>${c.name} ${c.surname || ''}</b> (${c.age} Jahre) — ${originLabel}<br>
+      <i>${roleInfo.statKey} ${c.stats[roleInfo.statKey]} · Eigenschaften: ${traitNames || '–'} · Gehaltsforderung ~${Math.round(c.salaryDemand || sel.cost)} Taler/Jahr</i><br>
+      <button onclick="doConfirmAdvisorSelection(${idx})">${c.name} berufen (${sel.cost} Taler)</button></div>`;
+  });
+  document.getElementById('advisorCandidatesBox').innerHTML = html;
+  document.getElementById('advisorCandidatesModal').style.display = 'flex';
+}
+
+function doConfirmAdvisorSelection(idx) {
+  const result = confirmAdvisorSelection(state, idx);
   if (!result.ok) { alert(result.reason); return; }
   playBeep(440, 0.1);
+  document.getElementById('advisorCandidatesModal').style.display = 'none';
   render();
 }
 
@@ -7427,16 +7987,18 @@ function doUpgradeAdvisor(role) {
   render();
 }
 
-// Rein informative Anzeige der aktuellen Beraterwirkung, damit der Effekt der
-// Ausbaustufe im Berater-Panel unmittelbar sichtbar ist (Nutzerwunsch).
-function advisorEffectLabel(role, level, statVal) {
-  const cfg = CONFIG.advisors;
-  if (role === 'schatzmeister') return `+${Math.round(Math.min(cfg.schatzmeisterMaxBonus * level, (statVal/100) * level) * 100)}% Steuereinnahmen`;
-  if (role === 'marschall') return `+${((statVal/cfg.marschallStrengthDivisor) * level).toFixed(1)} Armeestärke, stärkt den Kommandanten`;
-  if (role === 'diplomat') return `+${((statVal/cfg.diplomatRelationBonusDivisor) * level).toFixed(2)} Beziehungsgewinn je Aktion`;
-  if (role === 'handelsberater') return `+${Math.round((statVal/cfg.handelsberaterProductionDivisor) * level * 100)}% Produktion`;
-  if (role === 'spionagemeister') return `+${Math.round((statVal/cfg.spionagemeisterAccuracyDivisor) * level * 100)}% Aufklärungsgenauigkeit`;
-  if (role === 'geistlicher') return `+${(cfg.geistlicherSatBonus * level * 0.5).toFixed(1)} Zufriedenheit/Jahr`;
+// Rein informative Anzeige der aktuellen Beraterwirkung — ruft dieselbe
+// Formel (advisorEffectBonus()) auf, die auch tatsächlich im Spiel wirkt,
+// statt sie in der UI ein zweites Mal nachzubilden (kein Drift-Risiko
+// zwischen Anzeige und echter Wirkung).
+function advisorEffectLabel(role, adv) {
+  const bonus = advisorEffectBonus(state, role);
+  if (role === 'schatzmeister') return `+${Math.round(bonus * 100)}% Steuereinnahmen`;
+  if (role === 'marschall') return `+${bonus.toFixed(1)} Armeestärke, stärkt den Kommandanten`;
+  if (role === 'diplomat') return `+${bonus.toFixed(2)} Beziehungsgewinn je Aktion`;
+  if (role === 'handelsberater') return `+${Math.round(bonus * 100)}% Produktion`;
+  if (role === 'spionagemeister') return `+${Math.round(bonus * 100)}% Aufklärungsgenauigkeit`;
+  if (role === 'geistlicher') return `+${bonus.toFixed(1)} Zufriedenheit/Jahr`;
   return '';
 }
 
