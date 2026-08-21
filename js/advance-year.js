@@ -4,18 +4,38 @@
 // geladen werden.
 // ============================================================
 
-function advanceYear(state) {
-  state.year += 1;
-  state.pendingEvent = null;
+// ---------- advanceYear()-Teilschritte (Phase 2: Technical Stabilization) ----------
+// Reines Extract-Method-Refactoring einer zuvor ~123 Zeilen langen
+// Einzelfunktion: jeder Block steht unverändert (gleicher Code, gleiche
+// Reihenfolge, keine umgestellten Bedingungen/Schleifen) in einer eigenen,
+// benannten Funktion. advanceYear() selbst ruft sie danach nur noch in
+// exakt der bisherigen Reihenfolge auf — siehe CODE_AUDIT.md Abschnitt 13
+// für den zugrundeliegenden Plan.
+//
+// WICHTIG (RNG-Determinismus, §CODE_AUDIT.md 13.6): rnd() ist ein einziger
+// globaler Zufallsstrom. Die Aufrufreihenfolge der rnd()-konsumierenden
+// Fachfunktionen innerhalb jedes Teilschritts UND die Reihenfolge der
+// Teilschritte zueinander entspricht exakt der vorherigen Zeilenreihenfolge
+// in der ehemaligen Monolith-advanceYear(). Beim Ändern dieser Datei niemals
+// Anweisungen umsortieren, auch wenn es harmlos aussieht — siehe
+// tests/advance_year_snapshot_test.js für den verbindlichen Beweis.
 
-  // Berater-Effekt auf Produktion vor der Produktionsberechnung anwenden
+// Berater-/Infrastruktur-/Technologie-Boni auf die Produktion, vor der
+// eigentlichen Produktionsberechnung in processAllRegions().
+function applyPreProductionBonuses(state) {
   const handelsberaterBonus = advisorEffectBonus(state, "handelsberater");
   const infraProdBonus = state.regions.player.infrastructureLevel * CONFIG.infrastructure.productionBonusPerLevel;
   const handwerkTechBonus = techBonus(state, "handwerk");
   state.regions.player.productionBonus = (state.regions.player._baseProductionBonus || 0) + handelsberaterBonus + infraProdBonus + handwerkTechBonus;
   state.regions.player.getreideTechBonus = techBonus(state, "landwirtschaft");
   generateResearchPoints(state, state.regions.player); // §28
+}
 
+// Wetter/Produktion/Kornbilanz/Preise/Zufriedenheit/Bevölkerung/
+// Stadtentwicklung für JEDE Region (Spieler und alle KI-Regionen gleich
+// behandelt, keine Sonderpfade) — die komplette ehemalige for-in-Schleife,
+// unverändert.
+function processAllRegions(state) {
   for (const id in state.regions) {
     const r = state.regions[id];
     const weather = rollWeather();
@@ -44,7 +64,12 @@ function advanceYear(state) {
       for (const pid in r.population) r.population[pid].satisfaction = clamp(r.population[pid].satisfaction + tierSatBonus * 0.05, 0, 100);
     }
   }
+}
 
+// Landpreis, Regierungsstil, Regionalhandel, Migration, Diplomatie-Update,
+// Söldnerdesertion — alles, was nach der Region-Schleife, aber vor den
+// Dynastie-/Herrscher-Effekten läuft.
+function updateEconomyAndDiplomacy(state) {
   updateLandPrice(state); // §Original: Landpreis schwankt spekulativ
   applyGovernanceStyle(state, state.regions.player); // §Original-Justizregler
 
@@ -56,6 +81,11 @@ function advanceYear(state) {
   // Söldner-Fahnenflucht-Prüfung bleibt aber bewusst eine jährliche
   // Stichprobe (ihre Wahrscheinlichkeiten sind auf diese Frequenz kalibriert).
   checkSoeldnerDesertion(state, state.treasury < 0);
+}
+
+// Geistlicher-Bonus, Legitimitätserholung, Dynastie-Update (Altern/Heirat/
+// Geburt/Tod/Erbfolge), Prestige- und Charaktereigenschaften-Effekte.
+function applyRulerAndDynastyEffects(state) {
   const r = state.regions.player;
 
   // Geistlicher hebt die Zufriedenheit — Stärke skaliert mit seiner Ausbaustufe
@@ -86,10 +116,21 @@ function advanceYear(state) {
     }
     const prodBonus = traitEffectSum(ruler, "productionBonus");
     if (prodBonus) {
+      // handelsberaterBonus wie zuvor: derselbe reine, RNG-freie Wert wie in
+      // applyPreProductionBonuses() (kein state-Feld dafür nötig, das Neuberechnen
+      // liefert exakt denselben Wert, da sich Berater/Charaktere seit dort nicht
+      // geändert haben).
+      const handelsberaterBonus = advisorEffectBonus(state, "handelsberater");
       r._baseProductionBonus = (r._baseProductionBonus || 0) + prodBonus;
       r.productionBonus = r._baseProductionBonus + handelsberaterBonus;
     }
   }
+}
+
+// Titelaufstieg, Kaiserwahl-Trigger, Aufklärung, Religion, KI-
+// Kriegsinitiative, Kriegskarten-Garnisonserholung/-gegenangriff.
+function updatePoliticsAndWar(state) {
+  const r = state.regions.player;
   checkTitleProgress(state);
   checkElectionTrigger(state);
   updateIntel(state);
@@ -97,6 +138,12 @@ function advanceYear(state) {
   checkAiWarInitiative(state); // §31: KI wägt nicht nur ab, sondern erklärt ggf. tatsächlich Krieg
   reinforceAiTerritories(state); // Kriegskarte: KI-Garnisonen erholen sich langsam
   aiTerritoryCounterAttack(state); // Kriegskarte: eine im Krieg befindliche Region kann zurückschlagen
+}
+
+// Alternative Siegbedingungen, Statistik-Höchstwerte, Event-Auswahl,
+// Game-Over-Prüfung — der Jahresabschluss.
+function finalizeYear(state) {
+  const r = state.regions.player;
 
   // §47 alternative Siegbedingungen prüfen
   checkAlternativeVictory(state);
@@ -125,6 +172,18 @@ function advanceYear(state) {
     state.gameOver = "bankrupt";
     addChronicle(state, "Der Staatsbankrott ist unabwendbar. Deine Herrschaft endet.");
   }
+}
+
+function advanceYear(state) {
+  state.year += 1;
+  state.pendingEvent = null;
+
+  applyPreProductionBonuses(state);
+  processAllRegions(state);
+  updateEconomyAndDiplomacy(state);
+  applyRulerAndDynastyEffects(state);
+  updatePoliticsAndWar(state);
+  finalizeYear(state);
 
   return {};
 }
