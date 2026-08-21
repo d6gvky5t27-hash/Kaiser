@@ -160,11 +160,20 @@ function finalizeYear(state) {
   state.stats.maxTreasury = Math.max(state.stats.maxTreasury, state.treasury);
   state.stats.highestTitleIndex = Math.max(state.stats.highestTitleIndex, state.titleIndex);
 
-  // §Phase-5 Event Chains: laufende Ketten fortschreiben und ggf. genau
-  // EINE neue Kette anstoßen (siehe js/event-chains.js) — VOR den
-  // gewöhnlichen Flavour-Events, damit eine bedeutsame Chain-Entscheidung
-  // Vorrang vor einem beliebigen Wetter-/Kleinevent hat (§Punkt 39/40).
-  updateEventChains(state);
+  // §Phase-6-Punkt 41: aktive Chains IMMER zuerst fortschreiben (kann neue
+  // Memories/Thread-Signale erzeugen), DANN Story Threads mit dem
+  // aktualisierten Weltzustand fortschreiben/entdecken (js/story-threads.js),
+  // DANN der Drama Director seine Tension/Pacing/Fokus-Bewertung
+  // aktualisieren (js/drama-director.js, reiner Kurator, erfindet nichts),
+  // ERST DANN darf höchstens eine neue Chain starten — jetzt Director-
+  // priorisiert statt fester Reihenfolge (§Punkt 42: Eligibility bleibt
+  // dabei unverändert die einzige Wahrheit). Alles VOR den gewöhnlichen
+  // Flavour-Events, damit eine bedeutsame Chain-Entscheidung Vorrang vor
+  // einem beliebigen Wetter-/Kleinevent hat (§Punkt 39/40 aus Phase 5).
+  advanceActiveEventChains(state);
+  updateStoryThreads(state);
+  updateDramaDirector(state);
+  startNewEventChainIfEligible(state);
 
   // Event auswerten: erstes zutreffendes Event der Spielerregion (nur,
   // wenn nicht bereits eine Event-Chain-Entscheidung das Fenster belegt)

@@ -60,10 +60,12 @@ function startEventChain(state, templateId, payload, historyNote) {
     urgency: payload.urgency || "normal",
     expiresYear: payload.expiresYear || (state.year + CONFIG.eventChains.defaultExpiryYears),
     resolution: null,
+    threadId: null, // §Phase-6-Punkt 47: vom zugehörigen Story Thread gesetzt, siehe attachChainToThread()
   };
   state.eventChains.active[id] = chain;
   state.eventChains.cooldowns[chainCooldownKey(templateId, chain.actorIds, chain.targetIds)] =
     state.year + (tpl.cooldownYears || CONFIG.eventChains.defaultCooldownYears);
+  attachChainToThread(state, chain); // js/story-threads.js
   return chain;
 }
 
@@ -73,6 +75,7 @@ function endEventChain(state, chain, status, outcome, note) {
   chain.history.push({ year: state.year, stage: chain.stage, event: status.toLowerCase(), outcome, note });
   delete state.eventChains.active[chain.id];
   state.eventChains.resolved[chain.id] = chain;
+  notifyThreadOfChainResolution(state, chain); // js/story-threads.js (§Phase-6-Punkt 48)
 }
 function resolveEventChain(state, chain, outcome, note) { endEventChain(state, chain, "RESOLVED", outcome, note); }
 function failEventChain(state, chain, outcome, note) { endEventChain(state, chain, "FAILED", outcome, note); }
@@ -126,7 +129,10 @@ const CHAIN_PRIORITY_ORDER = [
   "church_conflict", "imperial_ambition",
 ];
 
-function updateEventChains(state) {
+// §Phase-6-Punkt 41: aktive Ketten fortschreiben bleibt unverändert von der
+// Priorisierung getrennt — Fortsetzung hat immer Vorrang vor Neustarts,
+// unabhängig vom Drama Director.
+function advanceActiveEventChains(state) {
   for (const id of Object.keys(state.eventChains.active)) {
     const chain = state.eventChains.active[id];
     if (!chain || chain.status !== "ACTIVE") continue;
@@ -143,10 +149,15 @@ function updateEventChains(state) {
     tpl.advance(state, chain);
     chain.lastAdvancedYear = state.year;
   }
+}
 
-  if (state.pendingEvent) return; // dieses Jahr ist die Event-Anzeige bereits belegt
-  if (Object.keys(state.eventChains.active).length >= CONFIG.eventChains.maxActive) return;
-
+// §Phase-6-Punkt 42: Eligibility bleibt UNVERÄNDERT die einzige Wahrheit —
+// diese Funktion liefert exakt dieselben Kandidaten wie Phase 5s
+// Festreihenfolge-Schleife, nur ohne bereits eine Auswahl zu treffen. Wird
+// sowohl vom Scheduler unten als auch vom Drama-Director-Debug-Panel
+// genutzt (js/drama-director.js, explainEligibleChainScores()).
+function collectEligibleChainCandidates(state) {
+  const out = [];
   for (const templateId of CHAIN_PRIORITY_ORDER) {
     const tpl = CHAIN_TEMPLATES[templateId];
     const result = tpl.checkEligibility(state);
@@ -154,11 +165,33 @@ function updateEventChains(state) {
     const people = (result.payload.actorIds || []).concat(result.payload.targetIds || []);
     if (people.some(pid => characterInActiveChain(state, pid))) continue;
     if (isChainOnCooldown(state, templateId, result.payload.actorIds, result.payload.targetIds)) continue;
-    // §Punkt 52/53: erst alle Bedingungen (oben), DANN genau EIN gezielter Wurf
-    if (rnd() < (tpl.startChance !== undefined ? tpl.startChance : CONFIG.eventChains.startChance)) {
-      startEventChain(state, templateId, result.payload);
-    }
-    break; // höchstens eine neue Kette pro Jahr (§Punkt 40)
+    out.push({ templateId, result });
+  }
+  return out;
+}
+
+// §Phase-6-Punkt 43/45: unter den bereits eligiblen Kandidaten wählt der
+// Drama Director per Score (js/drama-director.js) statt per fester
+// Reihenfolge — CHAIN_PRIORITY_ORDER dient nur noch als stabiler
+// Tie-Break bei Score-Gleichstand (§Punkt 39 "stabile feste
+// Tie-Break-Regel"). Der Phase-5-Zufallswurf, OB die gewählte Kette
+// dieses Jahr tatsächlich beginnt, bleibt bewusst bestehen (siehe
+// DEVELOPMENT.md "Phase 6" für die dokumentierte Entscheidung, §Punkt 46).
+function startNewEventChainIfEligible(state) {
+  if (state.pendingEvent) return; // dieses Jahr ist die Event-Anzeige bereits belegt
+  if (Object.keys(state.eventChains.active).length >= CONFIG.eventChains.maxActive) return;
+
+  const candidates = collectEligibleChainCandidates(state);
+  if (!candidates.length) return;
+
+  const scored = candidates.map(c => Object.assign({}, c, { score: computeChainDirectorScore(state, c.templateId, c.result.payload) }));
+  scored.sort((a, b) => b.score.total - a.score.total || CHAIN_PRIORITY_ORDER.indexOf(a.templateId) - CHAIN_PRIORITY_ORDER.indexOf(b.templateId));
+  const chosen = scored[0];
+  const tpl = CHAIN_TEMPLATES[chosen.templateId];
+  // §Punkt 52/53: erst alle Bedingungen (oben, inkl. Director-Score), DANN
+  // genau EIN gezielter Wurf, ob es dieses Jahr tatsächlich losgeht.
+  if (rnd() < (tpl.startChance !== undefined ? tpl.startChance : CONFIG.eventChains.startChance)) {
+    startEventChain(state, chosen.templateId, chosen.result.payload);
   }
 }
 
@@ -558,6 +591,7 @@ function canStartFamineCrisisChain(state) {
 const CHAIN_FAMINE_CRISIS = {
   id: "famine_crisis", name: "Hungerkrise", category: "wirtschaft",
   initialStage: "decision", cooldownYears: 8, startChance: 0.6,
+  systemCritical: true, // §Phase-6-Punkt 26: echte Hungersnot ist NICHT staffelbar, anders als optionale Chains
   checkEligibility: canStartFamineCrisisChain,
   advance(state, chain) {
     if (chain.stage === "decision") {
