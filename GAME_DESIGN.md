@@ -163,6 +163,106 @@ genau die Bereiche sind, die der "Next Generation"-Master-Prompt als
 nächste Vertiefungsrichtung vorschlägt — siehe ROADMAP.md, Abschnitt
 EXPERIMENTAL.
 
+## Narrative Density
+
+**Aktueller Zustand** (belegt durch `BASELINE.md`, Abschnitt "85-Year
+Chronicle Test"): Die Simulation erzeugt technisch viele Chronikeinträge,
+aber nur wenige erinnerungswürdige Ereignisse. In einem vollständig
+protokollierten 85-Jahre-Testlauf waren 95% aller Chronikeinträge reiner
+Wetter-Flavourtext, nur 11 Ereignisse über die gesamte Partie waren
+tatsächlich story-relevant (≈ alle 8 Jahre eines). Das aktuelle Verhältnis
+von ca. 95% Wetter-Flavour zu 5% relevanten Ereignissen ist nicht
+ausreichend, um die vom Master-Prompt geforderte "Nur noch ein Jahr"-
+Neugier zu erzeugen.
+
+**Designziel**: Die Chronik soll nicht primär Ereignis**menge** messen,
+sondern Ereignis**bedeutung**. Ein gutes 50- bis 100-Jahre-Spiel soll eine
+nachvollziehbare Geschichte erzählen, die sich in wenigen Sätzen
+zusammenfassen lässt — nicht in einer Liste von 200 Wetterberichten.
+
+Beispiele für bedeutende Chronikpunkte (bereits teilweise als
+Einzelereignisse vorhanden, aber ohne Verkettung/Gewichtung, siehe
+"Emergent Storytelling Gap" unten):
+
+- Geburt eines Thronfolgers
+- dynastische Hochzeit
+- Tod eines Herrschers
+- Erbfolgekonflikt
+- Aufstand
+- Krieg
+- Friedensvertrag
+- Titelaufstieg
+- große wirtschaftliche Krise
+- diplomatischer Verrat
+- Kaiserwahl
+- bedeutende Bauprojekte
+- Hungersnot
+- religiöser Konflikt
+
+Wetter soll weiterhin existieren, aber nur dann **prominent** in die
+Chronik eingehen, wenn es echte Folgen verursacht. Beispiel:
+
+NICHT: „1517 herrschte ein kalter Winter.“
+
+SONDERN: „Der ungewöhnlich harte Winter von 1517 vernichtete große Teile
+der Ernte und leitete eine zweijährige Hungerkrise ein.“
+
+## Emergent Storytelling Gap
+
+Die vorhandenen Systeme (Wirtschaft, Bevölkerung, Diplomatie, Dynastie,
+Militär, Titel) besitzen bereits viele potenzielle Story-Auslöser — sie
+sind nur noch nicht so verknüpft, dass daraus von selbst Geschichten
+entstehen. Konkret: Ein Großteil der `addChronicle()`-Aufrufe in
+`diplomacy.js`/`economy.js`/`military.js` (Bau, Handel, diplomatische
+Aktionen, Intrigen) entsteht **nur durch direkte Spieleraktionen**. Nur
+Wetter, seltene KI-Diplomatie-Initiativen und Dynastie-Lebensereignisse
+laufen automatisch. Dadurch erzeugt ein passives oder zurückhaltendes
+Spiel zu wenig eigenständige Weltgeschichte — was der Master-Prompt-
+Grundsatz "die Welt spielt ohne den Spieler weiter" (bereits mechanisch
+korrekt umgesetzt, siehe KI-Regionsentwicklung/KI-Diplomatie/KI-Kriege in
+`ai_vs_ai_test.js`) eigentlich verlangt, aber die Chronik bildet das noch
+nicht sichtbar ab.
+
+Dies soll **später** durch folgende Systeme adressiert werden (siehe
+ROADMAP.md → LATER → Narrative Systems für die Reihenfolge):
+
+- Event Chains
+- World Memory
+- Story Threads
+- Drama Director
+- aktivere KI-Dynastien
+- bedeutungsbasierte Chronik
+
+**Noch NICHT implementieren** — dieser Abschnitt ist reine Zieldefinition
+für eine spätere Phase.
+
+## Zukünftige Chronik-Architektur (Designregel, noch nicht implementiert)
+
+Nicht jedes simulierte Ereignis gehört automatisch in die Hauptchronik.
+Zukünftig sollen mindestens zwei Ebenen existieren:
+
+**WORLD LOG** — vollständige technische Ereignishistorie (das ist im
+Kern bereits das heutige `state.chronicle`, nur ungefiltert).
+
+**DYNASTY CHRONICLE** — nur bedeutende, erzählerisch relevante Ereignisse,
+gefiltert nach Wirkung statt nach Auftreten.
+
+Beispiel: Jeder Winter kann weiterhin im World Log stehen. In die
+(zukünftige) Dynasty Chronicle kommt er aber nur, wenn er:
+
+- eine Hungersnot auslöst
+- den Handel massiv verändert
+- einen Krieg beeinflusst
+- große Verluste erzeugt
+- eine Eventkette startet
+
+Damit vermeiden wir, dass Wetter (oder andere hochfrequente Routine-
+Ereignisse) die eigentliche Geschichte verdrängt, wie es der 85-Year-
+Chronicle-Test aktuell zeigt (95% Wetter-Flavour). **Diese Zwei-Ebenen-
+Architektur ist noch nicht umgesetzt** — sie ist eine vorbereitete
+Designregel für die Event-Chains-/Drama-Director-Phase (ROADMAP.md →
+LATER), keine aktuelle Funktion.
+
 ## Entscheidungsregel für neue Mechaniken
 
 Erzeugt sie eine interessante Entscheidung oder eine erinnerungswürdige

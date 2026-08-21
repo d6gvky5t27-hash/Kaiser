@@ -120,6 +120,46 @@ ist dieser Baseline-Wert danach nicht mehr vergleichbar (er würde durch
 neue, echte Ursachenvielfalt ersetzt) — das ist beabsichtigt und kein
 Problem, nur als Hinweis für den Vergleich in einer späteren Phase.
 
+## 85-Year Chronicle Test
+
+Zusätzlicher Einzeltest (nicht Teil von `baseline_analysis.js`, manuell
+per Skript im Rahmen der Gesprächsanalyse durchgeführt) zur Prüfung der
+**erzählerischen Dichte** der Chronik, nicht nur ihrer numerischen
+Balance-Werte — ergänzt die obige 30-Partien-Baseline um eine qualitative
+Auswertung eines einzelnen, vollständig protokollierten Verlaufs.
+
+**Methodik**: fester Seed 7, rein passives Spiel (keine Spieleraktion),
+`state.chronicle` nach Spielende vollständig ausgewertet.
+
+**Ergebnis**:
+- Simuliert: **85 Jahre** (Partie endete vorzeitig)
+- Spielende: **`no_heir`** (Dynastie ohne Erben ausgestorben)
+- Chronik-Cap von 200 Einträgen erreicht (`state.chronicle` kappt bei 200,
+  älteste Einträge fallen heraus — die Partie hat also über die 85 Jahre
+  mehr als 200 Einträge erzeugt, die letzten 200 sind erhalten)
+- **189 von 200 Einträgen (≈95%) waren reiner Wetter-Flavourtext**
+  ("In X herrschte Dürre/Kalter Winter/Starker Sommer …")
+- Nur **11 story-relevante Ereignisse über 85 Jahre**: 4× KI-Region
+  initiiert Diplomatie (Geschenk/Pakt/Handelsvertrag), 1 Herrschertod +
+  1 Nachfolge, 1 Heirat, 1 weiteres Geschenk, 2 weitere Geschenke, 1
+  Herrschertod ohne Erben (Spielende)
+- Das entspricht **durchschnittlich ungefähr einem relevanten Ereignis
+  alle 8 Jahre** (85 Jahre / 11 Ereignisse)
+
+**Einordnung**: Dieser Test bestätigt **unabhängig** (anderer Seed, andere
+Methodik als die 30-Partien-Baseline oben) das bereits bekannte Problem
+der zu häufig aussterbenden Dynastien — auch dieser Einzellauf endete mit
+`no_heir`. Die bisher gemessene `no_heir`-/Dynastie-Aussterberate von
+ungefähr **53%** (siehe Abschnitt "Game-Over-Gründe" oben) bleibt damit ein
+wichtiger Beobachtungspunkt für spätere Phasen. Zusätzlich zeigt dieser
+Test ein zweites, bisher nicht separat gemessenes Problem: die geringe
+erzählerische Dichte der Chronik bei zurückhaltendem/passivem Spiel (siehe
+`GAME_DESIGN.md`, Abschnitt "Narrative Density", für die Designeinordnung).
+
+**Wichtig**: Es wurde noch **keine automatische Korrektur** eingebaut —
+weder für die Dynastie-Aussterberate noch für die Chronik-Dichte. Dieser
+Abschnitt ist reine Beobachtung/Dokumentation.
+
 ## Wie man diese Baseline reproduziert
 
 ```

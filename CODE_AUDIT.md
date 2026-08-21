@@ -435,3 +435,325 @@ laufen grün (im Sinne von "innerhalb der erwarteten Toleranzen"), das Spiel
 ist vollständig spielbar. Das sind Wartbarkeits- und Erweiterbarkeits-
 Befunde für die weiteren Phasen, keine Bugs, die sofortiges Handeln
 erfordern.
+
+---
+
+## 12. Ergänzende Audit-Ergebnisse
+
+Nachtrag nach der ersten Gesprächsrunde zu Phase 1 — konsolidiert die
+mündlich erarbeiteten Befunde zu Architektur, Kopplung, Schutzbedarf und
+einer ersten Militär-Balance-Hypothese dauerhaft in dieser Datei. Keine
+neuen Erkenntnisse gegenüber Abschnitt 1–11, nur strukturiert und für den
+Phase-2-Plan (Abschnitt 13) referenzierbar aufbereitet.
+
+### Architektur (Kurzfassung)
+
+- Vanilla JS ohne Framework.
+- Ein flaches `state`-Objekt als Single Source of Truth.
+- 10 Fachmodule unter `js/*.js`.
+- `data/gamedata.js` als reine Datentabellen-Sammlung.
+- Eine isolierte, eigenständig testbare Kampf-Engine unter `battle-engine/*.js`.
+- Das Bundle aus allen genannten Dateien wird in den ersten `<script>`-Block
+  von `index.html` integriert (siehe Abschnitt 1, Ladereihenfolge).
+- Ein zweiter, separater UI-Block mit ca. 1.746 Zeilen existiert nur in
+  `index.html` selbst.
+- `advanceYear()` ist aktuell eine ca. 123 Zeilen große Funktion, die
+  praktisch jedes Fachmodul orchestriert ("God function").
+- Die Modul-Ladereihenfolge wird **nicht** technisch über Imports/Exports
+  erzwungen, sondern ausschließlich implizit durch das Rebuild-Skript
+  eingehalten (siehe Abschnitt 1).
+
+**Ausdrückliche Bewertung**: `advanceYear()` ist ein **Refactoring-
+Kandidat**, weil sie viele Verantwortlichkeiten in einer Funktion bündelt
+und dadurch schwerer zu lesen/erweitern ist als nötig — sie ist **nicht
+fehlerhaft**. Die Reihenfolge ihrer Teilschritte ist bewusst gewählt und in
+Kommentaren begründet (z. B. Berater-Produktionsbonus vor der
+Produktionsberechnung), alle drei automatisierten Tests laufen grün. Ein
+Refactoring dient ausschließlich der Lesbarkeit/Wartbarkeit, nicht der
+Fehlerbehebung.
+
+### Enge Kopplungen / technische Risiken
+
+1. Die UI (`index.html`, Block 2) greift an vielen Stellen direkt auf tief
+   verschachtelte `state`-Pfade zu (z. B.
+   `state.regions.player.population.bauern.satisfaction`) statt über
+   benannte Getter-Funktionen.
+2. Dadurch würde jede Änderung an einer `state`-Datenstruktur potenziell
+   sehr viele UI-Stellen gleichzeitig betreffen — eine gezielte,
+   lokalisierte Änderung ist aktuell nicht garantiert, eine Suche über die
+   gesamte `index.html` schon.
+3. Die Bundle-Reihenfolge der 13 Quelldateien ist implizit (nur durch das
+   Rebuild-Skript korrekt, kein technischer Zwang, siehe Abschnitt 1/5).
+4. `tools/data-sync.js` und `data/gamedata.js` sind bereits inhaltlich
+   auseinandergelaufen (siehe Abschnitt 6).
+5. Konkret: Das neue `baseCost`-Feld für Berater (seit Schritt 40) fehlt in
+   der JSON-Moddatei `data/json/advisor-roles.json`.
+6. Ein `node tools/data-sync.js build`-Lauf würde dadurch `baseCost` aus
+   `data/gamedata.js` stillschweigend entfernen und `advisorUpgradeCost()`
+   (`js/military.js:19`) mit `undefined * Math.pow(...)` beschädigen.
+7. Es existiert doppelte, tote Belagerungslogik in `js/military.js`
+   (`resolveSiegeStorm`/`resolveSiegeStarve`/`resolveSiegeBribe`) und
+   `js/battle-bridge.js` (`startSiege`/`siegeStarve`/`siegeBribe`).
+8. Beide Varianten besitzen leicht unterschiedliche Berechnungen (z. B.
+   unterschiedliche Untergrenzen für `defenderStrengthFactor`: 0.2 vs. 0.25;
+   nur die `battle-bridge.js`-Fassung pflegt `warsWon`/`warsWonAgainst` bei
+   erfolgreicher Bestechung).
+9. Das ist ein reines Wartungs- und Regressionsrisiko: Wird künftig nur
+   eine der beiden Kopien angepasst (z. B. weil Belagerungen als
+   Gebietsmechanik reaktiviert werden sollen), driften sie weiter
+   auseinander, ohne dass ein Test das bemerken würde — keiner der drei
+   bestehenden Tests deckt Belagerungscode ab.
+   **Ergänzender Fund bei der Vertiefung**: Der komplette alte
+   Belagerungspfad ist inzwischen **auch UI-seitig unerreichbar**. Die
+   Render-Verzweigung `if (state.pendingSiege) {...}` (`index.html:7076`)
+   und die Buttons für `doSiegeAction('storm'/'starve'/'bribe')`
+   (`index.html:7079-7083`) existieren zwar weiterhin vollständig im UI-
+   Code, aber `state.pendingSiege` wird nirgends mehr auf einen Wert
+   gesetzt — die einzige Stelle, die das täte
+   (`startSiege(state, aiId)` in `js/battle-bridge.js:129`), wird von
+   **keiner** Stelle im gesamten Projekt aufgerufen (geprüft per Volltext-
+   suche über `index.html` und `js/*.js`). Es handelt sich also nicht nur
+   um zwei redundante Backend-Implementierungen, sondern um einen
+   kompletten, seit der Kriegskarte (Schritt 38) unerreichbaren Ast inkl.
+   UI — ohne jede Funktionseinbuße entfernbar, siehe Phase-2-Plan
+   (Abschnitt 13).
+
+### Systeme, die geschützt werden müssen
+
+**DO NOT TOUCH WITHOUT REGRESSION TEST** — vor jeder Änderung an einem
+dieser Systeme müssen `battle_test.js`, `economy_test.js`,
+`ai_vs_ai_test.js` UND `baseline_analysis.js` vorher und nachher laufen,
+mit Ergebnisvergleich gegen `BASELINE.md`:
+
+- `battle-engine/*.js` — die eigenständige taktische Kampf-Engine
+- Das Kohorten-Bevölkerungsmodell (`updatePopulation()` in
+  `js/population-dynasty.js`)
+- Die Preisbildungsformel (`computeRegionalPrices()` in `js/economy.js`)
+- Das Ledger-/Kassenbuch-System (`logLedger()` in `js/core.js` und dessen
+  Auswertung in `applyMonthlyFinances()`)
+- Alle bereits kalibrierten `CONFIG`-Werte generell (mehrfache
+  Kalibrierungsrunden, siehe `DEVELOPMENT.md`)
+- Die Regierungsstil-Kalibrierung (`CONFIG.governance`,
+  `applyGovernanceStyle()` in `js/politics.js` — Gegenstand der erst kürzlich
+  behobenen Regression aus Schritt 40)
+- Die Regionalhandel-Balance (`CONFIG.interregionalTrade`, Schritt 39)
+
+### Potential Dominant Military Strategies (BALANCE HYPOTHESES — noch nicht bestätigt)
+
+Analytischer Befund, **keine** empirische Multi-Agenten-Messung (die wäre
+Gegenstand einer späteren Phase, siehe ROADMAP.md → EXPERIMENTAL/BALANCE
+RESEARCH). Reine Kostenrechnung aus `TROOP_TYPES` (`data/gamedata.js`):
+
+**Strategische Stärke pro Taler** (`cost / strength`):
+
+| Einheit | Kosten | Stärke | Taler/Stärke |
+|---|---|---|---|
+| Pikeniere | 110 | 3 | **≈ 36,7** |
+| Bogenschützen | 90 | 2 | 45 |
+| Ritter | 400 | 8 | 50 |
+| Söldner | 200 | 4 | 50 |
+| Schwere Kavallerie | 650 | 12 | ≈ 54,2 |
+
+**Hypothese**: Pikeniere könnten auf der strategischen Ebene (dort, wo
+`armyStrength()` als reiner Summenwert in KI-Kriegsentscheidungen einfließt,
+`js/military.js`) überproportional effizient sein — unabhängig davon, was
+in der taktischen Kampf-Engine an Konterboni greift (Pikeniere kontern dort
+gezielt Kavallerie, was diese Zahl relativiert, aber nicht auf der
+strategischen Stärke-Summe wirkt).
+
+**Zusätzlicher Befund**: `CONFIG.military.recruitPopCostPerUnit = 4` gilt
+**unabhängig vom Truppentyp**. Dadurch kostet eine Schwere Kavallerie
+(Stärke 12) genauso viele Bevölkerungsköpfe wie eine Bauernmiliz (Stärke 1)
+— pro verbrauchtem Kopf ist Schwere Kavallerie also 12× effizienter als
+Miliz, begrenzt nur durch verfügbare/zufriedene Adelsbevölkerung
+(`minAdelSatisfaction`).
+
+**Einordnung**: Diese Punkte sind ausdrücklich **Balance-Hypothesen, keine
+bestätigten Fehler**. Für eine belastbare Aussage fehlen handelnde
+KI-Agenten mit unterschiedlichen Armee-Kompositionen (reines Passivspiel,
+wie in allen bestehenden Tests, trifft nie eine Rekrutierungsentscheidung).
+**Keine Werte in dieser Phase verändern.**
+
+---
+
+## 13. Phase 2 — Technical Stabilization: Umsetzungsplan (noch NICHT ausgeführt)
+
+Dieser Abschnitt ist ein **Plan**, kein durchgeführtes Refactoring — es
+wurde in diesem Schritt kein Produktionscode verändert. Freigabe durch den
+Nutzer steht noch aus.
+
+### 13.1 Wie `advanceYear()` aufgeteilt werden soll
+
+Reines **Extract-Method**-Refactoring: die bestehenden, bereits durch
+Kommentare markierten Abschnitte werden 1:1 (keine Umsortierung, keine
+Zusammenlegung von Schleifen, keine geänderte Bedingung) in benannte
+Funktionen ausgeschnitten, die `advanceYear()` in exakt derselben
+Reihenfolge aufruft wie bisher die Codeblöcke selbst standen:
+
+```js
+function advanceYear(state) {
+  state.year += 1;
+  state.pendingEvent = null;
+
+  applyPreProductionBonuses(state);   // Berater-/Infrastruktur-/Tech-Boni, generateResearchPoints()
+  processAllRegions(state);           // die komplette for-in-Schleife über state.regions
+  updateEconomyAndDiplomacy(state);   // Landpreis, Regierungsstil, Regionalhandel, Migration, Diplomatie, Söldnerdesertion
+  applyRulerAndDynastyEffects(state); // Geistlicher-Bonus, Legitimität, updateDynasty(), Prestige/Charaktereigenschaften
+  updatePoliticsAndWar(state);        // Titel, Kaiserwahl-Trigger, Aufklärung, Religion, KI-Kriegsinitiative, Kriegskarte
+  finalizeYear(state);                // Siegbedingungen, Statistik-Höchstwerte, Event-Auswahl, Game-Over-Prüfung
+
+  return {};
+}
+```
+
+### 13.2 Neue Funktionen (Signatur, jeweils `(state)`, keine Rückgabewerte
+außer wo bereits vorhanden)
+
+`applyPreProductionBonuses`, `processAllRegions`,
+`updateEconomyAndDiplomacy`, `applyRulerAndDynastyEffects`,
+`updatePoliticsAndWar`, `finalizeYear` — alle in `js/advance-year.js`,
+direkt oberhalb von `advanceYear()` selbst.
+
+### 13.3 Reihenfolge, die zwingend erhalten bleiben muss
+
+Die exakte Aufrufreihenfolge **innerhalb** jeder neuen Teilfunktion UND die
+Reihenfolge der sechs Teilfunktionen **zueinander** muss identisch zur
+aktuellen Zeilenreihenfolge in `advanceYear()` bleiben. Besonders kritisch,
+weil `rnd()` einen einzigen globalen Zufallsstrom verbraucht (siehe 13.6):
+
+- Innerhalb von `processAllRegions`: pro Region **in Objekt-Iterationsreihenfolge**
+  (`player → ai1 → ai2 → ai3 → ai4 → ai5 → ai6 → ai7`, siehe `newGame()`) exakt
+  `rollWeather() → computeProduction() → computeGrainBalance() →
+  updatePriceNoise() → computeRegionalPrices() →
+  consumeAndUpdateSatisfaction() → applyExtraGrainDistribution() →
+  applyGrainSpoilage() → updatePopulation() → (Manipulationsjahre-Abbau) →
+  aiRegionDevelops() [nur KI] → updateSettlementTier()`.
+- Die sechs Teilfunktionen selbst in der oben gezeigten Reihenfolge, da
+  spätere Schritte auf Ergebnissen früherer aufbauen (z. B. `r.prices` aus
+  `processAllRegions` wird von nichts danach neu berechnet, aber
+  `state.regions.player` wird von `applyRulerAndDynastyEffects` und
+  `updatePoliticsAndWar` weiter gelesen/verändert).
+
+### 13.4 Zu berücksichtigende Seiteneffekte
+
+- `state.regions.player.productionBonus`/`getreideTechBonus` werden in
+  `applyPreProductionBonuses` gesetzt und von `processAllRegions`
+  (`computeProduction`) gelesen — Reihenfolge zwischen diesen beiden
+  Teilfunktionen ist also nicht nur eine Lesbarkeits-, sondern eine echte
+  Datenabhängigkeit.
+- `handelsberaterBonus` (in `applyPreProductionBonuses` berechnet) wird
+  aktuell auch später nochmal implizit über `r._baseProductionBonus +
+  handelsberaterBonus` in den Trait-Effekten (aktuell Teil von
+  `applyRulerAndDynastyEffects`) verwendet — dieser Wert muss entweder
+  erneut berechnet oder als Rückgabewert/`state`-Feld durchgereicht werden;
+  keine Neuberechnung mit anderer Formel.
+- `addChronicle()`-Aufrufe innerhalb der Region-Schleife dürfen ihre
+  Positionsreihenfolge in `state.chronicle` nicht verändern (unshift-basiert
+  — Reihenfolge ist bereits jetzt "neuestes zuerst pro Aufruf", muss gleich
+  bleiben, sonst ändert sich scheinbar nur die Chronik-Anzeige, aber die ist
+  spielerseitig sichtbar und Teil des durch `baseline_analysis.js`
+  geprüften Verhaltens).
+
+### 13.5 Tests vor und nach dem Umbau
+
+1. Vor dem Umbau: `node tests/battle_test.js`, `node tests/economy_test.js`,
+   `node tests/ai_vs_ai_test.js`, `node tests/baseline_analysis.js` je
+   einmal laufen lassen und die Ausgabe archivieren (Baseline steht bereits
+   in `BASELINE.md`, zusätzlich die aktuelle `economy_test.js`/
+   `ai_vs_ai_test.js`-Ausgabe als Referenzlauf sichern, da diese nicht
+   geseedet sind).
+2. Nach dem Umbau: dieselben vier Kommandos erneut. `baseline_analysis.js`
+   MUSS **zeichengenau** dieselbe Ausgabe liefern (fester Seed,
+   deterministisch) — jede Abweichung ist ein Beweis für eine RNG-
+   Reihenfolgeverschiebung und blockiert den Merge, bis behoben.
+   `economy_test.js`/`ai_vs_ai_test.js` dürfen im üblichen Stichproben-
+   Rahmen schwanken (siehe Abschnitt 7), sollten aber grob im selben
+   Bereich wie vor dem Umbau liegen.
+3. Zusätzlicher, spezifisch für dieses Refactoring neu zu schreibender Test
+   (Teil von Phase 2, noch nicht existent): ein kleines Skript, das `state`
+   zweimal mit identischem Seed über z. B. 20 Jahre laufen lässt — einmal
+   mit der alten `advanceYear()` (aus dem Git-Stand vor dem Refactoring),
+   einmal mit der neuen — und danach `JSON.stringify(state)` beider
+   Endzustände auf Byte-Gleichheit vergleicht. Das ist der eigentliche
+   Beweis, nicht nur die Testsuiten-Zusammenfassungen.
+
+### 13.6 Garantie für RNG-Reihenfolge/Determinismus
+
+`rnd()` (`js/core.js`) ist ein einziger globaler Zufallsstrom ohne
+Rücksetzung zwischen Aufrufen. Jede Verschiebung der Aufrufreihenfolge
+ändert ab diesem Punkt **alle** nachfolgenden Zufallswerte im gesamten
+restlichen Spiel (nicht nur lokal) — das Refactoring darf daher
+**ausschließlich** bestehende, zusammenhängende Codeblöcke unverändert in
+neue Funktionen verschieben, niemals Anweisungen umordnen, zusammenfassen
+oder vorziehen, selbst wenn das auf den ersten Blick harmlos aussieht (z. B.
+"die beiden `techBonus()`-Aufrufe zusammenfassen" ist erlaubt, weil
+`techBonus()` selbst kein `rnd()` verwendet — aber jede Umsortierung, die
+eine `rnd()`-konsumierende Funktion vor eine andere zieht, ist verboten).
+Konkret betroffene `rnd()`-Aufrufer innerhalb von `advanceYear()` (direkt
+oder über aufgerufene Fachfunktionen), in ihrer aktuellen Reihenfolge:
+`rollWeather` → `updatePriceNoise` → `consumeAndUpdateSatisfaction`
+(pro Bevölkerungsgruppe) → `aiRegionDevelops` (nur KI-Regionen, mehrere
+bedingte Aufrufe) → [Schleife wiederholt sich pro Region] →
+`updateLandPrice` → `runInterregionalTrade`/`rollBanditRisk` →
+`updateDiplomacy` (pro KI-Region) → `checkSoeldnerDesertion` (kein `rnd()`,
+zur Sicherheit mitgeprüft) → `updateDynasty` (Altern/Heirat/Geburt/Tod,
+mehrere bedingte Aufrufe) → `checkElectionTrigger` → `checkAiWarInitiative`
+(pro KI-Region, mehrere bedingte Aufrufe inkl. `estimateAiStrength`) →
+`aiTerritoryCounterAttack` → Event-Auswahlschleife (`ev.condition()` kann
+selbst `rnd()` aufrufen, z. B. beim Event `seuche`, plus der abschließende
+`rnd() < 0.6`-Wurf). Der unter 13.5 Punkt 3 beschriebene Byte-Vergleichstest
+ist die verbindliche Absicherung dafür — nicht nur diese manuelle Auflistung,
+die als Wegweiser dient, aber Fehler enthalten könnte.
+
+### 13.7 Absicherung von `data-sync.js`
+
+- `tools/data-sync.js` um die fehlenden Tabellen erweitern
+  (`TERRITORIES`, `START_REGIONS`) oder — falls entschieden wird, den
+  JSON-Roundtrip nicht weiterzuführen — das Sync-Tool und `data/json/*`
+  bewusst als "eingefroren/veraltet" kennzeichnen, statt es weiter
+  stillschweigend inkonsistent zu lassen. Diese Entscheidung selbst ist
+  **nicht** Teil von Phase 2 selbst, sondern eine Vorfrage, die vor der
+  technischen Umsetzung zu klären ist.
+- Konkrete Behebung der `baseCost`-Drift: `node tools/data-sync.js extract`
+  erneut laufen lassen, damit `data/json/advisor-roles.json` das aktuelle
+  `baseCost`-Feld und die aktuellen Beschreibungstexte übernimmt — danach
+  committen. Das ist unabhängig von der `advanceYear()`-Aufteilung und
+  risikoarm (reine Datendatei, kein Codepfad).
+
+### 13.8 Aktive vs. tote Belagerungslogik
+
+Bei der Vertiefung für diesen Plan bestätigt: **Beide** Implementierungen
+sind tot — nicht nur redundant zueinander, sondern beide komplett
+unerreichbar. `startSiege(state, aiId)` (`js/battle-bridge.js:129`, die
+einzige Stelle, die `state.pendingSiege` jemals setzt) wird von **keiner**
+Stelle im gesamten Projekt aufgerufen (per Volltextsuche über `index.html`
+und alle `js/*.js` bestätigt). Der `declareWar()`-Pfad (`js/military.js`)
+setzt seit der Kriegskarte (Schritt 38) stattdessen `state.warState[aiId] =
+true`. Folglich sind auch die UI-Verzweigung `if (state.pendingSiege)`
+(`index.html:7076`) und die zugehörigen `doSiegeAction()`-Buttons
+unerreichbar.
+
+**Empfehlung für Phase 2**: `resolveSiegeStorm`/`resolveSiegeStarve`/
+`resolveSiegeBribe` (`js/military.js`), `startSiege`/`siegeStarve`/
+`siegeBribe` (`js/battle-bridge.js`) sowie die zugehörige unerreichbare
+UI-Verzweigung können vollständig entfernt werden, **ohne** jede
+Verhaltensänderung am spielbaren Spiel — reine Totcode-Entfernung, kein
+Konsolidierungs-Kompromiss nötig. Nicht Teil dieses Plans selbst
+(Entscheidung/Umsetzung wartet auf Freigabe), hier nur als gesicherter
+Befund festgehalten.
+
+### 13.9 Betroffene Dateien
+
+- `js/advance-year.js` (Aufteilung von `advanceYear()`)
+- `js/military.js` (falls Totcode-Entfernung mitgenommen wird)
+- `js/battle-bridge.js` (falls Totcode-Entfernung mitgenommen wird)
+- `index.html` (falls Totcode-Entfernung mitgenommen wird: unerreichbare
+  Render-Verzweigung/Buttons; unabhängig davon in jedem Fall: Bundle-Rebuild
+  nach jeder Änderung an den `js/*.js`-Dateien)
+- `data/json/advisor-roles.json` (falls `data-sync.js`-Drift behoben wird)
+- `tools/data-sync.js` (falls um fehlende Tabellen erweitert)
+- Neu: ein kleines Vergleichsskript für den Byte-Gleichheits-Test (13.5,
+  Punkt 3), vermutlich unter `tests/`
+
+Kein einziger dieser Punkte wurde in diesem Schritt umgesetzt — reine
+Planung, wartet auf Freigabe.

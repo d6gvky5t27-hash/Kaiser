@@ -23,25 +23,37 @@ werden zuerst fertiggestellt/gefestigt, bevor neue Breite hinzukommt.
 
 ## NEXT (nach Freigabe, in der vom Master-Prompt vorgeschlagenen Reihenfolge)
 
-- [ ] Phase 2 — Modularisierung: `advanceYear()` (aktuell eine ~123-Zeilen-
-      Funktion, siehe CODE_AUDIT.md Abschnitt 3) in benannte Teilschritte
-      aufteilen, ohne Verhalten zu ändern. `index.html`-Block-2-UI-Code
-      (1.746 Zeilen) ggf. in `js/ui/*.js`-Dateien auslagern. Tote
-      Belagerungslogik (military.js/battle-bridge.js-Duplikat) bereinigen
-      oder bewusst konsolidieren. `tools/data-sync.js` gegenüber
-      `gamedata.js` nachziehen (fehlt: `baseCost` bei Beratern, komplett
-      fehlende Tabellen `TERRITORIES`/`START_REGIONS`).
+- [ ] **Phase 2 — Technical Stabilization** (Detailplan: CODE_AUDIT.md
+      Abschnitt 13, noch nicht ausgeführt, wartet auf Freigabe):
+      1. `advanceYear()` in benannte Teilschritte zerlegen
+         (`applyPreProductionBonuses`, `processAllRegions`,
+         `updateEconomyAndDiplomacy`, `applyRulerAndDynastyEffects`,
+         `updatePoliticsAndWar`, `finalizeYear`).
+      2. Verhalten 1:1 erhalten — reines Extract-Method, keine
+         Logikänderung, keine Umsortierung.
+      3. Regressionstests davor und danach (`battle_test.js`,
+         `economy_test.js`, `ai_vs_ai_test.js`, `baseline_analysis.js`)
+         plus ein neuer Byte-Gleichheits-Vergleichstest (alt vs. neu,
+         gleicher Seed).
+      4. Daten-Sync zwischen `data/json/*.json` und `data/gamedata.js`
+         absichern (`tools/data-sync.js` um `TERRITORIES`/`START_REGIONS`
+         erweitern oder bewusst als veraltet kennzeichnen).
+      5. `baseCost`-Drift bei `data/json/advisor-roles.json` beheben
+         (`node tools/data-sync.js extract` erneut laufen lassen).
+      6. Doppelte tote Belagerungslogik identifizieren (bestätigt: BEIDE
+         Implementierungen in `military.js` und `battle-bridge.js` sind
+         tot, inkl. der zugehörigen UI-Verzweigung in `index.html`) und
+         konsolidieren/entfernen.
+      7. Bestehende Kampf-Engine (`battle-engine/*.js`) unangetastet
+         lassen — DO NOT TOUCH WITHOUT REGRESSION TEST, siehe
+         CODE_AUDIT.md Abschnitt 12.
+      **RNG-Determinismus darf durch dieses Refactoring nicht verändert
+      werden** — siehe CODE_AUDIT.md Abschnitt 13.6 für die exakte
+      Aufrufreihenfolge-Garantie.
 - [ ] Phase 3 — Character Core: Berater-Kandidatenauswahl (3 Kandidaten
       statt automatischer Zuweisung — `generateAdvisorCandidate()` existiert
       bereits als Baustein), Beziehungs-Ursachen-Log statt eines einzelnen
       Zahlenwerts, Rivalen-Grundgerüst.
-- [ ] Phase 4 — World Memory: strukturierter Erinnerungsspeicher
-      (Typ/Jahr/Beteiligte/Stärke/Decay), Verknüpfung mit der Chronik.
-- [ ] Phase 5 — Event Chains: 23 isolierte Events → mindestens 10
-      hochwertige, mehrjährige Eventketten mit echten Vorbedingungen/
-      Folgeevents statt vieler neuer Einzelevents.
-- [ ] Phase 6 — Drama Director: Spannungswerte aus echtem Weltzustand
-      ableiten, plausible Krisen priorisieren statt willkürlich erzeugen.
 - [ ] Phase 7 — Kaiserwahl 2.0: Wahlkampf, Versprechen, Kurfürsten-
       Interessen statt reiner Bestechung/Beziehungsschwelle.
 - [ ] Phase 8 — War & Peace 2.0: Friedensverhandlung statt automatischer
@@ -52,6 +64,38 @@ werden zuerst fertiggestellt/gefestigt, bevor neue Breite hinzukommt.
       statt eines einzelnen Reglers, politische Interessengruppen.
 
 ## LATER
+
+### Narrative Systems
+
+Belegt durch den 85-Year-Chronicle-Test (`BASELINE.md`): 95% der Chronik
+ist aktuell Wetter-Flavourtext, nur ~1 relevantes Ereignis alle 8 Jahre bei
+passivem Spiel (siehe `GAME_DESIGN.md` → "Narrative Density"/"Emergent
+Storytelling Gap"). Diese Gruppe war zuvor als Phase 4–6 unter NEXT
+eingeplant, wandert aber nach der Priorisierung von Phase 2 (Technical
+Stabilization) hierher — erst nach Phase 2/3 sinnvoll angehbar:
+
+- [ ] World Memory: strukturierter Erinnerungsspeicher (Typ/Jahr/
+      Beteiligte/Stärke/Decay), Verknüpfung mit der Chronik.
+- [ ] Event Chains: 23 isolierte Events → mindestens 10 hochwertige,
+      mehrjährige Eventketten mit echten Vorbedingungen/Folgeevents statt
+      vieler neuer Einzelevents.
+- [ ] Story Threads: Status-Zustandsautomat (dormant/building/active/
+      climax/resolved/aftermath) für langlebige Handlungsstränge
+      (Erbfolgekrise, Rivalität, Kaiserwahl, Krieg, …).
+- [ ] Drama Director: Spannungswerte aus echtem Weltzustand ableiten,
+      plausible Krisen priorisieren statt willkürlich erzeugen.
+- [ ] Bedeutungsbasierte Chronik (WORLD LOG vs. DYNASTY CHRONICLE, siehe
+      `GAME_DESIGN.md` → "Zukünftige Chronik-Architektur"): nur Ereignisse
+      mit echter Wirkung (Hungersnot, Kriegseinfluss, große Verluste,
+      Eventketten-Start) erscheinen in der Hauptchronik statt jedes
+      Wetterberichts.
+- [ ] Aktivere KI-Dynastien (mehr eigenständig sichtbare Lebensereignisse
+      bei KI-Regionen, nicht nur beim Spieler).
+
+**Noch NICHT implementieren** — diese Gruppe ist Zieldefinition, kein
+aktueller Auftrag.
+
+### UI & Fun Pass
 
 - [ ] Phase 10 — UI-Redesign (erst wenn Gameplay-Systeme aus Phase 2–9
       stabil sind): Historical-Graphic-Novel-Look, Weltkarte als
@@ -74,6 +118,26 @@ werden zuerst fertiggestellt/gefestigt, bevor neue Breite hinzukommt.
       4+wenige Extra-Regionen.
 
 ## EXPERIMENTAL (Ideen, noch nicht eingeplant — Sammelbecken statt Sofort-Umsetzung)
+
+### Balance Research
+
+Aus der Militäranalyse in CODE_AUDIT.md Abschnitt 12 ("Potential Dominant
+Military Strategies") — ausdrücklich **Hypothesen, keine bestätigten
+Fehler**. Erfordert handelnde KI-Agenten, die aktuellen Tests spielen alle
+rein passiv (keine Rekrutierungs-/Diplomatie-/Bauentscheidungen):
+
+- [ ] Pikeniere-Spam testen (36,7 Taler/Stärkepunkt — günstigster Wert
+      aller Truppentypen, siehe CODE_AUDIT.md für die volle Tabelle).
+- [ ] Kavallerie-Bevölkerungseffizienz testen (`recruitPopCostPerUnit`
+      ist unabhängig vom Truppentyp — Schwere Kavallerie könnte pro
+      verbrauchtem Bevölkerungskopf deutlich überlegen sein).
+- [ ] Economic/Military/Diplomatic/Dynastic KI-Agenten (Vorstufe zu
+      Phase 11 "Fun Pass") — je Strategieprofil mindestens 100 Partien,
+      Erfolgsraten vergleichen.
+- [ ] Dominante Strategien empirisch messen, bevor an
+      Kosten-/Stärkewerten etwas verändert wird.
+
+**Keine Werte verändern, bevor diese Messungen vorliegen.**
 
 - [ ] Mehrere Herrscher gleichzeitig spielbar/vergleichbar (setzt eine
       Lösung für die globalen RNG-/Charakter-ID-Zähler voraus, siehe
