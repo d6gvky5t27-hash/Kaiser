@@ -1,10 +1,18 @@
 // ============================================================
 // MILITARY — Berater, Truppen, Armeestärke, Unterhalt, KI-Stärke-
 // Schätzung; declareWar() eröffnet seit der Kriegskarte (js/war-map.js) eine
-// andauernde Kampagne statt einer Sofortschlacht. Die alte
-// Belagerungsauflösung (startSiege/siegeStarve/siegeBribe/resolveSiegeStorm
-// weiter unten) bleibt als unbenutzter Code stehen, seit die "Burg"-
-// Geländeboni der Kampf-Engine dieselbe Rolle pro Gebiet übernehmen (§33/§34)
+// andauernde Kampagne statt einer Sofortschlacht. Die alte, regionsweite
+// Belagerungsauflösung (resolveSiegeStorm/resolveSiegeStarve/
+// resolveSiegeBribe sowie ihr Duplikat in js/battle-bridge.js) wurde in
+// Phase 2 (Technical Stabilization) entfernt — seit der Kriegskarte
+// (§38) übernehmen die "Burg"-Geländeboni der Kampf-Engine dieselbe
+// Rolle pro Gebiet (§33/§34). Beide Implementierungen waren nachweislich
+// unerreichbar: `startSiege()` (die einzige Stelle, die `state.pendingSiege`
+// je setzte) wurde von keiner Stelle im Projekt aufgerufen (siehe
+// CODE_AUDIT.md Abschnitt 12/13.8). `state.pendingSiege`-Prüfungen, die
+// als reine (stets falsche) Schutzbedingungen in noch aktivem Code stehen
+// (z. B. in checkAiWarInitiative()), bleiben bewusst unverändert stehen —
+// sie sind harmlos und ihre Entfernung war nicht Teil dieses Schritts.
 // ============================================================
 
 function generateAdvisorCandidate(role) {
@@ -254,76 +262,4 @@ function declareWar(state, aiId) {
   const report = `Krieg gegen ${region.name} erklärt! Die Kampagne beginnt — erobere ihre Gebiete auf der Kriegskarte.\n${allyLines.join(" ")}`;
   addChronicle(state, report.replace(/\n/g, " "));
   return { ok: true, report, allyLines };
-}
-
-// ---------- Mehrere Siegbedingungen (§47) ----------
-
-function resolveSiegeStorm(state) {
-  if (!state.pendingSiege) return { ok: false, reason: "Keine Belagerung im Gange." };
-  const s = state.pendingSiege;
-  const cfg = CONFIG.military;
-  const scfg = CONFIG.siege;
-  const region = state.regions[s.targetId];
-
-  const playerStrength = armyStrength(state, s.formation) + s.allyStrengthBonus;
-  const aiStrength = (estimateAiStrength(region) + s.enemyStrengthBonus) * s.defenderStrengthFactor;
-  const winChance = playerStrength / Math.max(playerStrength + aiStrength, 1);
-  const won = rnd() < winChance;
-
-  let report;
-  if (won) {
-    const loot = Math.round((region.warehouse.getreide||0) * cfg.lootShareOnWin * 2 + Object.values(region.population).reduce((sum,g)=>sum+g.count,0) * 0.05);
-    state.treasury += loot;
-    state.prestige += cfg.victoryPrestigeGain;
-    for (const type in state.army) state.army[type] = Math.round(state.army[type] * (1 - cfg.winTroopLossShare * scfg.stormCasualtyMultiplier));
-    state.stats.warsWon++;
-    if (!state.warsWonAgainst) state.warsWonAgainst = {};
-    state.warsWonAgainst[s.targetId] = true;
-    report = `Sturmangriff auf ${region.name} erfolgreich! Beute: ${loot} Taler, Prestige +${cfg.victoryPrestigeGain}. Der Angriff kostete hohe Verluste.`;
-  } else {
-    state.stats.warsLost++;
-    state.prestige = Math.max(0, state.prestige - cfg.defeatPrestigeLoss);
-    for (const type in state.army) state.army[type] = Math.round(state.army[type] * (1 - cfg.loseTroopLossShare * scfg.stormCasualtyMultiplier));
-    const r = state.regions.player;
-    for (const pid in r.population) r.population[pid].satisfaction = clamp(r.population[pid].satisfaction - cfg.loseSatisfactionPenalty, 0, 100);
-    report = `Sturmangriff auf ${region.name} gescheitert. Schwere Verluste, Prestige -${cfg.defeatPrestigeLoss}.`;
-  }
-  addChronicle(state, report);
-  state.pendingSiege = null;
-  return { ok: true, won, report };
-}
-
-function resolveSiegeStarve(state) {
-  if (!state.pendingSiege) return { ok: false, reason: "Keine Belagerung im Gange." };
-  const s = state.pendingSiege;
-  s.defenderStrengthFactor = Math.max(0.2, s.defenderStrengthFactor - CONFIG.siege.starveStrengthDrainPerYear);
-  let upkeep = 0;
-  for (const type in state.army) upkeep += state.army[type] * TROOP_TYPES[type].upkeep * CONFIG.siege.starveUpkeepShare;
-  state.treasury -= Math.round(upkeep);
-  s.duration -= 1;
-  addChronicle(state, `Die Belagerung von ${state.regions[s.targetId].name} zieht sich hin — der Verteidiger schwächt sich (Faktor ${s.defenderStrengthFactor.toFixed(2)}).`);
-  if (s.duration <= 0) return resolveSiegeStorm(state);
-  return { ok: true, ongoing: true };
-}
-
-function resolveSiegeBribe(state) {
-  if (!state.pendingSiege) return { ok: false, reason: "Keine Belagerung im Gange." };
-  const scfg = CONFIG.siege;
-  if (state.treasury < scfg.bribeCost) return { ok: false, reason: "Nicht genug Taler für die Bestechung." };
-  state.treasury -= scfg.bribeCost;
-  const s = state.pendingSiege;
-  const region = state.regions[s.targetId];
-  const dip = state.diplomacy[s.targetId];
-  if (rnd() < scfg.bribeSuccessChance) {
-    const loot = Math.round((region.warehouse.getreide||0) * 0.1);
-    state.treasury += loot;
-    state.prestige += Math.round(CONFIG.military.victoryPrestigeGain * 0.6);
-    addChronicle(state, `Die Garnison von ${region.name} wurde bestochen und übergibt die Stadt kampflos!`);
-    state.pendingSiege = null;
-    return { ok: true, won: true, report: `Die Garnison von ${region.name} wurde bestochen — Sieg ohne Schlacht!` };
-  } else {
-    dip.relation = clamp(dip.relation + scfg.bribeRelationPenalty, -100, 100);
-    addChronicle(state, `Der Bestechungsversuch bei ${region.name} wurde entdeckt und schlug fehl.`);
-    return { ok: true, won: false, report: "Der Bestechungsversuch ist gescheitert." };
-  }
 }

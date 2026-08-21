@@ -121,62 +121,13 @@ function determineWarTerrain(region) {
   return "ebene";
 }
 
-// ---------- Mehrjährige Belagerung (§36), jetzt kombiniert mit der Kampf-Engine:
-// die Belagerung selbst bleibt eine mehrjährige strategische Entscheidung
-// (Aushungern schwächt den Verteidiger, Bestechung kann sie ohne Schlacht
-// beenden), aber ein Sturmangriff wird über die volle interaktive
-// Kampf-Engine ausgetragen statt über eine reine Wahrscheinlichkeitsformel.
-function startSiege(state, aiId) {
-  const cfg = CONFIG.siege;
-  const region = state.regions[aiId];
-  const wallLevel = buildingLevelSum(region, "stadtmauer");
-  const duration = Math.min(cfg.maxDuration, wallLevel * cfg.durationPerWallLevel);
-  state.pendingSiege = { targetId: aiId, duration, defenderStrengthFactor: 1.0 };
-  addChronicle(state, `Die Belagerung von ${region.name} beginnt (Stadtmauer verteidigt, bis zu ${duration} Jahre möglich).`);
-  return { ok: true, duration };
-}
-
-function siegeStarve(state) {
-  if (!state.pendingSiege) return { ok: false, reason: "Keine Belagerung im Gange." };
-  const cfg = CONFIG.siege;
-  const s = state.pendingSiege;
-  const region = state.regions[s.targetId];
-  s.defenderStrengthFactor = Math.max(0.25, s.defenderStrengthFactor - cfg.starveStrengthDrainPerYear);
-  let upkeep = 0;
-  for (const type in state.army) upkeep += state.army[type] * TROOP_TYPES[type].upkeep * cfg.starveUpkeepShare;
-  state.treasury -= Math.round(upkeep);
-  s.duration -= 1;
-  addChronicle(state, `Die Belagerung von ${region.name} zieht sich hin — der Verteidiger schwächt sich (Faktor ${s.defenderStrengthFactor.toFixed(2)}).`);
-  if (s.duration <= 0) {
-    addChronicle(state, `Die maximale Belagerungsdauer ist erreicht — ein Sturmangriff ist jetzt unausweichlich.`);
-  }
-  return { ok: true, forced: s.duration <= 0 };
-}
-
-function siegeBribe(state) {
-  if (!state.pendingSiege) return { ok: false, reason: "Keine Belagerung im Gange." };
-  const cfg = CONFIG.siege;
-  if (state.treasury < cfg.bribeCost) return { ok: false, reason: "Nicht genug Taler für die Bestechung." };
-  state.treasury -= cfg.bribeCost;
-  const s = state.pendingSiege;
-  const region = state.regions[s.targetId];
-  const dip = state.diplomacy[s.targetId];
-  if (rnd() < cfg.bribeSuccessChance) {
-    const loot = Math.round((region.warehouse.getreide || 0) * 0.1);
-    state.treasury += loot;
-    state.prestige += Math.round(CONFIG.military.victoryPrestigeGain * 0.6);
-    state.stats.warsWon++;
-    if (!state.warsWonAgainst) state.warsWonAgainst = {};
-    state.warsWonAgainst[s.targetId] = true;
-    addChronicle(state, `Die Garnison von ${region.name} wurde bestochen und übergibt die Stadt kampflos!`);
-    state.pendingSiege = null;
-    return { ok: true, won: true };
-  } else {
-    dip.relation = clamp(dip.relation + cfg.bribeRelationPenalty, -100, 100);
-    addChronicle(state, `Der Bestechungsversuch bei ${region.name} wurde entdeckt und schlug fehl.`);
-    return { ok: true, won: false };
-  }
-}
+// Die frühere mehrjährige Belagerungsauflösung (startSiege/siegeStarve/
+// siegeBribe) wurde in Phase 2 (Technical Stabilization) entfernt — siehe
+// den Kommentar am Anfang von js/military.js für den vollständigen
+// Hintergrund und den Unerreichbarkeits-Nachweis (CODE_AUDIT.md
+// Abschnitt 12/13.8). determineWarTerrain() oben bleibt aktiv: die
+// "Burg"-Geländebonus-Logik der Kriegskarte übernimmt seither dieselbe
+// Rolle pro Gebiet.
 
 function applyBattleResultToGame(state, aiId, battleResult) {
   const cfg = CONFIG.military;
