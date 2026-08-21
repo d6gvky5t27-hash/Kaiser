@@ -24,10 +24,10 @@ strukturiert, und wo sind die technischen Schwachstellen".
 | `js/population-dynasty.js` | 236 | Bevölkerungsentwicklung (Geburt/Tod/Hunger/Seuche), Stadtentwicklungsstufen, Charakteraltern, Heirat, Geburt, Tod des Herrschers, Erbfolge/Erbstreit, Migration zwischen Regionen. |
 | `js/politics.js` | 156 | Titelaufstieg, alternative Siegbedingungen, Kaiserwahl (Trigger/Bestechung/Auflösung), Regierungsstil, Religion. |
 | `js/diplomacy.js` | 386 | 12 diplomatische Aktionen, Beziehungsupdate, Vasallisierung, 6 Intrigenarten, Spionage/Aufklärung, Kriegsverbündete. |
-| `js/military.js` | 329 | Berater (Anwerbung/Ausbau/Entlassung/Wirkung), Truppenaushebung, Armeestärke, Söldnerdesertion, KI-Kriegsentscheidung (`evaluateAiAggressionFactors`/`checkAiWarInitiative`), `declareWar()`, **plus toter Code**: `resolveSiegeStorm/Starve/Bribe` (siehe Abschnitt 6). |
+| `js/military.js` | ~290 | Berater (Anwerbung/Ausbau/Entlassung/Wirkung), Truppenaushebung, Armeestärke, Söldnerdesertion, KI-Kriegsentscheidung (`evaluateAiAggressionFactors`/`checkAiWarInitiative`), `declareWar()`. Die tote Belagerungslogik (`resolveSiegeStorm/Starve/Bribe`) wurde in Phase 2 entfernt, siehe Abschnitt 14. |
 | `js/war-map.js` | 297 | Kriegskarte: 16 Gebiete, Truppenstationierung/-verlegung, Gebietsangriff über die Kampf-Engine, KI-Garnisonserholung/-gegenangriff, Regions-Eroberung → Vasallisierung. |
-| `js/advance-year.js` | 227 | **Der zentrale Orchestrator**: `advanceYear()` (jährlicher Rundenschritt, ruft praktisch jedes andere Modul auf), `applyMonthlyFinances()`, `advanceMonth()` (Monatstakt-Wrapper). |
-| `js/battle-bridge.js` | 240 | Übersetzt zwischen Hauptspiel-Truppentypen und der Kampf-Engine (Armeeaufbau, Ergebnisanwendung), Geländebestimmung, **plus toter Code**: `startSiege/siegeStarve/siegeBribe` (Duplikat zu `js/military.js`, siehe Abschnitt 6). |
+| `js/advance-year.js` | ~275 | **Der zentrale Orchestrator**: `advanceYear()` ist seit Phase 2 (Abschnitt 14) ein 6-zeiliger Aufrufer von `applyPreProductionBonuses()`/`processAllRegions()`/`updateEconomyAndDiplomacy()`/`applyRulerAndDynastyEffects()`/`updatePoliticsAndWar()`/`finalizeYear()`, plus `applyMonthlyFinances()`/`advanceMonth()` (Monatstakt-Wrapper). |
+| `js/battle-bridge.js` | ~195 | Übersetzt zwischen Hauptspiel-Truppentypen und der Kampf-Engine (Armeeaufbau, Ergebnisanwendung), Geländebestimmung (`determineWarTerrain()`). Die tote Belagerungslogik (`startSiege/siegeStarve/siegeBribe`) wurde in Phase 2 entfernt, siehe Abschnitt 14. |
 | `js/debug.js` | 63 | Debug-Helfer (Geld/Jahr setzen, Event/Charakter erzwingen), KI-Kriegsanalyse-Anzeige. |
 | `battle-engine/battle-data.js` | 140 | Reine Kampf-Datentabellen (Einheitentypen, Konter, Gelände, Wetter, Formationen, Taktiken, Moralstufen, `BATTLE_CONFIG`). |
 | `battle-engine/battle-engine.js` | 356 | Kampfberechnung: Effektivwerte, Konterboni, Verlustanwendung, Moral, Fluchtprüfung, Kommandanten-Ereignisse, KI-Formationswahl. |
@@ -36,7 +36,8 @@ strukturiert, und wo sind die technischen Schwachstellen".
 | `tests/economy_test.js` | 61 | 20×100 Jahre Solo-Simulation, prüft Preisexplosion/Bevölkerungskollaps. **Kein fester Seed** (siehe Abschnitt 7). |
 | `tests/ai_vs_ai_test.js` | 93 | 100×100 Jahre Simulation, prüft KI-Dominanzverteilung und passive Spieler-Titelprogression. **Kein fester Seed.** |
 | `tests/baseline_analysis.js` | neu (Phase 1) | Siehe `BASELINE.md` — zusätzliches, additives Skript mit festen Seeds für reproduzierbare Referenzwerte. |
-| `tools/data-sync.js` | 112 | Synchronisiert 9 Datentabellen zwischen `data/gamedata.js` und `data/json/*.json` (Extract/Build). **Veraltet gegenüber `gamedata.js`**, siehe Abschnitt 6. |
+| `tools/data-sync.js` | ~150 | Synchronisiert 9 Datentabellen zwischen `data/gamedata.js` und `data/json/*.json` (Extract/Build), seit Phase 2 mit Pflichtfeld-Validierung vor jedem Schreiben (Abschnitt 14). |
+| `tools/build-bundle.js` | neu (Phase 2) | Fest eingerichtetes Bundle-Build-Werkzeug mit Existenz-/Syntax-/Laufzeit-Rauchtest-Validierung, ersetzt das bisherige Ad-hoc-Inline-Rebuild-Skript (Abschnitt 14.2). |
 | `battle.html`, `battle_standalone.html` | 312 / 1.088 | Eigenständige Kampf-Engine-Demos/Testseiten, unabhängig vom Hauptspiel. Nicht Teil des regulären Spielablaufs. |
 
 **Ladereihenfolge des Bundles** (aus dem wiederkehrenden Rebuild-Skript,
@@ -757,3 +758,136 @@ Befund festgehalten.
 
 Kein einziger dieser Punkte wurde in diesem Schritt umgesetzt — reine
 Planung, wartet auf Freigabe.
+
+---
+
+## 14. Phase 2 — Ergebnisse (ausgeführt, siehe Commits)
+
+Der obige Plan (Abschnitt 13) wurde nach Freigabe durch den Nutzer
+umgesetzt. Status je Punkt aus Abschnitt 12/13:
+
+| Befund | Status |
+|---|---|
+| `advanceYear()` God-Function | **RESOLVED** — in 6 benannte Teilschritte zerlegt (`applyPreProductionBonuses`, `processAllRegions`, `updateEconomyAndDiplomacy`, `applyRulerAndDynastyEffects`, `updatePoliticsAndWar`, `finalizeYear`), reines Extract-Method, RNG-Determinismus über `tests/advance_year_snapshot_test.js` (3 Seeds, jahrgenau) bewiesen unverändert. |
+| Data-Sync-Drift (`baseCost` fehlte in `advisor-roles.json`) | **RESOLVED** — `data/json/advisor-roles.json` neu extrahiert, `tools/data-sync.js` validiert jetzt vor jedem Schreiben Pflichtfelder für alle 9 Tabellen (kein stilles Datenverlust-Risiko mehr). |
+| Doppelte tote Belagerungslogik (`military.js`/`battle-bridge.js`) | **REMOVED** — beide Implementierungen plus der unerreichbare UI-Pfad (`index.html`) entfernt, Unerreichbarkeit vor der Entfernung erneut verifiziert. |
+| Implizite Bundle-Ladereihenfolge | **TEILWEISE ADRESSIERT** — siehe 14.1/14.2: fest eingerichtetes, validierendes `tools/build-bundle.js` statt eines Ad-hoc-Inline-Skripts; die Reihenfolge selbst bleibt (bewusst, siehe 14.1) unverändert bestehen, keine ES-Module-Migration. |
+| UI-State-Kopplung (tiefe `state`-Pfad-Zugriffe) | **NICHT verändert** — außerhalb des Phase-2-Scopes (Punkt 26/27 der Phase-2-Anweisung: nur vorbereiten, keine Migration). Siehe 14.3 für die vorbereitete Getter-Liste. |
+| Militär-Balance-Hypothesen (Pikeniere/Kavallerie) | **UNVERÄNDERT** — ausdrücklich außerhalb des Phase-2-Scopes, keine Werte angefasst. |
+
+### 14.1 Modul-Abhängigkeiten (Dependency-Übersicht, Punkt 29)
+
+Kleine, manuell erstellte Übersicht statt eines automatisierten
+Abhängigkeitsgraphen (§Punkt 30: "nicht unnötig eskalieren"). Wichtige
+Vorbemerkung, die die Dringlichkeit dieses Punkts relativiert:
+**Funktionsdeklarationen (`function foo() {}`) werden von der JS-Engine
+innerhalb des gesamten gemeinsamen Auswertungsbereichs gehoisted** — da
+alle 14 Dateien zu EINEM `<script>`-Block bzw. EINEM `eval()`-Aufruf
+konkateniert werden, können sich Funktionen in der Praxis bereits jetzt
+unabhängig von der Dateireihenfolge gegenseitig aufrufen. Die
+Ladereihenfolge ist trotzdem nicht beliebig — sie ist relevant für:
+
+- **Top-Level-`const`-Deklarationen, die beim Laden sofort einen Wert
+  aus einer anderen Datei lesen** (nicht nur eine Funktion definieren).
+  Das betrifft praktisch nur `data/gamedata.js` selbst: `STRINGS`,
+  `TITLES`, `TRAITS`, `EVENTS` etc. sind reine Literale ohne
+  Fremdreferenzen, aber `battle-engine/battle-data.js` deklariert einige
+  Top-Level-Konstanten (`BATTLE_CONFIG` u. a.), die nur battle-eigene
+  Werte referenzieren — daher muss `battle-data.js` vor
+  `battle-engine.js`/`battle-state-machine.js` stehen (beide lesen
+  Battle-Datentabellen beim Modulaufbau nicht sofort, sondern erst
+  innerhalb von Funktionsaufrufen zur Laufzeit — auch hier greift die
+  Hoisting-Entspannung).
+- **Reine Lesbarkeit/Konvention**: `data/gamedata.js` zuerst, weil sie
+  die von praktisch jeder Funktion referenzierten Datentabellen
+  (`CONFIG`, `GOODS`, `POP_GROUPS`, …) enthält — auch wenn diese
+  Referenzen dank Hoisting technisch erst zur Laufzeit (nicht beim Laden)
+  aufgelöst werden, macht das lineare Layout die Datei leichter
+  nachvollziehbar.
+- **`js/advance-year.js` muss nach allen Fachmodulen stehen**, deren
+  Funktionen sie direkt beim eigenen Aufbau nutzt — auch das ist wegen
+  Hoisting technisch nicht zwingend, bleibt aber die etablierte,
+  getestete Konvention (siehe Kommentar am Dateianfang).
+
+**Grob zusammengefasst** (Pfeil = "wird von den Funktionen darin
+verwendet"):
+
+```
+data/gamedata.js  (CONFIG, GOODS, POP_GROUPS, BUILDINGS, TROOP_TYPES, …)
+      ↓
+js/core.js  (rnd(), clamp(), newGame(), makeRegion(), logLedger() …)
+      ↓
+js/economy.js, js/population-dynasty.js, js/politics.js, js/diplomacy.js,
+js/military.js, js/debug.js, js/war-map.js
+      (nutzen core.js + gamedata.js + z.T. gegenseitig, z.B.
+       military.js -> advisorEffectBonus() wird von advance-year.js
+       gebraucht; war-map.js -> buildTerritoryBattleArmies() nutzt
+       battle-bridge.js-Funktionen zur Laufzeit)
+      ↓
+js/advance-year.js  (orchestriert praktisch alle oben genannten Module)
+      ↓
+battle-engine/battle-data.js -> battle-engine.js -> battle-state-machine.js
+      (eigenständig, kaum Rückbezüge zum Hauptspiel)
+      ↓
+js/battle-bridge.js  (Brücke zwischen Hauptspiel-Truppentypen/`state`
+                       und der Kampf-Engine — braucht BEIDE Seiten)
+```
+
+**Fazit**: Die Reihenfolge ist überwiegend Konvention/Lesbarkeit, nicht
+technischer Zwang (dank Hoisting) — mit der einen echten Einschränkung,
+dass `battle-bridge.js` sowohl Kampf-Engine-Funktionen als auch
+Hauptspiel-Funktionen aufruft und daher nach beiden Gruppen stehen muss.
+Eine ES-Module-Migration (die diese Unklarheit technisch explizit machen
+würde) ist bewusst **nicht** Teil von Phase 2 (§Punkt 30).
+
+### 14.2 Build-Validierung (Punkt 31)
+
+Neu: `tools/build-bundle.js` ersetzt das bisherige Ad-hoc-Inline-Rebuild-
+Skript (das nach jeder `js/*.js`-Änderung von Hand im Terminal
+eingegeben wurde, siehe die vorherigen Schritte in `DEVELOPMENT.md`)
+durch ein festes, committetes Werkzeug. Prüft vor jedem Schreiben:
+
+1. Alle 14 Quelldateien existieren.
+2. Der gebündelte Code ist syntaktisch gültig (`new Function()`-Check).
+3. **Laufzeit-Rauchtest**: das Bundle wird in einem `vm`-Sandbox-Kontext
+   tatsächlich ausgeführt — `newGame()` + 12× `advanceMonth()` (damit
+   `advanceYear()` mindestens einmal durchläuft) — und muss dabei
+   fehlerfrei durchlaufen. Das ist der eigentliche Beweis für "Reihenfolge
+   funktioniert", nicht nur "Syntax ist gültig" (ein reiner Syntax-Check
+   hätte einen `ReferenceError` durch eine fehlende Datei nicht erkannt).
+
+**Bei der Entwicklung dieses Prüfschritts selbst eine reale Schwachstelle
+gefunden und behoben**: die erste Fassung rief `advanceMonth()` nur
+einmal auf und hätte daher einen Fehler innerhalb von `advanceYear()`
+NICHT erkannt (der 12. Monat, der `advanceYear()` auslöst, wurde nie
+erreicht) — verifiziert durch einen bewussten Testfehler
+(`rollWeather()` künstlich kaputt gemacht): die erste Fassung ließ den
+Build trotzdem grün durch, die korrigierte Fassung (12× `advanceMonth()`)
+erkennt denselben Fehler zuverlässig mit vollständigem Stacktrace. Beide
+Testfälle (fehlende Datei, kaputte Funktion) wurden manuell durchgespielt
+und danach der Originalzustand wiederhergestellt, bevor `index.html`
+regulär neu gebaut wurde.
+
+Bewusst NICHT Teil dieses Werkzeugs: ein automatischer Daten-Sync-Check
+(bleibt ein eigener, bewusster Schritt über `tools/data-sync.js`, siehe
+dessen Kopfkommentar) — Bundle-Build und Daten-Sync sind unterschiedliche
+Aktionen mit unterschiedlicher Absicht (eine schreibt `index.html`, die
+andere `data/gamedata.js`), eine automatische Kopplung würde beide
+Werkzeuge unnötig verkomplizieren.
+
+### 14.3 Vorbereitete Getter/Selector-Liste (Punkt 26/27 — NICHT umgesetzt)
+
+Rein vorbereitend dokumentiert, keine Migration durchgeführt. Falls eine
+spätere Phase die UI-State-Kopplung angeht, sind das plausible erste
+Kandidaten (aus den am häufigsten wiederkehrenden `index.html`-Zugriffs-
+mustern):
+
+- `getPlayerRegion(state)` → `state.regions.player`
+- `getPlayerPopulationGroup(state, groupId)` → `state.regions.player.population[groupId]`
+- `getPlayerTreasury(state)` → `state.treasury`
+- `getRegionEconomy(state, regionId)` → `{ prices, warehouse, taxRate }` der jeweiligen Region
+- `getRuler(state)` → `state.characters[state.rulerId]`
+- `getAdvisor(state, role)` → `state.characters[state.advisors[role]]` (oder `null`)
+
+Keine dieser Funktionen wurde angelegt — reine Dokumentation für eine
+spätere, separat freizugebende Phase.
