@@ -657,6 +657,15 @@
       <button onclick="doShowCharacterDebug()">Anzeigen</button>
       <div id="characterDebugOutput" style="margin-top:var(--sp-2); white-space:pre-line; border:2px solid #0a0c11; padding:6px; background:rgba(0,0,0,0.05);"></div>
     </div>
+    <div style="margin-top:var(--sp-2);">
+      <b>Welt-Erinnerungen (§Phase-4-Punkt 41-44 — Memory-Debug-Panel):</b><br>
+      <select id="memoryDebugCharSelect"><option value="">alle Charaktere</option></select>
+      <select id="memoryDebugTypeSelect"><option value="">alle Typen</option></select>
+      <label>Min. Bedeutsamkeit <input type="number" id="memoryDebugMinImportance" value="0" min="0" max="100" style="width:4em;"></label>
+      <select id="memoryDebugSign"><option value="">positiv+negativ</option><option value="pos">nur positiv</option><option value="neg">nur negativ</option></select>
+      <button onclick="doShowMemoryDebug()">Anzeigen</button>
+      <div id="memoryDebugOutput" style="margin-top:var(--sp-2); max-height:300px; overflow-y:auto; border:2px solid #0a0c11; padding:6px; background:rgba(0,0,0,0.05);"></div>
+    </div>
   </div>
 </div>
 
@@ -2531,6 +2540,46 @@ const TITLES = [
   }
 ];
 
+// ---------- World Memory (Phase 4) ----------
+// Datengetriebene Defaults pro Memory-Typ (§Punkt 66: "klare Defaults pro
+// Memory-Typ bevorzugen" statt einer riesigen universellen Formel).
+// `direction` steuert, ob/wie eine Memory die Beziehungsberechnung
+// beeinflusst (js/characters.js, computeRelationshipBreakdown()):
+//   "target_to_actor" — wirkt nur vom Ziel Richtung Akteur (Groll/Dank)
+//   "symmetric"        — wirkt zwischen allen Teilnehmern in beide Richtungen
+//   "none"             — rein historisch, beeinflusst keine Beziehung direkt
+// `importance` (1-100) ist der Startwert, `decayRate` der Anteil des
+// emotionalWeight, der pro Jahr verblasst (0 = verblasst nie, siehe §Punkt 46).
+// ELECTION_PROMISE_BROKEN ist bewusst vorbereitet, aber noch nicht verdrahtet
+// (§Punkt 6: "falls einzelne Systeme noch nicht existieren: nur vorbereiten"
+// — es gibt noch kein Versprechenssystem bei Kaiserwahlen, das wäre
+// Kaiserwahl 2.0 und ausdrücklich nicht Teil dieser Phase, §Punkt 79).
+const MEMORY_TYPES = {
+  CHILD_BORN:                { importance: 25, decayRate: 0.04, direction: "none", tags: ["dynasty", "birth"] },
+  HEIR_BORN:                 { importance: 65, decayRate: 0.02, direction: "none", tags: ["dynasty", "birth", "succession"] },
+  MARRIAGE:                  { importance: 55, decayRate: 0,    direction: "none", tags: ["dynasty", "marriage"] },
+  RULER_DIED:                { importance: 90, decayRate: 0,    direction: "none", tags: ["dynasty", "death"] },
+  SUCCESSION:                { importance: 80, decayRate: 0,    direction: "none", tags: ["dynasty", "succession"] },
+  PASSED_OVER_IN_SUCCESSION: { importance: 60, decayRate: 0.02, direction: "target_to_actor", tags: ["dynasty", "succession", "grievance"] },
+  APPOINTED_TO_OFFICE:       { importance: 30, decayRate: 0.06, direction: "target_to_actor", tags: ["hof", "office", "gratitude"] },
+  DENIED_OFFICE:             { importance: 35, decayRate: 0.05, direction: "target_to_actor", tags: ["hof", "office", "grievance"] },
+  DISMISSED_FROM_OFFICE:     { importance: 35, decayRate: 0.05, direction: "target_to_actor", tags: ["hof", "office", "grievance"] },
+  DIED_IN_OFFICE:            { importance: 40, decayRate: 0.03, direction: "none", tags: ["hof", "death"] },
+  ALLIANCE_FORMED:           { importance: 35, decayRate: 0.05, direction: "none", tags: ["diplomacy", "alliance"] },
+  ALLIANCE_BROKEN:           { importance: 50, decayRate: 0.02, direction: "none", tags: ["diplomacy", "betrayal"] },
+  AID_GRANTED:               { importance: 30, decayRate: 0.06, direction: "none", tags: ["diplomacy", "gratitude"] },
+  AID_REFUSED:               { importance: 30, decayRate: 0.06, direction: "none", tags: ["diplomacy", "grievance"] },
+  WAR_DECLARED:              { importance: 50, decayRate: 0.03, direction: "none", tags: ["war"] },
+  MAJOR_BATTLE_WON:          { importance: 65, decayRate: 0.02, direction: "none", tags: ["war", "victory"] },
+  MAJOR_BATTLE_LOST:         { importance: 65, decayRate: 0.02, direction: "none", tags: ["war", "defeat"] },
+  PEACE_SIGNED:              { importance: 45, decayRate: 0,    direction: "none", tags: ["war", "peace"] },
+  TITLE_GAINED:              { importance: 70, decayRate: 0,    direction: "none", tags: ["politics", "title"] },
+  ELECTION_SUPPORT_GIVEN:    { importance: 40, decayRate: 0.04, direction: "none", tags: ["politics", "election", "gratitude"] },
+  ELECTION_PROMISE_BROKEN:   { importance: 55, decayRate: 0.015, direction: "none", tags: ["politics", "election", "betrayal"] },
+  RIVALRY_BEGAN:             { importance: 55, decayRate: 0.01, direction: "symmetric", tags: ["rivalry"] },
+  FAMINE:                    { importance: 55, decayRate: 0.03, direction: "none", tags: ["disaster", "famine"] },
+};
+
 // Event-System: TRIGGER/BEDINGUNGEN/TEXT/ENTSCHEIDUNGEN/KONSEQUENZEN (§38)
 // ---------- Charaktersystem (§9/§10) ----------
 const MALE_NAMES = ["Friedrich","Wilhelm","Heinrich","Konrad","Albrecht","Ludwig","Otto","Rudolf","Gottfried","Sigismund","Bernhard","Eberhard"];
@@ -2570,18 +2619,18 @@ const TRAITS = [
   { id: "fromm",         name: "fromm",         effects: { satisfactionBonus: 4 } },
   { id: "verschwenderisch", name: "verschwenderisch", effects: { treasuryDrain: 0.1 } },
   // --- neu in Phase 3 ---
-  { id: "loyal",         name: "loyal",         effects: { loyaltyMod: 15 } },
-  { id: "barmherzig",    name: "barmherzig",    effects: { loyaltyMod: 5 } },
+  { id: "loyal",         name: "loyal",         effects: { loyaltyMod: 15, memoryDecayModPositive: -0.3 } },
+  { id: "barmherzig",    name: "barmherzig",    effects: { loyaltyMod: 5, memoryDecayModNegative: 0.5 } },
   { id: "mutig",         name: "mutig",         effects: { claimAggression: 5 } },
   { id: "feige",         name: "feige",         effects: { loyaltyMod: 10, claimAggression: -10 } },
   { id: "intelligent",   name: "intelligent",   effects: { advisorEffectMod: 0.08 } },
   { id: "naiv",          name: "naiv",          effects: { advisorEffectMod: -0.05, loyaltyMod: 5 } },
   { id: "charismatisch", name: "charismatisch", effects: { relationshipMod: 5 } },
-  { id: "paranoid",      name: "paranoid",      effects: { loyaltyMod: -10 } },
+  { id: "paranoid",      name: "paranoid",      effects: { loyaltyMod: -10, memoryWeightAmplifierNegative: 0.3 } },
   { id: "arrogant",      name: "arrogant",      effects: { loyaltyMod: -8, claimAggression: 8 } },
   { id: "bescheiden",    name: "bescheiden",    effects: { loyaltyMod: 8, claimAggression: -10 } },
   { id: "korrupt",       name: "korrupt",       effects: { advisorEffectMod: -0.1 } },
-  { id: "rachsuechtig",  name: "rachsüchtig",   effects: { claimAggression: 10 } },
+  { id: "rachsuechtig",  name: "rachsüchtig",   effects: { claimAggression: 10, memoryDecayModNegative: -0.4 } },
 ];
 
 // §Punkt 75: offensichtlich widersprüchliche Kombinationen vermeiden (nicht
@@ -2656,6 +2705,7 @@ function createCharacter(gender, age, surname) {
     loyalty: 50,          // getrennt von "Beziehung" (§Punkt 16), siehe computeLoyalty()
     advisorRole: null,
     rivalIds: [],
+    rivalryOrigin: {},    // §Phase-4-Punkt 32: rivalId -> Memory-ID des auslösenden Ereignisses
   };
 }
 
@@ -3199,6 +3249,7 @@ function newGame(options) {
     dynastyName: dynastyName,
     characters: {},
     rulerId: null,
+    memories: { byId: {}, nextId: 1 }, // §Phase-4 World Memory: state.memories.byId["m1"...], siehe js/memory.js
   };
 
   for (const ext of EXTRA_REGIONS) {
@@ -3237,7 +3288,7 @@ function logLedger(state, label, amount) {
 
 // ---------- Landwirtschaft (§18/§19) ----------
 
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 4;
 
 function serializeSave(state) {
   return JSON.stringify({
@@ -3273,9 +3324,28 @@ function migrateSaveV2ToV3(parsed) {
   return parsed;
 }
 
+// §Phase-4-Punkt 50/51/52: World Memory erweitert den State um
+// `state.memories`. Alte Saves bekommen einen LEEREN Speicher — KEINE
+// rückwirkend erfundenen historischen Memories ("keine retroaktive
+// Fiktion"). Alte, in Phase 3 auf `character.relationships[x].modifiers`
+// dauerhaft gespeicherte Ereignis-Modifikatoren (amt_verweigert/
+// erbfolge_uebergangen/rivalitaet) werden von der neuen, memory-basierten
+// computeRelationshipBreakdown() ohnehin nicht mehr gelesen — sie bleiben
+// als harmlose, ungenutzte Altlast im Save stehen statt sie künstlich in
+// Memories umzudeuten (dieselbe Nicht-Erfindungs-Regel).
+function migrateSaveV3ToV4(parsed) {
+  if (!parsed.state.memories) parsed.state.memories = { byId: {}, nextId: 1 };
+  for (const id in parsed.state.characters) {
+    if (!parsed.state.characters[id].rivalryOrigin) parsed.state.characters[id].rivalryOrigin = {};
+  }
+  parsed.saveVersion = 4;
+  return parsed;
+}
+
 function deserializeSave(json) {
   let parsed = JSON.parse(json);
   if (parsed.saveVersion === 2) parsed = migrateSaveV2ToV3(parsed);
+  if (parsed.saveVersion === 3) parsed = migrateSaveV3ToV4(parsed);
   if (parsed.saveVersion !== SAVE_VERSION) {
     throw new Error("Inkompatible Spielstand-Version: " + parsed.saveVersion);
   }
@@ -3903,25 +3973,44 @@ function updateDynasty(state) {
     spouse.spouseId = state.rulerId;
     addChronicle(state, `${ruler.name} ${ruler.surname} vermählte sich mit ${spouse.name}.`);
     state.pendingMarriage = sid;
+    recordWorldEvent(state, {
+      type: "MARRIAGE", actorIds: [state.rulerId, sid], targetIds: [state.rulerId, sid],
+      emotionalWeight: 40,
+      description: `${ruler.name} ${ruler.surname} vermählte sich mit ${spouse.name}.`,
+    });
   }
 
   // Geburt eines Kindes — der voreingestellte Zufallsname bleibt als Fallback
   // (z.B. für die Node-Tests ohne UI), state.pendingBirth lässt die Oberfläche
   // aber ein Fenster zum eigenen Umbenennen anzeigen (auf Nutzerwunsch).
   if (ruler.spouseId && ruler.age >= cfg.birthMinAge && ruler.age <= cfg.birthMaxAge && rnd() < cfg.birthChance) {
+    const isFirstChild = ruler.childrenIds.length === 0; // §Punkt 8: Geburt DES Thronfolgers vs. eines weiteren Kindes
     const child = createCharacter(rnd() < 0.5 ? "m" : "f", 0, ruler.surname);
     child.parentId = state.rulerId;
     const cid = nextCharId();
     state.characters[cid] = child;
     ruler.childrenIds.push(cid);
-    addChronicle(state, `${ruler.gender === "m" ? "Dem Herrscherpaar" : "Der Herrscherin"} wurde ein Kind geboren: ${child.name} ${ruler.surname}.`);
+    const birthDesc = `${ruler.gender === "m" ? "Dem Herrscherpaar" : "Der Herrscherin"} wurde ein Kind geboren: ${child.name} ${ruler.surname}.`;
+    addChronicle(state, birthDesc);
     state.pendingBirth = cid;
+    recordWorldEvent(state, {
+      type: isFirstChild ? "HEIR_BORN" : "CHILD_BORN",
+      actorIds: [state.rulerId, ruler.spouseId], targetIds: [cid],
+      emotionalWeight: isFirstChild ? 45 : 25,
+      description: birthDesc,
+    });
   }
 
   // Sterbewahrscheinlichkeit
   if (rnd() < rollDeathChance(ruler)) {
     ruler.alive = false;
-    addChronicle(state, `${ruler.name} ${ruler.surname} verstarb im Alter von ${ruler.age} Jahren.`);
+    const deathDesc = `${ruler.name} ${ruler.surname} verstarb im Alter von ${ruler.age} Jahren.`;
+    addChronicle(state, deathDesc);
+    recordWorldEvent(state, {
+      type: "RULER_DIED", actorIds: [state.rulerId], targetIds: [],
+      emotionalWeight: -50, metadata: { age: ruler.age },
+      description: deathDesc,
+    });
     handleSuccession(state);
   }
 }
@@ -3968,15 +4057,27 @@ function handleSuccession(state) {
   // Erbfolgekrisen-Eventketten (Phase 5+), noch OHNE automatischen
   // Bürgerkrieg (§Punkt 22 ausdrücklich: "noch keinen vollständigen
   // Bürgerkrieg automatisch auslösen").
+  const oldRulerId = state.rulerId;
   for (const passedOver of heirs.slice(1)) {
     const passedOverId = Object.keys(state.characters).find(id => state.characters[id] === passedOver);
     if (!passedOverId) continue;
     setClaim(passedOver, "player", "strong", "succession_passed_over");
-    addPersistentRelationshipModifier(passedOver, heirId, "erbfolge_uebergangen", -25);
+    const memory = recordWorldEvent(state, {
+      type: "PASSED_OVER_IN_SUCCESSION", actorIds: [heirId], targetIds: [passedOverId],
+      emotionalWeight: -45, metadata: { titleId: "player" },
+      description: `${passedOver.name} ${passedOver.surname || ""} wurde bei der Nachfolge von ${heir.name} übergangen.`.replace(/\s+/g, " "),
+    });
+    refreshRelationship(state, passedOverId, heirId);
+    addChronicle(state, memory.description);
   }
 
   state.rulerId = heirId;
   addChronicle(state, `${heir.name} ${heir.surname} tritt im Alter von ${heir.age} Jahren die Nachfolge an.`);
+  recordWorldEvent(state, {
+    type: "SUCCESSION", actorIds: [oldRulerId], targetIds: [heirId],
+    emotionalWeight: 20, metadata: { heirsPassedOver: heirs.length - 1 },
+    description: `${heir.name} ${heir.surname} trat im Alter von ${heir.age} Jahren die Nachfolge an.`,
+  });
 
   // §Character-Core-Punkt 30: Berater können durch den Herrscherwechsel ihr
   // Amt verlieren — abhängig von ihrer (zuletzt gegenüber dem alten
@@ -4063,35 +4164,219 @@ function applyInterRegionalMigration(state) {
 // ---------- Regierungsstil: "Sehr fair" bis "Gierig" (§Original-Justizregler) ----------
 
 // ============================================================
+// MEMORY — Phase 4 "World Memory": strukturierte, bedeutsame Erinnerungen
+// statt nackter Beziehungszahlen. Erzeugt/liest ausschließlich
+// `state.memories.byId`. KEIN Ersatz für die Chronik (menschenlesbare
+// Erzählung, unverändert in index.html) — siehe memoryToChronicleCandidate()
+// für die vorbereitete, aber noch nicht aktiv genutzte Brücke dorthin.
+//
+// Zentrale Designregel (§Punkt 2): nur BEDEUTSAME Ereignisse werden
+// gespeichert. Normales Wetter, einzelne Preisänderungen usw. erzeugen
+// keine Memory. Alle Aufrufer von recordWorldEvent() sind bewusst an
+// konkrete, bereits bestehende Spielereignisse gebunden (Geburt, Heirat,
+// Tod, Erbfolge, Amtsvergabe/-verlust, Bündnis, Krieg, Titel, Wahl,
+// Rivalität, Hungersnot) — kein neuer, eigenständiger Zufallsgenerator.
+//
+// WICHTIG (§Punkt 53/54): Dieses Modul verbraucht KEIN `rnd()`. Es
+// zeichnet bereits geschehene, deterministisch abgeleitete Ereignisse auf.
+// ============================================================
+
+// Zentraler Hook (§Punkt 23) — jede Memory-Erzeugung läuft hier durch.
+// Deterministische ID (m1, m2, ...), keine Zufalls-IDs.
+function recordWorldEvent(state, opts) {
+  const typeCfg = MEMORY_TYPES[opts.type];
+  if (!typeCfg) throw new Error("Unbekannter Memory-Typ: " + opts.type);
+  const id = "m" + state.memories.nextId++;
+  const memory = {
+    id,
+    type: opts.type,
+    year: state.year,
+    actorIds: opts.actorIds || [],
+    targetIds: opts.targetIds || [],
+    regionIds: opts.regionIds || [],
+    importance: opts.importance !== undefined ? opts.importance : typeCfg.importance,
+    emotionalWeight: opts.emotionalWeight !== undefined ? opts.emotionalWeight : 0,
+    decayRate: opts.decayRate !== undefined ? opts.decayRate : typeCfg.decayRate,
+    expiresYear: opts.expiresYear || null,
+    tags: (opts.tags || []).concat(typeCfg.tags),
+    metadata: opts.metadata || {},
+    description: opts.description || "",
+  };
+  state.memories.byId[id] = memory;
+  return memory;
+}
+
+// ---------- Effektive Wirkung (§Punkt 17/19/45/60/61) ----------
+// Reine Funktion: liest state.year + Charakter-Traits, mutiert NICHTS
+// ("keine Zeitreise" — Decay wird bei jedem Aufruf frisch berechnet,
+// niemals im Memory-Objekt selbst gespeichert/verändert).
+function computeEffectiveWeight(state, memory, characterId) {
+  const yearsElapsed = Math.max(0, state.year - memory.year);
+  let decayRate = memory.decayRate;
+  const character = characterId ? state.characters[characterId] : null;
+  if (character) {
+    if (memory.emotionalWeight < 0) decayRate *= (1 + traitEffectSum(character, "memoryDecayModNegative"));
+    else if (memory.emotionalWeight > 0) decayRate *= (1 + traitEffectSum(character, "memoryDecayModPositive"));
+  }
+  decayRate = clamp(decayRate, 0, 1);
+  let weight = memory.emotionalWeight * Math.max(0, 1 - decayRate * yearsElapsed);
+  if (character && memory.emotionalWeight < 0) {
+    weight *= (1 + traitEffectSum(character, "memoryWeightAmplifierNegative"));
+  }
+  return Math.round(weight * 10) / 10; // eine Nachkommastelle, keine Scheinpräzision (§Punkt 83)
+}
+
+// ---------- Queries (§Punkt 15/16, bewusst einfache Funktionen statt einer Datenbank) ----------
+function allMemories(state) { return Object.values(state.memories.byId); }
+
+function getMemoriesForCharacter(state, characterId) {
+  return allMemories(state).filter(m => m.actorIds.includes(characterId) || m.targetIds.includes(characterId));
+}
+
+function getMemoriesBetweenCharacters(state, aId, bId) {
+  return allMemories(state).filter(m => {
+    const participants = m.actorIds.concat(m.targetIds);
+    return participants.includes(aId) && participants.includes(bId);
+  });
+}
+
+function getMemoriesByType(state, type) {
+  return allMemories(state).filter(m => m.type === type);
+}
+
+function getRecentMemories(state, years) {
+  const since = state.year - years;
+  return allMemories(state).filter(m => m.year >= since);
+}
+
+function getImportantMemories(state, minImportance) {
+  return allMemories(state).filter(m => m.importance >= minImportance);
+}
+
+// §Punkt 76: Grundbaustein für spätere Event Chains.
+function hasMemory(state, query) {
+  const sinceYear = query.sinceYear !== undefined ? query.sinceYear : -Infinity;
+  return allMemories(state).some(m => {
+    if (query.type && m.type !== query.type) return false;
+    if (query.actorId && !m.actorIds.includes(query.actorId)) return false;
+    if (query.targetId && !m.targetIds.includes(query.targetId)) return false;
+    if (m.year < sinceYear) return false;
+    return true;
+  });
+}
+
+// Für js/characters.js: welche Memories fließen in die Beziehung
+// fromId -> toId ein? (§Punkt 27/28, ersetzt die alten, statischen
+// Phase-3-Beziehungsereignisse — siehe computeRelationshipBreakdown()).
+function getMemoriesForRelationship(state, fromId, toId) {
+  return allMemories(state).filter(m => {
+    const cfg = MEMORY_TYPES[m.type];
+    if (!cfg || cfg.direction === "none") return false;
+    if (cfg.direction === "target_to_actor") return m.targetIds.includes(fromId) && m.actorIds.includes(toId);
+    if (cfg.direction === "symmetric") {
+      const participants = m.actorIds.concat(m.targetIds);
+      return participants.includes(fromId) && participants.includes(toId);
+    }
+    return false;
+  });
+}
+
+// ---------- Aggregate für spätere Phasen (§Punkt 78, hier nur vorbereitet) ----------
+function getNegativeMemoryPressure(state, characterId) {
+  let sum = 0;
+  for (const m of getMemoriesForCharacter(state, characterId)) {
+    const w = computeEffectiveWeight(state, m, characterId);
+    if (w < 0) sum += -w;
+  }
+  return Math.round(sum * 10) / 10;
+}
+
+function getDynastyMemoryPressure(state, houseName) {
+  let sum = 0;
+  for (const m of allMemories(state)) {
+    const involvesHouse = [...m.actorIds, ...m.targetIds].some(id => state.characters[id] && state.characters[id].surname === houseName);
+    if (!involvesHouse) continue;
+    if (m.emotionalWeight < 0) sum += -m.emotionalWeight;
+  }
+  return Math.round(sum * 10) / 10;
+}
+
+function getRecentConflictMemories(state, years) {
+  return getRecentMemories(state, years).filter(m => m.tags.includes("grievance") || m.tags.includes("betrayal") || m.tags.includes("rivalry") || m.tags.includes("war"));
+}
+
+// ---------- Major Character (§Punkt 84/85) ----------
+// Zentrale Definition statt verstreuter Einzelprüfungen. "Fremder
+// Herrscher" (§Punkt 85) fehlt bewusst als Kriterium: KI-Regionen besitzen
+// aktuell keine individuell simulierten Herrscher-Charaktere (nur
+// `region.commander`, ein reiner Militärposten) — kann erst geprüft
+// werden, wenn eine spätere Phase das ergänzt.
+function isMajorCharacter(state, characterId) {
+  const c = state.characters[characterId];
+  if (!c) return false;
+  if (getImportantCharacterIds(state).includes(characterId)) return true;
+  if (c.rivalIds.length > 0) return true;
+  if (c.claims.some(cl => cl.strength === "strong" || cl.strength === "primary")) return true;
+  return false;
+}
+
+// ---------- Chronik-Brücke (§Punkt 39/40/74, vorbereitet, nicht aktiv genutzt) ----------
+// World Memory ist NICHT die Chronik. Diese Funktion liefert nur einen
+// KANDIDATEN-Text, den eine spätere Phase (bedeutungsbasierte Chronik,
+// siehe GAME_DESIGN.md) tatsächlich einspeisen könnte — sie schreibt
+// nichts automatisch in state.chronicle.
+function memoryToChronicleCandidate(memory) {
+  if (memory.importance < 50 || !memory.description) return null;
+  return `${memory.year}: ${memory.description}`;
+}
+
+// ---------- Hungersnot-Erkennung (§Punkt 2/64) ----------
+// Läuft nach updatePopulation() (in processAllRegions(), advance-year.js) —
+// liest nur das dort bereits berechnete r.lastPopBreakdown, verändert
+// keine Bevölkerungsformel. Normales Wetter/normale Dürre erzeugt KEINE
+// Memory — erst wenn der Hungertod-Anteil eine spürbare Schwelle
+// überschreitet.
+const FAMINE_DEATH_SHARE_THRESHOLD = 0.01; // 1% der Regionsbevölkerung an Hunger gestorben
+
+function checkFamineMemory(state, regionId, region) {
+  if (!region.lastPopBreakdown) return;
+  let hungerDeaths = 0, totalPop = 0;
+  for (const pid in region.population) totalPop += region.population[pid].count;
+  for (const pid in region.lastPopBreakdown) hungerDeaths += -(region.lastPopBreakdown[pid].hungertote || 0);
+  if (totalPop <= 0 || hungerDeaths / totalPop < FAMINE_DEATH_SHARE_THRESHOLD) return;
+  recordWorldEvent(state, {
+    type: "FAMINE",
+    regionIds: [regionId],
+    emotionalWeight: -Math.round(clamp(hungerDeaths / totalPop * 1000, 20, 90)),
+    metadata: { hungerDeaths: Math.round(hungerDeaths), region: region.name },
+    description: `Eine Hungerkrise in ${region.name} forderte etwa ${Math.round(hungerDeaths)} Menschenleben.`,
+  });
+}
+
+// ============================================================
 // CHARACTERS — Phase 3 "Character Core": Beziehungen, Loyalität,
 // dynastische Ansprüche (Claims), Rivalitäten. Erweitert das bestehende
 // Charaktermodell (state.characters, createCharacter() in data/gamedata.js)
 // additiv — KEIN zweites paralleles Modell (§Phase-3-Punkt 2).
 //
-// Persistente vs. strukturelle Beziehungsgründe: die meisten Modifikatoren
-// (Geschwister/Ehepartner/gleiches Haus/Charisma) werden jedes Jahr NEU aus
-// dem aktuellen Zustand berechnet (rein deterministisch, kein RNG, immer
-// konsistent — kein Risiko einer stillen Divergenz). Drei Gründe sind
-// dagegen echte, einmalige Ereignisse und werden dauerhaft auf dem
-// Charakter gespeichert (PERSISTENT_MODIFIER_SOURCES unten): Amt
-// verweigert, bei der Erbfolge übergangen, Rivalität — diese verschwinden
-// nicht wieder, wenn sich der strukturelle Zustand ändert.
+// Seit Phase 4 (World Memory): Beziehungsgründe kommen aus zwei Quellen —
+// STRUKTURELLE Modifikatoren (Geschwister/Ehepartner/gleiches Haus/
+// Charisma) werden jedes Jahr neu aus dem aktuellen Zustand berechnet
+// (deterministisch, kein RNG), und EREIGNIS-Modifikatoren kommen jetzt aus
+// `state.memories` statt aus früher (Phase 3) direkt auf dem Charakter
+// gespeicherten Fixwerten — SINGLE SOURCE OF TRUTH (§Phase-4-Punkt 25/27),
+// mit echtem Verfall über die Zeit (js/memory.js: computeEffectiveWeight()).
+// Die alten, in Phase 3 eingeführten `addPersistentRelationshipModifier()`/
+// `PERSISTENT_MODIFIER_SOURCES` sind damit entfallen — ersetzt durch
+// Memory-Einträge (DENIED_OFFICE/PASSED_OVER_IN_SUCCESSION/RIVALRY_BEGAN),
+// keine doppelte Zählung (§Punkt 26).
 // ============================================================
 
-const PERSISTENT_MODIFIER_SOURCES = new Set(["amt_verweigert", "erbfolge_uebergangen", "rivalitaet"]);
-
-function addPersistentRelationshipModifier(character, targetId, source, value) {
-  if (!character.relationships[targetId]) character.relationships[targetId] = { total: 0, modifiers: [] };
-  const mods = character.relationships[targetId].modifiers;
-  if (mods.some(m => m.source === source)) return; // nicht duplizieren
-  mods.push({ source, value });
-}
-
-// Berechnet, wie `fromId` über `toId` denkt — kombiniert die dauerhaft
-// gespeicherten Ereignis-Modifikatoren (siehe oben) mit frisch berechneten
-// strukturellen Modifikatoren, klammert auf -100..100. Schreibt NICHT in
-// state — reiner Leseweg, siehe refreshCharacterRelationships() für die
-// Stelle, die das Ergebnis tatsächlich zurück in relationships[] speichert.
+// Berechnet, wie `fromId` über `toId` denkt — kombiniert frisch berechnete
+// strukturelle Modifikatoren mit den aktuell noch wirksamen (verfallenen)
+// Memory-Effekten, klammert auf -100..100. Schreibt NICHT in state — reiner
+// Leseweg, siehe refreshRelationship() für die Stelle, die das Ergebnis
+// tatsächlich zurück in relationships[] speichert.
 function computeRelationshipBreakdown(state, fromId, toId) {
   if (fromId === toId) return { modifiers: [], total: 0 };
   const from = state.characters[fromId];
@@ -4099,13 +4384,6 @@ function computeRelationshipBreakdown(state, fromId, toId) {
   if (!from || !to) return { modifiers: [], total: 0 };
 
   const modifiers = [];
-  const stored = from.relationships[toId];
-  if (stored) {
-    for (const m of stored.modifiers) {
-      if (PERSISTENT_MODIFIER_SOURCES.has(m.source)) modifiers.push(m);
-    }
-  }
-
   if (from.parentId === toId || to.parentId === fromId) modifiers.push({ source: "eltern_kind", value: 15 });
   if (from.parentId && from.parentId === to.parentId) modifiers.push({ source: "geschwister", value: 15 });
   if (from.spouseId === toId) modifiers.push({ source: "ehepartner", value: 25 });
@@ -4113,6 +4391,11 @@ function computeRelationshipBreakdown(state, fromId, toId) {
   if (from.advisorRole && toId === state.rulerId) modifiers.push({ source: "amt_innehat", value: 10 });
   const charismaBonus = traitEffectSum(to, "relationshipMod");
   if (charismaBonus) modifiers.push({ source: "charisma", value: charismaBonus });
+
+  for (const memory of getMemoriesForRelationship(state, fromId, toId)) {
+    const weight = computeEffectiveWeight(state, memory, fromId);
+    if (weight !== 0) modifiers.push({ source: memory.type, value: weight, memoryId: memory.id, year: memory.year });
+  }
 
   const total = clamp(modifiers.reduce((s, m) => s + m.value, 0), -100, 100);
   return { modifiers, total };
@@ -4222,11 +4505,21 @@ function addRivalry(state, aId, bId) {
   if (!a || !b) return;
   if (!a.rivalIds.includes(bId)) a.rivalIds.push(bId);
   if (!b.rivalIds.includes(aId)) b.rivalIds.push(aId);
-  addPersistentRelationshipModifier(a, bId, "rivalitaet", -30);
-  addPersistentRelationshipModifier(b, aId, "rivalitaet", -30);
+  const memory = recordWorldEvent(state, {
+    type: "RIVALRY_BEGAN",
+    actorIds: [aId, bId],
+    targetIds: [aId, bId],
+    emotionalWeight: -30,
+    metadata: { characterA: aId, characterB: bId },
+    description: `${a.name} ${a.surname || ""} und ${b.name} ${b.surname || ""} gelten fortan als Rivalen.`.replace(/\s+/g, " ").trim(),
+  });
+  // §Punkt 32: Ursprung der Rivalität dauerhaft und direkt abrufbar speichern
+  // (UI muss nicht bei jedem Aufruf danach suchen).
+  a.rivalryOrigin[bId] = memory.id;
+  b.rivalryOrigin[aId] = memory.id;
   refreshRelationship(state, aId, bId);
   refreshRelationship(state, bId, aId);
-  addChronicle(state, `${a.name} ${a.surname || ""} gilt nun als Rivale von ${b.name} ${b.surname || ""}.`.replace(/\s+/g, " ").trim());
+  addChronicle(state, memory.description);
 }
 
 function updateRivalries(state) {
@@ -4292,6 +4585,13 @@ function checkTitleProgress(state) {
   if (totalPop >= next.reqPop && state.treasury >= next.reqWealth && state.prestige >= next.reqPrestige) {
     state.titleIndex = nextIdx;
     addChronicle(state, `Du wurdest zum ${next.name} erhoben!`);
+    // §Punkt 36: je höher der Titel, desto höher die Bedeutung.
+    recordWorldEvent(state, {
+      type: "TITLE_GAINED", actorIds: [state.rulerId], targetIds: [],
+      importance: Math.min(100, 45 + nextIdx * 6),
+      emotionalWeight: 35, metadata: { titleId: next.id },
+      description: `${state.characters[state.rulerId].name} wurde zum ${next.name} erhoben.`,
+    });
     return next;
   }
   return null;
@@ -4366,8 +4666,17 @@ function resolveElection(state) {
   for (const aiId in state.diplomacy) {
     const dip = state.diplomacy[aiId];
     const votedFor = state.pendingElection.bribed[aiId] || dip.relation >= cfg.knownElectorVoteRelationThreshold;
-    if (votedFor) votesFor++;
-    else {
+    if (votedFor) {
+      votesFor++;
+      // §Punkt 79: Kaiserwahl-Unterstützung als Memory festhalten (regionsbasiert,
+      // da KI-Regionen aktuell keinen individuellen Herrscher-Charakter besitzen —
+      // KEINE Kaiserwahl 2.0, nur eine Beobachtung des bestehenden Ergebnisses).
+      recordWorldEvent(state, {
+        type: "ELECTION_SUPPORT_GIVEN", actorIds: [state.rulerId], regionIds: [aiId],
+        emotionalWeight: 20, metadata: { bribed: !!state.pendingElection.bribed[aiId] },
+        description: `${state.regions[aiId].name} unterstützte dich bei der Kaiserwahl.`,
+      });
+    } else {
       dip.relation = clamp(dip.relation + cfg.lossRelationPenalty, -100, 100);
     }
     details.push(`${state.regions[aiId].name}: ${votedFor ? "dafür" : "dagegen"}`);
@@ -4475,6 +4784,11 @@ function proposeAlliance(state, aiId) {
   dip.relation = clamp(dip.relation + cfg.allianceRelationGain, -100, 100);
   state.prestige += cfg.alliancePrestigeGain;
   addChronicle(state, `Ein Bündnis mit ${state.regions[aiId].name} wurde geschlossen.`);
+  recordWorldEvent(state, {
+    type: "ALLIANCE_FORMED", actorIds: [state.rulerId], regionIds: [aiId],
+    emotionalWeight: 30,
+    description: `Ein Bündnis mit ${state.regions[aiId].name} wurde geschlossen.`,
+  });
   return { ok: true };
 }
 
@@ -4533,6 +4847,11 @@ function demandTribute(state, aiId) {
   } else {
     dip.relation = clamp(dip.relation + cfg.demandTributeFailRelationPenalty, -100, 100);
     addChronicle(state, `${state.regions[aiId].name} weigerte sich, Tribut zu zahlen — die Beziehungen leiden.`);
+    recordWorldEvent(state, {
+      type: "AID_REFUSED", actorIds: [state.rulerId], regionIds: [aiId],
+      emotionalWeight: -15,
+      description: `${state.regions[aiId].name} verweigerte die geforderte Tributzahlung.`,
+    });
     return { ok: true, success: false };
   }
 }
@@ -4594,6 +4913,11 @@ function proposePeaceTreaty(state, aiId) {
   // (bereits eroberte Gebiete bleiben beim Eroberer, kein Rückzug).
   if (state.warState && state.warState[aiId]) state.warState[aiId] = false;
   addChronicle(state, `Ein Friedensvertrag mit ${state.regions[aiId].name} wurde für ${cost} Taler geschlossen.`);
+  recordWorldEvent(state, {
+    type: "PEACE_SIGNED", actorIds: [state.rulerId], regionIds: [aiId],
+    emotionalWeight: 15, metadata: { cost },
+    description: `Ein Friedensvertrag mit ${state.regions[aiId].name} wurde geschlossen.`,
+  });
   return { ok: true, cost };
 }
 
@@ -4908,13 +5232,22 @@ function confirmAdvisorSelection(state, candidateIndex) {
   state.treasury -= sel.cost;
   logLedger(state, `Berater berufen: ${ADVISOR_ROLES[sel.role].name}`, -sel.cost);
   addChronicle(state, `${character.name} ${character.surname || ""} wurde zum ${ADVISOR_ROLES[sel.role].name} ernannt.`.replace(/\s+/g, " "));
+  recordWorldEvent(state, {
+    type: "APPOINTED_TO_OFFICE", actorIds: [state.rulerId], targetIds: [cid],
+    emotionalWeight: 25, metadata: { role: sel.role },
+    description: `${character.name} ${character.surname || ""} wurde zum ${ADVISOR_ROLES[sel.role].name} ernannt.`.replace(/\s+/g, " "),
+  });
 
   for (const other of sel.candidates) {
     if (other === chosen || !other.existingId) continue;
     const rejected = state.characters[other.existingId];
-    addPersistentRelationshipModifier(rejected, state.rulerId, "amt_verweigert", -20);
+    const memory = recordWorldEvent(state, {
+      type: "DENIED_OFFICE", actorIds: [state.rulerId], targetIds: [other.existingId],
+      emotionalWeight: -35, metadata: { role: sel.role },
+      description: `${rejected.name} ${rejected.surname || ""} wurde bei der Vergabe des Amtes ${ADVISOR_ROLES[sel.role].name} übergangen.`.replace(/\s+/g, " "),
+    });
     refreshRelationship(state, other.existingId, state.rulerId);
-    addChronicle(state, `${rejected.name} ${rejected.surname || ""} wurde bei der Vergabe des Amtes ${ADVISOR_ROLES[sel.role].name} übergangen.`.replace(/\s+/g, " "));
+    addChronicle(state, memory.description);
   }
   state.pendingAdvisorSelection = null;
   return { ok: true };
@@ -4936,9 +5269,18 @@ function upgradeAdvisor(state, role) {
 
 function dismissAdvisor(state, role) {
   if (!state.advisors[role]) return { ok: false, reason: "Dieses Amt ist nicht besetzt." };
-  const c = state.characters[state.advisors[role]];
+  const advId = state.advisors[role];
+  const c = state.characters[advId];
   addChronicle(state, `${c ? c.name : "Der Amtsinhaber"} wurde als ${ADVISOR_ROLES[role].name} entlassen.`);
-  if (c) c.advisorRole = null;
+  if (c) {
+    c.advisorRole = null;
+    recordWorldEvent(state, {
+      type: "DISMISSED_FROM_OFFICE", actorIds: [state.rulerId], targetIds: [advId],
+      emotionalWeight: -30, metadata: { role },
+      description: `${c.name} ${c.surname || ""} wurde als ${ADVISOR_ROLES[role].name} entlassen.`.replace(/\s+/g, " "),
+    });
+    refreshRelationship(state, advId, state.rulerId);
+  }
   state.advisors[role] = null;
   state.advisorLevels[role] = 0;
   return { ok: true };
@@ -4958,7 +5300,13 @@ function checkAdvisorDeaths(state) {
     if (rnd() < rollDeathChance(adv)) {
       adv.alive = false;
       adv.advisorRole = null;
-      addChronicle(state, `${adv.name} ${adv.surname || ""}, ${ADVISOR_ROLES[role].name}, ist verstorben.`.replace(/\s+/g, " "));
+      const desc = `${adv.name} ${adv.surname || ""}, ${ADVISOR_ROLES[role].name}, ist verstorben.`.replace(/\s+/g, " ");
+      addChronicle(state, desc);
+      recordWorldEvent(state, {
+        type: "DIED_IN_OFFICE", actorIds: [advId], targetIds: [],
+        emotionalWeight: -15, metadata: { role },
+        description: desc,
+      });
       state.advisors[role] = null;
       state.advisorLevels[role] = 0;
     }
@@ -5160,6 +5508,7 @@ function declareWar(state, aiId) {
     : `${result.name} bleibt neutral.`
   );
 
+  const wasAllied = dip.treaties.allianz;
   dip.treaties.nichtangriff = false;
   dip.treaties.allianz = false;
   dip.treaties.handel = false;
@@ -5169,6 +5518,27 @@ function declareWar(state, aiId) {
   state.warState[aiId] = true;
   const report = `Krieg gegen ${region.name} erklärt! Die Kampagne beginnt — erobere ihre Gebiete auf der Kriegskarte.\n${allyLines.join(" ")}`;
   addChronicle(state, report.replace(/\n/g, " "));
+
+  recordWorldEvent(state, {
+    type: "WAR_DECLARED", actorIds: [state.rulerId], regionIds: [aiId],
+    emotionalWeight: -20, metadata: { targetRegion: aiId },
+    description: `${state.characters[state.rulerId].name} erklärte ${region.name} den Krieg.`,
+  });
+  if (wasAllied) {
+    recordWorldEvent(state, {
+      type: "ALLIANCE_BROKEN", actorIds: [state.rulerId], regionIds: [aiId],
+      emotionalWeight: -40, metadata: { targetRegion: aiId },
+      description: `Das Bündnis mit ${region.name} wurde durch die Kriegserklärung gebrochen.`,
+    });
+  }
+  for (const result of allyResults) {
+    if (result.stance !== "supportPlayer") continue;
+    recordWorldEvent(state, {
+      type: "AID_GRANTED", actorIds: [state.rulerId], regionIds: [result.aiId],
+      emotionalWeight: 30, metadata: { war: aiId },
+      description: `${result.name} unterstützte dich im Krieg gegen ${region.name}.`,
+    });
+  }
   return { ok: true, report, allyLines };
 }
 
@@ -5485,6 +5855,15 @@ function checkRegionConquest(state, aiId) {
   state.treasury += cfg.conquestTreasuryGain;
   state.stats.warsWon++;
   addChronicle(state, `${region.name} ist vollständig erobert und unterwirft sich als Vasall!`);
+  // §Punkt 38: die vollständige Eroberung einer Region ist das klarste
+  // definierte Kriegsergebnis der Kriegskarte und daher bedeutsam genug
+  // für eine eigene Erinnerung (die einzelnen Gebietsscharmützel selbst
+  // bleiben bewusst unterhalb der Bedeutsamkeitsschwelle).
+  recordWorldEvent(state, {
+    type: "MAJOR_BATTLE_WON", actorIds: [state.rulerId], regionIds: [aiId],
+    importance: 85, emotionalWeight: 45, metadata: { conquest: true },
+    description: `${state.characters[state.rulerId].name} eroberte ${region.name} vollständig und machte es zum Vasallen.`,
+  });
   return true;
 }
 
@@ -5589,6 +5968,7 @@ function processAllRegions(state) {
     r.grainDistributed = r.grainAvailable - (r.warehouse.getreide || 0); // tatsächlich ans Volk abgegeben (Grundbedarf + Kornausgabe)
     applyGrainSpoilage(r); // Schwund/Verderb des Restbestands oberhalb der Lagerkapazität
     updatePopulation(r);
+    checkFamineMemory(state, id, r); // §Punkt 8/38: schwere Hungerkrise als Erinnerung festhalten
     if (r._manipulationYears > 0) r._manipulationYears -= 1; // §32 politische Manipulation klingt ab
     if (!r.isPlayer) aiRegionDevelops(r, state);
 
@@ -6798,6 +7178,13 @@ function applyBattleResultToGame(state, aiId, battleResult) {
     }
     addChronicle(state, `Sieg in der Schlacht gegen ${region.name}! Beute: ${loot} Taler.` +
       (conqueredHectares > 0 ? ` Zudem werden ${conqueredHectares} Hektar Land erobert.` : ""));
+    // §Punkt 37/38: eine entscheidende Feldschlacht ist ein klar definiertes
+    // Kriegsereignis und damit bedeutsam genug für eine Erinnerung.
+    recordWorldEvent(state, {
+      type: "MAJOR_BATTLE_WON", actorIds: [state.rulerId], regionIds: [aiId],
+      emotionalWeight: 30, metadata: { loot },
+      description: `${state.characters[state.rulerId].name} errang einen entscheidenden Sieg gegen ${region.name}.`,
+    });
   } else {
     state.prestige = Math.max(0, state.prestige - cfg.defeatPrestigeLoss);
     state.stats.warsLost++;
@@ -6805,6 +7192,11 @@ function applyBattleResultToGame(state, aiId, battleResult) {
       state.regions.player.population[pid].satisfaction = clamp(state.regions.player.population[pid].satisfaction - cfg.loseSatisfactionPenalty, 0, 100);
     }
     addChronicle(state, `Niederlage in der Schlacht gegen ${region.name}. Schwere Verluste.`);
+    recordWorldEvent(state, {
+      type: "MAJOR_BATTLE_LOST", actorIds: [state.rulerId], regionIds: [aiId],
+      emotionalWeight: -30,
+      description: `${state.characters[state.rulerId].name} erlitt eine schwere Niederlage gegen ${region.name}.`,
+    });
   }
   checkAlternativeVictory(state);
 }
@@ -7090,7 +7482,7 @@ document.getElementById('langSelect').addEventListener('change', (e) => setLocal
 document.getElementById('langSelectTitle').addEventListener('change', (e) => setLocale(e.target.value));
 document.getElementById('debugToggle').addEventListener('change', (e) => {
   document.getElementById('debugPanel').style.display = e.target.checked ? 'block' : 'none';
-  if (e.target.checked) { populateDebugEventSelect(); populateCharacterDebugSelect(); }
+  if (e.target.checked) { populateDebugEventSelect(); populateCharacterDebugSelect(); populateMemoryDebugFilters(); }
 });
 
 // §Character-Core-Punkt 58-62: technischer Charakter-Inspektor — zeigt für
@@ -7125,6 +7517,21 @@ function doShowCharacterDebug() {
     relLines = `  Base: 0\n${modLines}\n  Gesamt: ${rel.total}`;
   }
   const rivalNames = c.rivalIds.map(rid => state.characters[rid] ? `${state.characters[rid].name} ${state.characters[rid].surname || ''}` : rid).join(', ') || 'keine';
+
+  // §Phase-4-Punkt 41-44: ERINNERUNGEN-Abschnitt — chronologisch, mit
+  // aktueller (zerfallener) Wirkung aus Sicht DIESES Charakters. Zeigt
+  // damit direkt den zentralen Qualitätstest "warum hat diese Person
+  // heute diese Haltung?" statt einer bloßen Endzahl.
+  const charMemories = getMemoriesForCharacter(state, id).slice().sort((a, b) => b.year - a.year);
+  const memLines = charMemories.length
+    ? charMemories.map(m => {
+        const eff = computeEffectiveWeight(state, m, id);
+        const role = m.actorIds.includes(id) && m.targetIds.includes(id) ? '' : (m.actorIds.includes(id) ? ' [als Akteur]' : (m.targetIds.includes(id) ? ' [als Betroffene(r)]' : ''));
+        return `  ${m.year} [${m.id}] ${m.type}${role}: ${m.description || '(keine Beschreibung)'}\n` +
+               `      Bedeutsamkeit ${m.importance} · urspr. ${m.emotionalWeight >= 0 ? '+' : ''}${m.emotionalWeight} · aktuell ${eff >= 0 ? '+' : ''}${eff} (Zerfallsrate ${m.decayRate}/Jahr)`;
+      }).join('\n')
+    : '  keine';
+
   out.textContent =
 `ID: ${id}
 Name: ${c.name} ${c.surname || ''}${c.alive ? '' : ' (verstorben)'}
@@ -7145,7 +7552,63 @@ BEZIEHUNG ZUM HERRSCHER
 ${relLines}
 
 LOYALITÄT: ${id === state.rulerId ? '100 (Herrscher)' : c.loyalty}
-RIVALEN: ${rivalNames}`;
+RIVALEN: ${rivalNames}
+
+ERINNERUNGEN (${charMemories.length}, neueste zuerst)
+${memLines}`;
+}
+
+// §Phase-4-Punkt 41-44: allgemeines, filterbares Memory-Debug-Panel —
+// unabhängig vom Charakter-Inspektor, zeigt den kompletten Erinnerungs-
+// speicher (state.memories.byId) mit allen Rohfeldern. Rein lesend.
+function populateMemoryDebugFilters() {
+  const charSel = document.getElementById('memoryDebugCharSelect');
+  const typeSel = document.getElementById('memoryDebugTypeSelect');
+  if (!state) return;
+  const charOptions = Object.keys(state.characters).map(id => {
+    const c = state.characters[id];
+    return `<option value="${id}">${c.alive ? '' : '✝ '}${c.name} ${c.surname || ''} (${id})</option>`;
+  }).join('');
+  charSel.innerHTML = '<option value="">alle Charaktere</option>' + charOptions;
+  const typeOptions = Object.keys(MEMORY_TYPES).map(t => `<option value="${t}">${t}</option>`).join('');
+  typeSel.innerHTML = '<option value="">alle Typen</option>' + typeOptions;
+}
+
+function doShowMemoryDebug() {
+  const charId = document.getElementById('memoryDebugCharSelect').value || null;
+  const type = document.getElementById('memoryDebugTypeSelect').value || null;
+  const minImportance = Number(document.getElementById('memoryDebugMinImportance').value) || 0;
+  const sign = document.getElementById('memoryDebugSign').value;
+  const out = document.getElementById('memoryDebugOutput');
+
+  const nameOf = (cid) => state.characters[cid] ? `${state.characters[cid].name} ${state.characters[cid].surname || ''}`.trim() : cid;
+  const regionOf = (rid) => state.regions[rid] ? state.regions[rid].name : rid;
+
+  let mems = charId ? getMemoriesForCharacter(state, charId) : allMemories(state);
+  if (type) mems = mems.filter(m => m.type === type);
+  if (minImportance) mems = mems.filter(m => m.importance >= minImportance);
+  mems = mems.slice().sort((a, b) => b.year - a.year);
+
+  const rows = mems.map(m => {
+    const eff = computeEffectiveWeight(state, m, charId);
+    if (sign === 'pos' && eff <= 0) return null;
+    if (sign === 'neg' && eff >= 0) return null;
+    const actors = m.actorIds.map(nameOf).join(', ') || '–';
+    const targets = m.targetIds.map(nameOf).join(', ') || '–';
+    const regions = m.regionIds.map(regionOf).join(', ') || '–';
+    const tooltip = `${m.description || m.type}\nBedeutsamkeit: ${m.importance} · urspr. Wirkung: ${m.emotionalWeight} · aktuelle Wirkung: ${eff} · Zerfallsrate: ${m.decayRate}/Jahr\nTags: ${m.tags.join(', ')}`;
+    return `<tr title="${tooltip.replace(/"/g, '&quot;')}">` +
+      `<td>${m.id}</td><td>${m.year}</td><td>${m.type}</td><td>${actors}</td><td>${targets}</td><td>${regions}</td>` +
+      `<td>${m.importance}</td><td>${m.emotionalWeight}</td><td>${eff}</td><td>${m.decayRate}</td>` +
+      `</tr>`;
+  }).filter(Boolean);
+
+  if (!rows.length) { out.innerHTML = 'Keine Erinnerungen für diese Filter gefunden.'; return; }
+  out.innerHTML = `<table style="width:100%; font-size:0.85em; border-collapse:collapse;">` +
+    `<tr><th>ID</th><th>Jahr</th><th>Typ</th><th>Akteure</th><th>Betroffene</th><th>Region</th>` +
+    `<th>Bedeutsamkeit</th><th>Wirkung (urspr.)</th><th>Wirkung (aktuell)</th><th>Zerfall/Jahr</th></tr>` +
+    rows.join('') + `</table>` +
+    `<div style="margin-top:4px; opacity:0.7;">${rows.length} von ${mems.length} Treffer(n) (Zeile hovern für Details). "Wirkung (aktuell)" ist ${charId ? 'aus Sicht des gewählten Charakters berechnet (Traits fließen ein).' : 'ohne Charakterperspektive berechnet (keine Trait-Modifikatoren).'}</div>`;
 }
 
 function populateDebugEventSelect() {
