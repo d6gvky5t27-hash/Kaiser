@@ -6,7 +6,7 @@ const path = require("path");
 
 const ROOT = path.join(__dirname, "..");
 const gamedata = fs.readFileSync(path.join(ROOT, "data/gamedata.js"), "utf8");
-const simModules = ["core", "economy", "population-dynasty", "characters", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
+const simModules = ["core", "economy", "population-dynasty", "memory", "characters", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
 const sim = simModules.map(m => fs.readFileSync(path.join(ROOT, "js", m + ".js"), "utf8")).join("\n");
 
 const testBody = `
@@ -44,10 +44,15 @@ console.log('--- Beziehungen ---');
   check('Beziehungssumme = Summe der Modifikatoren', rel.total === Math.max(-100, Math.min(100, expectedSum)));
   check('Gründe sind erhalten (mind. 1 Modifikator: Geschwister)', rel.modifiers.some(m => m.source === 'geschwister'));
 
-  // Minimum/Maximum-Klammerung
-  addPersistentRelationshipModifier(sib, state.rulerId, 'rivalitaet', -1000);
+  // Minimum/Maximum-Klammerung (§Phase-4: Modifikatoren kommen jetzt aus
+  // dem World-Memory-System statt aus einem statischen Zusatzwert)
+  recordWorldEvent(state, {
+    type: 'RIVALRY_BEGAN', actorIds: [sibId, state.rulerId], targetIds: [sibId, state.rulerId],
+    emotionalWeight: -1000,
+    description: 'Testszenario: extreme Rivalität zur Prüfung der Klammerung.',
+  });
   refreshRelationship(state, sibId, state.rulerId);
-  check('Beziehung wird nach unten auf -100 geklammert', state.characters[sibId].relationships[state.rulerId].total >= -100);
+  check('Beziehung wird nach unten auf -100 geklammert', state.characters[sibId].relationships[state.rulerId].total === -100);
 })();
 
 // ---------- §51: Traits ----------

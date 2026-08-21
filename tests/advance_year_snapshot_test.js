@@ -15,6 +15,17 @@
 // stammende Fixture wurde NICHT gelöscht, sondern versioniert unter
 // `tests/fixtures/advance_year_snapshot_golden_phase2.json` archiviert.
 //
+// PHASE 4 WORLD MEMORY BASELINE (§Punkt 54/55/91): Phase 4 verbraucht
+// bewusst KEINE zusätzlichen rnd()-Aufrufe (reine Buchführung bereits
+// gewürfelter Ereignisse) — geprüft: rngCalls und alle numerischen Felder
+// blieben Jahr für Jahr exakt identisch. Einzige Abweichung waren zwei
+// NEUE Chronik-Zeilen (Rivalität, übergangene Nachfolge), die die neuen
+// addChronicle()-Aufrufe in addRivalry()/handleSuccession() erzeugen —
+// eine gewollte Erzähl-Verbesserung, kein RNG-Drift. Das Golden-Fixture
+// wurde deshalb neu erzeugt; das Phase-3-Fixture wurde NICHT gelöscht,
+// sondern versioniert unter
+// `tests/fixtures/advance_year_snapshot_golden_phase3.json` archiviert.
+//
 // Nutzung:
 //   node tests/advance_year_snapshot_test.js            vergleicht gegen
 //                                                        das gespeicherte
@@ -42,7 +53,7 @@ const SEEDS = [101, 202, 303]; // Seed A, B, C
 const MAX_YEARS = 100;
 
 const gamedata = fs.readFileSync(path.join(ROOT, "data/gamedata.js"), "utf8");
-const simModules = ["core", "economy", "population-dynasty", "characters", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
+const simModules = ["core", "economy", "population-dynasty", "memory", "characters", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
 const sim = simModules.map(m => fs.readFileSync(path.join(ROOT, "js", m + ".js"), "utf8")).join("\n");
 
 const testBody = `
