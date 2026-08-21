@@ -2119,3 +2119,153 @@ eine spätere, bewusste Entscheidung dokumentiert, analog zu
 Director, Event Chains, große UI-Überarbeitung. Battle Engine
 (`battle-engine/*.js`) unverändert — Charakter-Militärskill wird noch nicht
 in die Kampf-Engine eingespeist.
+
+## 2026-08-21 – Phase 4 (KAISERREICH-Next-Generation-Master-Prompt): World Memory
+
+Zentrale Zielsetzung laut Auftrag: "KAISERREICH soll sich bedeutende
+Ereignisse merken" — nicht "Beziehung zu Wilhelm = −52", sondern "Wilhelm
+wurde 1518 bei der Vergabe des Marschallamtes übergangen." Zentrale
+Designregel (§Punkt 2): NUR bedeutsame Ereignisse werden gespeichert, kein
+Gedächtnis für Wetter/Preisrauschen. Kein zweites paralleles System — World
+Memory ersetzt die bisherigen Phase-3-Statik-Modifikatoren als einzige
+Quelle der Wahrheit, ist aber ausdrücklich NICHT die Chronik (die bleibt
+unverändert, weiterhin mit dem bekannten 95%-Wetter-Problem aus
+`BASELINE.md`, siehe unten).
+
+**Neues Modul `js/memory.js`.** Zentraler Hook `recordWorldEvent(state,
+opts)` — jede Memory-Erzeugung läuft ausschließlich hier durch, deterministische
+IDs (`m1`, `m2`, …, nie wiederverwendet). Memory-Objekt: `id`, `type`,
+`year`, `actorIds`/`targetIds`/`regionIds` (KI-Regionen besitzen keine
+individuellen Herrscher-Charaktere — Diplomatie-/Kriegsereignisse referenzieren
+deshalb bewusst `regionIds` statt erfundener Charakter-IDs), `importance`
+(1-100, wie bedeutsam), `emotionalWeight` (−100..100, wie sehr freut/ärgert
+es), `decayRate`, `expiresYear`, `tags`, `metadata`, `description`. Neue
+Datentabelle `MEMORY_TYPES` (23 Einträge über Dynastie/Hof/Diplomatie/Krieg/
+Politik) liefert je Typ Default-`importance`/`decayRate`/`tags` sowie ein
+neues `direction`-Feld (`target_to_actor`/`symmetric`/`none`), das steuert,
+ob und wie ein Ereignis (asymmetrisch oder gegenseitig) in die Beziehungs-
+berechnung einfließt — löst den Zielkonflikt zwischen einem einzelnen
+`emotionalWeight`-Feld im Schema und der geforderten
+perspektivenabhängigen Wirkung (§Punkt 21).
+
+**Zerfall ohne Löschen (§Punkt 17-19).** `computeEffectiveWeight(state,
+memory, characterId)` ist eine reine Funktion — liest `state.year` und
+optional Charakter-Traits, verändert nie das Memory-Objekt selbst ("keine
+Zeitreise": Zerfall wird bei jedem Aufruf frisch berechnet). Lineare
+Verblassung (`emotionalWeight × max(0, 1 − decayRate × Jahre)`), geklammert
+auf eine Zerfallsrate zwischen 0 und 1. Manche Typen (RULER_DIED, SUCCESSION,
+MARRIAGE, PEACE_SIGNED, TITLE_GAINED) haben `decayRate: 0` — historische
+Fakten, die bewusst nie verblassen. Memories bleiben IMMER in
+`state.memories.byId` stehen, auch wenn ihre mechanische Wirkung längst auf 0
+gefallen ist (historisch vs. aktuell-wirksam ist eine reine Leseunterscheidung,
+keine Speicherunterscheidung).
+
+**Traits beeinflussen Zerfall/Gewichtung.** 3 neue, additive Effekt-
+Schlüssel auf bestehenden Traits: `loyal` → `memoryDecayModPositive: -0.3`
+(gute Erinnerungen verblassen langsamer), `barmherzig` →
+`memoryDecayModNegative: 0.5` (vergibt schneller), `paranoid` →
+`memoryWeightAmplifierNegative: 0.3` (empfindet Kränkungen stärker),
+`rachsüchtig` → `memoryDecayModNegative: -0.4` (vergisst Kränkungen
+langsamer/nie). Alles über die bestehende, generische `traitEffectSum()`
+gelesen — keine neue if-Kette.
+
+**Single Source of Truth statt Doppelbuchführung (§Punkt 25).** Die drei
+bisherigen Phase-3-Statik-Modifikatoren (Amt verweigert, Erbfolge übergangen,
+Rivalität) wurden vollständig auf live aus Memories berechnete Werte
+umgestellt — nicht als zusätzliche Parallel-Buchführung beibehalten. Grund:
+die eigenen Beispielwerte des Auftrags (§Punkt 87/102, "1518 –
+Marschallamt verweigert: −11 aktuell", abklingend von ursprünglich −20)
+verlangen selbst eine live zerfallende Berechnung. `PERSISTENT_MODIFIER_SOURCES`
+und `addPersistentRelationshipModifier()` wurden entfernt;
+`computeRelationshipBreakdown()` liest jetzt zusätzlich zu den weiterhin
+bestehenden strukturellen Modifikatoren (Geschwister/Ehepartner/Haus/Charisma)
+`getMemoriesForRelationship(state, fromId, toId)` und berechnet pro Memory
+`computeEffectiveWeight()`. Rivalitäten (`addRivalry()`) und übergangene
+Nachfolge (`handleSuccession()`) legen jetzt selbst eine `RIVALRY_BEGAN`-
+bzw. `PASSED_OVER_IN_SUCCESSION`-Memory an und speichern deren ID zusätzlich
+in `character.rivalryOrigin[rivalId]` (§Punkt 32, `originMemoryId`-Referenz).
+
+**Hooks in bestehenden Systemen (kein neuer Zufallsgenerator, §Punkt 6).**
+Jeder `recordWorldEvent()`-Aufruf hängt an einem bereits bestehenden
+Spielereignis: Geburt (`HEIR_BORN` beim ersten Kind des Herrschers,
+sonst `CHILD_BORN`), Heirat, Herrschertod, Erbfolge (inkl. übergangene
+Geschwister), Amtsvergabe/-verweigerung/-entlassung/Tod im Amt,
+Bündnisschluss/-bruch, Hilfegewährung/-verweigerung, Kriegserklärung,
+entscheidender Schlachtsieg/-niederlage (`battle-bridge.js`, sowie
+vollständige Gebietseroberung in `checkRegionConquest()`, `war-map.js`),
+Friedensschluss, Titelaufstieg, Kaiserwahl-Unterstützung, Rivalitätsbeginn,
+Hungerkrise (`checkFamineMemory()`, neue Schwelle: ≥1% der Regionsbevölkerung
+an Hungertod — läuft direkt nach `updatePopulation()` in
+`processAllRegions()`). `ELECTION_PROMISE_BROKEN` ist bewusst nur in
+`MEMORY_TYPES` vorbereitet, aber unverdrahtet — es existiert kein
+Versprechen-Tracking in der aktuellen Kaiserwahl ("Kaiserwahl 2.0" wäre
+ein eigenständiges, hier nicht beauftragtes Feature).
+
+**Determinismus: null zusätzliche `rnd()`-Aufrufe (§Punkt 53-55).**
+World Memory ist reine Buchführung bereits deterministisch entschiedener
+Ereignisse. Geprüft mit dem bestehenden Golden-Snapshot-Test: `rngCalls`
+und alle numerischen Felder blieben über alle 3 Seeds/100 Jahre exakt
+identisch zum Phase-3-Fixture. Einzige Abweichung: zwei neue Chronik-Zeilen
+(aus den neuen `addChronicle()`-Aufrufen in `addRivalry()`/
+`handleSuccession()`, keine Chronik-Automatisierung durch Memories selbst)
+— eine gewollte Erzähl-Verbesserung, kein RNG-Drift. Golden-Fixture daher
+neu erzeugt, das Phase-3-Fixture NICHT gelöscht, sondern versioniert unter
+`tests/fixtures/advance_year_snapshot_golden_phase3.json` archiviert.
+
+**Savegame-Migration.** `SAVE_VERSION` 3 → 4. `migrateSaveV3ToV4()` legt
+für alte Spielstände einen LEEREN `state.memories`-Speicher an (§Punkt 51:
+ausdrückliches Verbot retroaktiver Fiktion — keine rückwirkend erfundene
+Geschichte für Ereignisse, die vor der Migration bereits passiert sind) und
+ergänzt fehlendes `character.rivalryOrigin`. Alte, in Phase 3 dauerhaft in
+`character.relationships[x].modifiers` gespeicherte Ereignis-Modifikatoren
+werden von der neuen memory-basierten `computeRelationshipBreakdown()`
+ohnehin nicht mehr gelesen — sie bleiben als harmlose ungenutzte Altlast im
+Save stehen statt künstlich in Memories umgedeutet zu werden (dieselbe
+Nicht-Erfindungs-Regel).
+
+**Chronik-Brücke vorbereitet, nicht aktiv (§Punkt 39/40/74).**
+`memoryToChronicleCandidate(memory)` liefert nur einen Kandidaten-Text
+(`importance >= 50`) für eine spätere, bedeutungsbasierte Chronik — schreibt
+nichts automatisch in `state.chronicle`. Das bestehende 95%-Wetter-Problem
+aus `BASELINE.md` bleibt in dieser Phase bewusst unangetastet.
+
+**API-Oberflächen für spätere Phasen vorbereitet, nicht genutzt (§Punkt 76-78).**
+`hasMemory()`, `getNegativeMemoryPressure()`, `getDynastyMemoryPressure()`,
+`getRecentConflictMemories()`, `isMajorCharacter()` — Grundbausteine für
+später mögliche Event Chains/Drama Director, hier nur bereitgestellt, von
+keinem aktuellen Code aufgerufen außer den Metriktests.
+
+**Neue Tests.** `tests/world_memory_test.js` (10 Fallgruppen aus §Punkt 58
+plus die Beziehungsintegrations-Beispielrechnung aus §Punkt 59: Erzeugung,
+Teilnehmer, Importance-Default/-Override, positive/negative Memory, Zerfall,
+`rachsüchtig`-Wirkung, alle Query-Funktionen, Save/Load-Erhalt, Migration
+v3→v4) — alle grün. `tests/phase4_memory_metrics_test.js` (30×100 Jahre):
+Ø 22,9 Memories/Partie, Verteilung über 8 tatsächlich ausgelöste Typen
+(FAMINE 20,8%, CHILD_BORN 18,2%, PASSED_OVER_IN_SUCCESSION 14,6%,
+RIVALRY_BEGAN 14,1%, MARRIAGE/RULER_DIED je 8,9%, HEIR_BORN 8,0%, SUCCESSION
+6,6%), 42%/58% positiv/negativ, Ø Importance 55,8, Ø Speichergröße ~84 KB,
+~89ms/Partie (keine spürbare Verschlechterung ggü. Phase 3). Narratives
+Signal (§Punkt 93): Ø 18,7 chronik-taugliche Memories (`importance >= 50`)
+pro 100-Jahre-Partie — deutlich mehr als die 11 story-relevanten
+Chronik-Ereignisse der ursprünglichen 85-Jahre-Baseline (`BASELINE.md`),
+ohne dass diese bereits automatisch in die Chronik geschrieben werden.
+Bestehende Regressionstests (`character_core_test.js`,
+`advance_year_snapshot_test.js`, `ai_vs_ai_test.js`, `economy_test.js`,
+`battle_test.js`, `phase3_metrics_test.js`) unverändert grün.
+
+**UI-Erweiterungen (kein Redesign, §Punkt 41-44).** Charakter-Inspektor um
+einen neuen Abschnitt "ERINNERUNGEN" ergänzt (chronologisch, mit aktueller
+zerfallener Wirkung aus Sicht des jeweiligen Charakters). Neues,
+eigenständiges Memory-Debug-Panel (`#memoryDebugOutput`) mit Filtern nach
+Charakter/Typ/Mindest-Bedeutsamkeit/Vorzeichen, tabellarische Ausgabe mit
+Tooltip (Beschreibung, Bedeutsamkeit, ursprüngliche/aktuelle Wirkung,
+Zerfallsrate, Tags) — keine Blackbox.
+
+**Data-Sync.** `MEMORY_TYPES` bewusst NICHT in `tools/data-sync.js`
+aufgenommen — analog zur bestehenden, bereits dokumentierten Entscheidung
+bei `TRAITS` in Phase 3 (kein Extract→Build-Support ohne eigene, bewusste
+Entscheidung).
+
+**Bewusst NICHT umgesetzt (§Punkt 101):** Event Chains, Drama Director,
+Story Threads, UI-Redesign. Die vorbereiteten API-Oberflächen
+(`hasMemory()` etc.) warten auf eine spätere, gesondert freigegebene Phase.

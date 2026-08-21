@@ -46,19 +46,44 @@ werden zuerst fertiggestellt/gefestigt, bevor neue Breite hinzukommt.
       im Debug-Bereich. RNG-Golden-Fixture erwartungsgemäß neu erzeugt
       (altes Fixture versioniert, nicht gelöscht). Keine bestehenden
       Balance-/CONFIG-Werte außerhalb der Beratermechanik verändert,
-      Kampf-Engine unangetastet. **Phase 4 (World Memory) wurde NICHT
-      begonnen** — wartet auf ausdrückliche Freigabe. Offen geblieben
-      (bewusst außerhalb des Phase-3-Scopes): `TRAITS` nicht in
-      `tools/data-sync.js` aufgenommen (dieselbe offene Frage wie bei
-      `TERRITORIES`/`START_REGIONS`, siehe Tech-Debt-Punkt unten).
+      Kampf-Engine unangetastet. Offen geblieben (bewusst außerhalb des
+      Phase-3-Scopes): `TRAITS` nicht in `tools/data-sync.js` aufgenommen
+      (dieselbe offene Frage wie bei `TERRITORIES`/`START_REGIONS`, siehe
+      Tech-Debt-Punkt unten).
+- [x] **Phase 4 — World Memory** (Ergebnisse: GAME_DESIGN.md → "World
+      Memory (Phase 4)", Ablauf: DEVELOPMENT.md "Phase 4"): neues Modul
+      `js/memory.js` (`recordWorldEvent()` als zentraler Hook, 23
+      Erinnerungstypen über Dynastie/Hof/Diplomatie/Krieg/Politik,
+      Zerfall ohne Löschen, Trait-Einfluss auf Zerfall/Gewichtung). Die
+      drei bisherigen Phase-3-Beziehungs-Fixwerte (Amt verweigert,
+      Erbfolge übergangen, Rivalität) wurden vollständig auf live
+      zerfallende Memory-Werte umgestellt (keine Doppelbuchführung).
+      Savegame-Migration v3→v4 (leerer Speicher für Altspielstände, keine
+      retroaktive Fiktion). Verbraucht nachweislich 0 zusätzliche
+      `rnd()`-Aufrufe (Golden-Fixture bestätigt: nur zwei neue,
+      erwartete Chronik-Zeilen, keine numerische Abweichung — altes
+      Fixture versioniert, nicht gelöscht). Memory-Debug-Panel +
+      Charakter-Inspektor-Erweiterung ("ERINNERUNGEN"-Abschnitt). World
+      Memory bleibt ausdrücklich getrennt von der Chronik (95%-Wetter-
+      Problem aus `BASELINE.md` unangetastet). **Phase 5 (Event Chains)
+      wurde NICHT begonnen** — wartet auf ausdrückliche Freigabe. Offen
+      geblieben (bewusst außerhalb des Phase-4-Scopes): `MEMORY_TYPES`
+      nicht in `tools/data-sync.js` aufgenommen (dieselbe offene Frage
+      wie bei `TRAITS`, siehe Tech-Debt-Punkt unten).
 
 ## NEXT (nach Freigabe, in der vom Master-Prompt vorgeschlagenen Reihenfolge)
 
-- [ ] Tech Debt (klein, aus Phase 2 zurückgestellt, um `TRAITS` seit
-      Phase 3 erweitert): Entscheiden, ob `tools/data-sync.js` um
-      `TERRITORIES`/`START_REGIONS`/`TRAITS` erweitert oder die
-      JSON-Modding-Schicht bewusst als begrenzt dokumentiert wird (siehe
-      CODE_AUDIT.md Abschnitt 6).
+- [ ] Tech Debt (klein, aus Phase 2 zurückgestellt, seither um `TRAITS`
+      aus Phase 3 und `MEMORY_TYPES` aus Phase 4 erweitert): Entscheiden,
+      ob `tools/data-sync.js` um `TERRITORIES`/`START_REGIONS`/`TRAITS`/
+      `MEMORY_TYPES` erweitert oder die JSON-Modding-Schicht bewusst als
+      begrenzt dokumentiert wird (siehe CODE_AUDIT.md Abschnitt 6).
+- [ ] Phase 5 — Event Chains: 23 isolierte Events → mindestens 10
+      hochwertige, mehrjährige Eventketten mit echten Vorbedingungen/
+      Folgeevents statt vieler neuer Einzelevents. Kann jetzt auf der in
+      Phase 4 geschaffenen World-Memory-Datengrundlage aufbauen
+      (`hasMemory()`/`getRecentConflictMemories()` u. a. sind bereits als
+      API-Oberfläche vorbereitet, siehe DEVELOPMENT.md "Phase 4").
 - [ ] Phase 7 — Kaiserwahl 2.0: Wahlkampf, Versprechen, Kurfürsten-
       Interessen statt reiner Bestechung/Beziehungsschwelle.
 - [ ] Phase 8 — War & Peace 2.0: Friedensverhandlung statt automatischer
@@ -77,13 +102,11 @@ ist aktuell Wetter-Flavourtext, nur ~1 relevantes Ereignis alle 8 Jahre bei
 passivem Spiel (siehe `GAME_DESIGN.md` → "Narrative Density"/"Emergent
 Storytelling Gap"). Diese Gruppe war zuvor als Phase 4–6 unter NEXT
 eingeplant, wandert aber nach der Priorisierung von Phase 2 (Technical
-Stabilization) hierher — erst nach Phase 2/3 sinnvoll angehbar:
+Stabilization) hierher — erst nach Phase 2/3 sinnvoll angehbar. **World
+Memory ist seit Phase 4 erledigt** (siehe CURRENT oben) und **Event Chains
+sind nach Phase 4 nach NEXT vorgezogen** (siehe oben) — beide daher hier
+nicht mehr aufgeführt:
 
-- [ ] World Memory: strukturierter Erinnerungsspeicher (Typ/Jahr/
-      Beteiligte/Stärke/Decay), Verknüpfung mit der Chronik.
-- [ ] Event Chains: 23 isolierte Events → mindestens 10 hochwertige,
-      mehrjährige Eventketten mit echten Vorbedingungen/Folgeevents statt
-      vieler neuer Einzelevents.
 - [ ] Story Threads: Status-Zustandsautomat (dormant/building/active/
       climax/resolved/aftermath) für langlebige Handlungsstränge
       (Erbfolgekrise, Rivalität, Kaiserwahl, Krieg, …).

@@ -161,9 +161,10 @@ bestehenden 6 Werten (`stats`, Bereich 3-17, unverändert — plus zwei neue,
 - **Beziehungen** (`character.relationships[targetId]`): kein nackter
   Gesamtwert, sondern eine nachvollziehbare Liste von Gründen (Geschwister
   +15, Ehepartner +25, gleiches Haus +5, Amt inne +10, Charisma-Trait +5 —
-  strukturell, jedes Jahr frisch berechnet; sowie dauerhaft gespeicherte
-  Ereignisse: Amt verweigert −20, bei der Erbfolge übergangen −25, Rivalität
-  −30), geklammert auf −100..100.
+  strukturell, jedes Jahr frisch berechnet; seit Phase 4 zusätzlich jede
+  passende, noch wirksame World-Memory-Erinnerung mit ihrer aktuellen,
+  zerfallenen Wirkung — siehe „World Memory (Phase 4)" unten), geklammert
+  auf −100..100.
 - **Loyalität** (`character.loyalty`): bewusst getrennt von "Beziehung" —
   Basis 50, plus 0,3× Beziehung zum Herrscher, plus Trait-Modifikatoren,
   plus Amtsbonus, plus Legitimitätsfaktor, minus ein Malus abhängig vom
@@ -196,16 +197,58 @@ moderater Amtserfahrungsbonus erhalten). Berater altern und sterben (Tod
 macht das Amt frei), und können durch einen Herrscherwechsel ihr Amt
 verlieren, abhängig von ihrer Loyalität zum alten Herrscher.
 
-**Bewusst NICHT Teil von Phase 3**: World Memory, Drama Director, Event
-Chains, ein automatischer Bürgerkrieg bei einer Erbfolgekrise (der Claim/
-die Beziehungsspannung entstehen, eine Eskalation daraus bleibt einer
-späteren Phase vorbehalten), Battle-Engine-Integration des Militär-Skills.
+**Bewusst NICHT Teil von Phase 3**: World Memory (folgte in Phase 4, siehe
+unten), Drama Director, Event Chains, ein automatischer Bürgerkrieg bei
+einer Erbfolgekrise (der Claim/die Beziehungsspannung entstehen, eine
+Eskalation daraus bleibt einer späteren Phase vorbehalten),
+Battle-Engine-Integration des Militär-Skills.
+
+## World Memory (Phase 4)
+
+KAISERREICH merkt sich jetzt bedeutende Ereignisse als strukturierte
+Erinnerungen statt nur als Beziehungszahl — die Grundlage, um den
+zentralen Qualitätstest "Warum hat diese Person heute diese Haltung?" mit
+Geschichte statt mit einem bloßen Endwert zu beantworten. Zentrale
+Designregel: NUR bedeutsame Ereignisse erzeugen eine Erinnerung, kein
+Gedächtnis für Wetter oder einzelne Preisschwankungen.
+
+- **Memory-Objekt** (`state.memories.byId["m1"...]`, stabile IDs über
+  `js/memory.js`): Typ, Jahr, Beteiligte (Akteure/Betroffene/Regionen,
+  KI-Regionen ohne eigenen Herrscher-Charakter referenzieren `regionIds`),
+  `importance` (1-100, wie bedeutsam), `emotionalWeight` (−100..100, wie
+  positiv/negativ), `decayRate`, Tags, Metadaten, menschenlesbare
+  Beschreibung. 23 Typen über Dynastie/Hof/Diplomatie/Krieg/Politik
+  (`MEMORY_TYPES`-Tabelle).
+- **Zerfall ohne Löschen**: `computeEffectiveWeight()` berechnet die
+  aktuelle Wirkung live und rein lesend (lineare Verblassung über die
+  Jahre) — die Erinnerung selbst bleibt dauerhaft bestehen, auch wenn ihre
+  mechanische Wirkung längst auf 0 gefallen ist. Manche Typen (Herrschertod,
+  Erbfolge, Heirat, Friedensschluss, Titelaufstieg) verblassen bewusst nie
+  (`decayRate: 0`) — das sind historische Fakten, keine vorübergehenden
+  Stimmungen.
+- **Traits verändern das Erinnerungsvermögen**: `rachsüchtig` lässt
+  Kränkungen langsamer verblassen, `barmherzig` vergibt schneller, `loyal`
+  lässt positive Erinnerungen länger nachwirken, `paranoid` verstärkt die
+  Wirkung negativer Erinnerungen.
+- **Single Source of Truth**: die drei bisherigen Phase-3-Beziehungs-
+  Ereignisse (Amt verweigert, Erbfolge übergangen, Rivalität) sind jetzt
+  selbst Memories und fließen live-zerfallend statt als starrer Fixwert in
+  `computeRelationshipBreakdown()` ein — keine doppelte Buchführung.
+- **World Memory ist NICHT die Chronik.** Eine vorbereitete, aber noch
+  nicht aktiv genutzte Brücke (`memoryToChronicleCandidate()`) liefert
+  Kandidaten-Text für eine spätere, bedeutungsbasierte Chronik — das
+  bestehende 95%-Wetter-Problem (siehe „Narrative Density" unten) bleibt in
+  dieser Phase bewusst unangetastet.
+- **Bewusst NICHT Teil von Phase 4**: Event Chains, Drama Director, Story
+  Threads, UI-Redesign. Vorbereitete, aber ungenutzte API-Oberflächen
+  (`hasMemory()`, `getNegativeMemoryPressure()`, `getDynastyMemoryPressure()`,
+  `getRecentConflictMemories()`) warten auf eine spätere, gesondert
+  freigegebene Phase.
 
 ## Bekannte, bewusste Vereinfachungen (nicht implementiert, siehe ROADMAP.md)
 
-Keine World-Memory-Struktur (Erinnerungen zerfallen nicht über die Zeit,
-Rivalitäten vererben sich noch nicht über Generationen), keine Eventketten
-(23 isolierte Events statt verketteter Handlungsstränge), keine
+Keine Eventketten (23 isolierte Events statt verketteter Handlungsstränge,
+World Memory aus Phase 4 liefert dafür erst die Datengrundlage), keine
 differenzierten Herrscher-Todesursachen (nur Alter/Gesundheit — Berater
 sterben seit Phase 3 zwar auch, aber mit derselben undifferenzierten
 Formel). Diese Lücken sind absichtlich hier dokumentiert, weil sie genau
@@ -277,7 +320,12 @@ Dies soll **später** durch folgende Systeme adressiert werden (siehe
 ROADMAP.md → LATER → Narrative Systems für die Reihenfolge):
 
 - Event Chains
-- World Memory
+- World Memory — **die Datengrundlage ist seit Phase 4 vorhanden**
+  (`js/memory.js`, siehe Abschnitt „World Memory (Phase 4)" oben), aber
+  bewusst noch NICHT an die Chronik angeschlossen (`memoryToChronicleCandidate()`
+  ist nur vorbereitet) — dieser Abschnitt bleibt daher als offene Lücke
+  stehen, bis eine spätere Phase die bedeutungsbasierte Chronik tatsächlich
+  umsetzt
 - Story Threads
 - Drama Director
 - aktivere KI-Dynastien

@@ -935,3 +935,51 @@ CONFIG-Werte, Regierungsstil-/Regionalhandel-Balance). Neu kalibrierte
 CONFIG-Werte in Phase 3 (`CONFIG.advisors.tenureBonusPerLevel`) sind
 ausschließlich Beratermechanik-intern und betreffen keinen der
 geschützten Bereiche.
+
+## 16. Ergänzende Audit-Ergebnisse — Phase 4 (World Memory)
+
+Neue Datei `js/memory.js` (siehe DEVELOPMENT.md für den vollständigen
+Funktionsumfang). Keine Architektur-Regression, aber drei neue,
+beobachtbare technische Punkte:
+
+1. **Ungebundenes Wachstum von `state.memories.byId`, jede Query ein voller
+   Scan**: Memories werden nie gelöscht (Designentscheidung, §Punkt 19 —
+   historisch vs. aktuell-wirksam ist reine Leseunterscheidung). Alle
+   Query-Funktionen (`getMemoriesForCharacter`, `getMemoriesForRelationship`,
+   …) iterieren über `Object.values(state.memories.byId)` ohne Index. Da
+   `computeRelationshipBreakdown()` bereits Teil der bestehenden O(n²)-
+   Beziehungsschleife aus Phase 3 ist (Abschnitt 15, Punkt 1), multipliziert
+   sich der Aufwand pro Jahr jetzt zusätzlich mit der insgesamt seit
+   Spielbeginn angesammelten Memory-Zahl. Bei der in
+   `phase4_memory_metrics_test.js` gemessenen Größenordnung (Ø 22,9
+   Memories/100-Jahre-Partie, ~89ms/Partie) unkritisch — wird aber bei
+   deutlich längeren Kampagnen (mehrere hundert Jahre, siehe ROADMAP.md
+   "Vollständige Kampagne 1450–1650+") relevant und sollte dann zuerst
+   gemessen statt vorab optimiert werden (kein YAGNI-Verstoß in dieser
+   Phase). Ein einfacher künftiger Hebel: Index nach `characterId` bei
+   Bedarf, ohne das Speicherformat selbst zu ändern.
+2. **FAMINE-Häufigkeit höher als die übrigen Memory-Typen**: 20,8% aller
+   erzeugten Memories sind `FAMINE` (Schwelle: ≥1% Hungertod-Anteil der
+   Regionsbevölkerung, `checkFamineMemory()`), das ist der größte Einzel-
+   anteil aller 8 in den Metriktests tatsächlich ausgelösten Typen (von 23
+   definierten). Kein Bug — die Schwelle wurde bewusst niedrig gewählt, um
+   echte Hungerkrisen sicher zu erfassen — aber ein Kalibrierungs-
+   Beobachtungspunkt für eine spätere Phase, falls sich FAMINE-Memories in
+   der (noch nicht gebauten) bedeutungsbasierten Chronik als zu dominant
+   gegenüber saisonalen/dynastischen Ereignissen erweisen sollten.
+3. **`isMajorCharacter()` ohne "fremder Herrscher"-Kriterium**: KI-Regionen
+   besitzen aktuell keine individuell simulierten Herrscher-Charaktere (nur
+   `region.commander`, ein reiner Militärposten, siehe Abschnitt 4) — daher
+   kann `isMajorCharacter()` dieses in einer früheren Diskussion erwähnte
+   Kriterium nicht prüfen. Diplomatie-/Kriegs-Memories referenzieren
+   deshalb bewusst `regionIds` statt fiktiver Charakter-IDs (siehe
+   DEVELOPMENT.md "Phase 4"). Betrifft nur die Vollständigkeit von
+   `isMajorCharacter()`, keine falschen Ergebnisse.
+
+**DO-NOT-TOUCH-Liste aus Abschnitt 12 bleibt unverändert gültig** — keines
+der geschützten Systeme wurde in Phase 4 verändert (Kampf-Engine,
+Kohorten-Bevölkerungsmodell, Preisbildung, Ledger-System, kalibrierte
+CONFIG-Werte, Regierungsstil-/Regionalhandel-Balance, Beratermechanik aus
+Phase 3). World Memory verbraucht nachweislich keinen zusätzlichen
+`rnd()`-Aufruf (Golden-Snapshot-Test bestätigt exakte RNG-Gleichheit zu
+Phase 3, siehe DEVELOPMENT.md "Phase 4").
