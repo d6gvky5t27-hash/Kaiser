@@ -198,9 +198,10 @@ macht das Amt frei), und können durch einen Herrscherwechsel ihr Amt
 verlieren, abhängig von ihrer Loyalität zum alten Herrscher.
 
 **Bewusst NICHT Teil von Phase 3**: World Memory (folgte in Phase 4),
-Event Chains (folgte in Phase 5), Drama Director, ein automatischer
-Bürgerkrieg bei einer Erbfolgekrise (der Claim/die Beziehungsspannung
-entstehen, eine Eskalation daraus bleibt einer späteren Phase
+Event Chains (folgte in Phase 5), Story Threads/Drama Director (folgten
+in Phase 6), ein automatischer Bürgerkrieg bei einer Erbfolgekrise (der
+Claim/die Beziehungsspannung entstehen, eine Eskalation daraus bleibt
+einer späteren Phase
 vorbehalten), Battle-Engine-Integration des Militär-Skills.
 
 ## World Memory (Phase 4)
@@ -239,8 +240,9 @@ Gedächtnis für Wetter oder einzelne Preisschwankungen.
   Kandidaten-Text für eine spätere, bedeutungsbasierte Chronik — das
   bestehende 95%-Wetter-Problem (siehe „Narrative Density" unten) bleibt in
   dieser Phase bewusst unangetastet.
-- **Bewusst NICHT Teil von Phase 4**: Event Chains (folgte in Phase 5,
-  siehe unten), Drama Director, Story Threads, UI-Redesign.
+- **Bewusst NICHT Teil von Phase 4**: Event Chains (folgte in Phase 5),
+  Story Threads/Drama Director (folgten in Phase 6, siehe unten),
+  UI-Redesign.
 
 ## Event Chains (Phase 5)
 
@@ -305,18 +307,66 @@ selbst neue Memories (`DEMAND_ACCEPTED`/`DEMAND_REFUSED`/
 welcher Erinnerung sie entstanden — nachvollziehbar, warum eine
 Geschichte begann.
 
-**Bewusst NICHT Teil von Phase 5**: Drama Director, Story Threads
-außerhalb dessen, was die Ketten intern brauchen, UI-Redesign, Kaiserwahl
-2.0.
+**Bewusst NICHT Teil von Phase 5**: Drama Director (folgte in Phase 6,
+siehe unten), Story Threads außerhalb dessen, was die Ketten intern
+brauchen, UI-Redesign, Kaiserwahl 2.0.
+
+## Story Threads & Drama Director (Phase 6)
+
+Aus einzelnen Event Chains wird eine lebendige Kampagne: mehrere Ketten,
+Memories und Zustände verbinden sich zu größeren, mehrjährigen
+Erzählbögen. Eine Chain erzählt "Der gekränkte Berater"; ein Story Thread
+kann über Jahrzehnte "Der Anspruch von Wilhelm" erzählen und dabei mehrere
+Chains, Rivalitäten und Erinnerungen bündeln.
+
+**Der Drama Director ist Kurator, nicht Autor.** Er erfindet keine Krisen
+— er betrachtet World Memories, aktive Event Chains, Rivalitäten, Claims,
+Wirtschaft, Diplomatie, Herrschergesundheit, Kaiserwahl und Hunger, und
+entscheidet nur, welche bereits plausible Entwicklung gerade Aufmerksamkeit
+verdient. Verboten: "10 Jahre Frieden → Krieg starten", "Spieler ist reich
+→ Pest erzeugen", "Spannung niedrig → zufällig jemanden rebellieren
+lassen". Erlaubt: eine bereits bestehende Geschichte (echter Rivale,
+starker Anspruch, alte Demütigung, niedrige Loyalität) bekommt höhere
+Priorität als eine andere, ebenfalls plausible.
+
+**8 Thread-Typen**: Nachfolgekonflikt, Persönliche Rivalität,
+Wirtschaftskrise, Hungerkrise, Auswärtiger Konflikt, Religiöser Konflikt,
+Kaiserliche Ambition, Dynastisches Bündnis. Jeder Typ erkennt seine
+Voraussetzungen rein aus dem aktuellen Zustand — kein Würfel entscheidet,
+ob ein Thread entsteht, nur ob und wann eine bereits plausible Kette
+daraus tatsächlich zu einer Entscheidung führt.
+
+**Lebenszyklus**: DORMANT (Potenzial vorhanden, noch nicht relevant) →
+BUILDING (mehrere passende Signale) → ACTIVE (beeinflusst spürbar das
+Spiel) → CLIMAX (nie erzwungen, entsteht rein aus hoher Spannung) →
+AFTERMATH → RESOLVED. Nicht jeder Thread braucht einen Höhepunkt — eine
+Versöhnung ist ein genauso legitimes Ende wie eine Eskalation. Ein
+ACTIVE-Thread ohne neue Entwicklung über mehrere Jahre schläft (DORMANT)
+statt zu verschwinden und kann durch eine neue passende Erinnerung
+Jahrzehnte später wieder relevant werden — die Vergangenheit bleibt
+erreichbar, ohne dass etwas rückwirkend erfunden wird.
+
+**Tension ist keine Katastrophen-Wahrscheinlichkeit**, sondern eine
+Beschreibung, wie angespannt die Welt gerade ist — vollständig
+nachvollziehbar aus einzelnen, konfigurierbaren Komponenten (aktive
+Rivalitäten, unsichere Erbfolge, Hunger, Krieg, schlechte Beziehungen
+… gegen Frieden, Wohlstand, hohe Legitimität, gelöste Krisen). Ruhige,
+erfolgreiche Regierungszeiten bleiben ausdrücklich erlaubt — Erfolg wird
+nicht bestraft, es gibt keine "Spieler ist zu gut → mach's schwerer"-Logik.
+
+**Bewusst NICHT Teil von Phase 6**: Kaiserwahl 2.0, komplettes
+UI-Redesign, Kriegssystem-Erweiterung, politische Interessengruppen, neue
+Waren.
 
 ## Bekannte, bewusste Vereinfachungen (nicht implementiert, siehe ROADMAP.md)
 
 Keine differenzierten Herrscher-Todesursachen (nur Alter/Gesundheit —
 Berater sterben seit Phase 3 zwar auch, aber mit derselben
-undifferenzierten Formel), keine Story Threads/Drama Director (siehe
-ROADMAP.md, Abschnitt LATER "Narrative Systems"), keine bedeutungsbasierte
-Chronik (Event Chains liefern seit Phase 5 chronikwürdige Momente, werden
-aber bewusst noch nicht automatisch in die Chronik geschrieben).
+undifferenzierten Formel), keine bedeutungsbasierte Chronik (Event Chains
+liefern seit Phase 5 chronikwürdige Momente, werden aber bewusst noch
+nicht automatisch in die Chronik geschrieben), Story-Thread-Resolution
+unterscheidet noch nicht zwischen friedlichem und eskalationsbedingtem
+Ende (siehe CODE_AUDIT.md).
 
 ## Narrative Density
 
@@ -393,8 +443,9 @@ ROADMAP.md → LATER → Narrative Systems für die Reihenfolge):
   Nebeneffekt der bestehenden Event-UI-Wiederverwendung, keine bewusste
   bedeutungsbasierte Chronik-Selektion — diese Lücke bleibt also trotzdem
   offen
-- Story Threads
-- Drama Director
+- Story Threads — **seit Phase 6 erledigt** (siehe Abschnitt „Story
+  Threads & Drama Director (Phase 6)" oben)
+- Drama Director — **seit Phase 6 erledigt**, siehe oben
 - aktivere KI-Dynastien
 - bedeutungsbasierte Chronik
 

@@ -2444,3 +2444,178 @@ Event-Anzeige selbst wurde NICHT verändert.
 außerhalb dessen, was die Ketten intern brauchen, UI-Redesign, Kaiserwahl
 2.0. Battle Engine (`battle-engine/*.js`, `js/battle-bridge.js`) technisch
 unverändert.
+
+## 2026-08-21 – Phase 6 (KAISERREICH-Next-Generation-Master-Prompt): Story Threads + Drama Director
+
+Ziel: aus einzelnen Event Chains wird eine lebendige Kampagne. Zentraler
+Grundsatz (§Punkt 2): der Drama Director ist KURATOR, NICHT AUTOR — er
+erfindet keine Krisen, sondern priorisiert nur bereits plausible,
+tatsächlich im Weltzustand vorhandene Entwicklungen.
+
+**Story Threads (`js/story-threads.js`).** 8 Thread-Typen
+(SUCCESSION_CONFLICT, PERSONAL_RIVALRY, ECONOMIC_CRISIS, FOOD_CRISIS,
+FOREIGN_CONFLICT, RELIGIOUS_CONFLICT, IMPERIAL_AMBITION,
+DYNASTIC_ALLIANCE), jeder mit genau einer `detect(state)`-Funktion, die
+Signal-Kandidaten (Beteiligte/Regionen/Memories + grobe Anfangsstärke)
+liefert — KEIN RNG (§Punkt 37/38): ein Thread existiert, weil seine
+Voraussetzungen objektiv im Zustand vorhanden sind, nie per Würfel.
+`discoverStoryThreads()` legt für noch nicht abgedeckte Kandidaten neue
+Threads an, `advanceStoryThread()` bewertet jährlich Tension/Momentum/
+Importance neu und führt die Statusmaschine DORMANT → BUILDING → ACTIVE
+→ CLIMAX → AFTERMATH → RESOLVED (zusätzlich EXPIRED bei Tod eines
+Beteiligten). Klimax entsteht rein aus Tension ≥ 80 (§Punkt 15: nie
+erzwungen), Auflösung erfolgt automatisch, sobald das zugrunde liegende
+Signal verschwindet — friedliche Enden (z. B. Versöhnung) sind genauso
+häufig vorgesehen wie Eskalation.
+
+**Dedup + Reaktivierung (§Punkt 12/33/34).** Neue Signale werden zuerst
+gegen bereits bestehende Threads DESSELBEN Typs mit überlappenden
+Beteiligten/Regionen abgeglichen (`findExistingThreadForCandidate()`) —
+mehrere passende Memories derselben Person erzeugen nie mehrere fast
+identische Threads. Ein DORMANT-Thread kann durch eine neue passende
+Memory Jahre/Jahrzehnte später wieder auf BUILDING/ACTIVE springen
+(generationenübergreifende Geschichten technisch möglich, ohne eigene
+Haus-Rivalitäts-KI). Ein bereits RESOLVED-Thread bleibt bewusst terminal
+— eine erneut relevante Familiengeschichte erzeugt einen NEUEN Thread
+(§Punkt 35 "nicht zwingend derselbe Thread").
+
+**Verknüpfung mit Event Chains (§Punkt 47-49).** `startEventChain()`
+ruft jetzt `attachChainToThread()` auf (verknüpft mit einem bestehenden
+oder neu erzeugten Thread anhand der Typ-Zuordnung
+`CHAIN_THREAD_TYPE`), `endEventChain()` ruft `notifyThreadOfChainResolution()`
+auf. Ein Thread kann mehrere Chains über Jahre sammeln (`thread.chainIds`);
+die eigentliche Auflösungsprüfung übernimmt weiterhin `advanceStoryThread()`
+im nächsten Zyklus anhand des dann bereits veränderten Weltzustands, nicht
+die Chain-Auflösung selbst.
+
+**Thread-Titel (§Punkt 51/52).** Vollständig dynamisch aus State generiert
+(`generateThreadTitle()`) — keine Hardcodes, Namen kommen live aus
+`state.characters`/`state.regions`.
+
+**Drama Director (`js/drama-director.js`).**
+`computeDramaTensionBreakdown()` ist eine additive, vollständig
+konfigurierbare Formel (`CONFIG.drama.tensionWeights`, §Punkt 22/107 —
+keine verstreuten Magic Numbers): Rivalitäten, niedrige Loyalität
+einflussreicher Personen, ungeklärte Ansprüche, Hunger, schwache
+Wirtschaft, Krieg, schlechte Beziehungen, Herrschergesundheit, unsichere
+Erbfolge, aktive Event Chains, bevorstehende Kaiserwahl, religiöse
+Spannung — jeweils POSITIV; Frieden, stabile Dynastie, volle
+Kornspeicher, gute Wirtschaft, hohe Legitimität, hohe Loyalität, kürzlich
+gelöste Krisen — jeweils NEGATIV. `state.drama.tensionBreakdown` macht
+jede Komponente einzeln nachvollziehbar (§Punkt 21/22 "keine Blackbox").
+Tension ist ausdrücklich KEINE Katastrophen-Wahrscheinlichkeit (§Punkt 18).
+
+**Pacing (§Punkt 23/26/27).** Rein deskriptiv abgeleitet
+(QUIET/BUILDING/HIGH_TENSION/CRISIS/RECOVERY) — beeinflusst NUR die
+Priorisierung optionaler Chains, nie die physische Realität: Herrschertod,
+echte Hungersnot und alle anderen system-kritischen Vorgänge laufen
+komplett unverändert außerhalb des Director-Systems weiter (dieselben
+Codepfade wie vor Phase 6). Ein `systemCritical: true`-Flag (bisher nur
+auf `famine_crisis`) markiert die einzige system-kritische Event Chain —
+sie wird im Recovery-Fenster nie zurückgestaffelt, alle 9 übrigen
+(optionalen) Ketten können es.
+
+**Fokus (§Punkt 28/29).** `computeFocusThread()` wählt deterministisch den
+höchstbewerteten aktiven (nicht-dormanten) Thread, wechselt aber nur bei
+klar höherer Dringlichkeit (`CONFIG.drama.focusSwitchThreshold`) oder wenn
+der bisherige Fokus resolved/nicht mehr vorhanden ist — kein jährlicher
+Wechsel.
+
+**Chain-Priorisierung ohne Eligibility-Verletzung (§Punkt 41-46).** Phase
+5s feste `CHAIN_PRIORITY_ORDER`-Reihenfolge für NEUE Chain-Starts wurde
+durch `computeChainDirectorScore()` ersetzt (Basis 30, + Fokus-Bonus, +
+anteilige Thread-Tension, + Jahre seit Thread-Aktivität, − Recovery-Malus
+für optionale Ketten) — `collectEligibleChainCandidates()`
+(js/event-chains.js) liefert dabei UNVERÄNDERT exakt dieselben
+Eligibility-/Cooldown-/Bindungs-Kandidaten wie in Phase 5; der Director
+wählt nur unter den bereits eligiblen aus, kann nie eine ineligible Kette
+starten (§Punkt 42, per Test verifiziert). **Entscheidung zum
+Phase-5-Zufallswurf (§Punkt 45/46, wie gefordert dokumentiert):** der
+bestehende `rnd() < startChance`-Wurf ("startet die score-höchste Chain
+dieses Jahr tatsächlich?") bleibt UNVERÄNDERT bestehen — er steuert seit
+Phase 5 bewusst nur das TIMING innerhalb eines bereits plausiblen Jahres,
+nicht die Auswahl selbst, und genau das empfiehlt der Auftrag ausdrücklich
+("ein geringer RNG-Faktor darf eventuell Timing variieren"). Nur die
+Auswahl, WELCHE Chain diesen Wurf überhaupt bekommt, ist jetzt
+Score- statt Reihenfolge-basiert.
+
+**Determinismus.** Thread Discovery und Drama Director selbst verbrauchen
+nachweislich kein `rnd()`. Der bestehende Chain-Start-Wurf verschiebt sich
+aber ggf. auf eine andere Chain als in Phase 5 (score- statt
+reihenfolgebasiert), was den nachfolgenden Zufallsstrom verändern kann —
+Golden-Fixture daher neu erzeugt (Phase-5-Fixture archiviert unter
+`tests/fixtures/advance_year_snapshot_golden_phase5.json`).
+
+**Savegame-Migration.** `SAVE_VERSION` 5 → 6. `migrateSaveV5ToV6()` legt
+leere `state.storyThreads`/`state.drama`-Speicher an. Alte Memories
+fließen ab dem nächsten Simulationsschritt ganz normal in die
+Signal-Erkennung ein (das ist reales, bereits existierendes Material,
+keine Fiktion, §Punkt 77) — aber `thread.startedYear` ist immer das
+Jahr der ENTDECKUNG, nie rückwirkend behauptet (§Punkt 78:
+`thread.memoryIds` kann auf deutlich ältere Memories verweisen als
+`thread.startedYear`). Bestehende Event Chains aus Version 5 bekommen
+`threadId: null`.
+
+**Neue Tests.** `tests/story_thread_test.js` (§Punkt 80-84 + 2 Zusatzfälle:
+Discovery, Negativtest — mit der wichtigen Klarstellung, dass "kein
+Konfliktthread" nicht "gar kein Thread" bedeutet, da ein unverheirateter
+Erbe objektiv weiterhin ein gültiges DYNASTIC_ALLIANCE-Signal ist —, Dedup,
+Reaktivierung, Auflösung, Thread↔Chain-Verknüpfung, Zusammenfassung) — alle
+grün. `tests/drama_director_test.js` (§Punkt 85-88 + die zwei zentralen
+Anti-Cheat-Tests §116/117): akute Hungerkrise bekommt mindestens so hohe
+Priorität wie ein optionaler Beraterstreit; Recovery-Fenster staffelt nur
+optionale Ketten zurück; ein extrem stabiler, erfolgreicher Zustand erzeugt
+niedrige Tension statt einer Bestrafung; ganz ohne plausible Voraussetzung
+startet nichts, auch nach 30 Jahren Ruhe nicht; **§116 bestätigt**: ein
+durchweg stabiler Zustand (reich, 95 Legitimität, volle Nahrung, kein
+Rivale, gesicherte UND VERHEIRATETE Erbfolge, gute Beziehungen, Frieden)
+erzeugt über 5 Jahre nachweislich keine einzige neue Chain und keinen
+neuen Konfliktthread; **§117 bestätigt**: ein Zustand mit kranker
+Herrschergesundheit, starkem Rivalen-Claim, alten Demütigungs-Memories,
+niedriger Loyalität und schlechten Beziehungen erzeugt sofort hohe globale
+Tension UND wird korrekt als Fokus-Thread erkannt. (Bemerkenswerter
+Nebenbefund beim ersten §116-Testentwurf: ein unverheirateter erwachsener
+Erbe bei guten Beziehungen ist selbst bei sonst perfekter Stabilität ein
+objektiv gültiges, nicht-manufakturiertes DYNASTIC_ALLIANCE-Signal — exakt
+das in §Punkt 67 ausdrücklich als legitime "ruhige Phase"-Entwicklung
+genannte Beispiel "Eheverhandlung läuft", kein Bug. Der Test wurde
+entsprechend mit einem bereits verheirateten Erben aufgesetzt, um wirklich
+ALLE Signalquellen auszuschließen.)
+`tests/phase6_story_metrics_test.js` (30×100 Jahre, FIRST_OPTION): Ø 13,8
+gestartete Threads/Partie, Ø 1,69 gleichzeitig aktive Threads, 38 % der
+simulierten Jahre mit Story-Überlappung (≥2 aktive Threads), Ø
+Thread-Dauer 7,0 Jahre, 111 von 415 Threads erreichen mindestens einmal
+CLIMAX, Pacing-Verteilung 64 % QUIET / 25 % RECOVERY / 10 % BUILDING / 0 %
+HIGH_TENSION / 0 % CRISIS (erwartungsgemäß bei der durchgehend
+großzügigen FIRST_OPTION-Politik — RANDOM_VALID_OPTION-Läufe aus Phase 5
+zeigen bereits, dass echte Eskalation möglich ist), ~155 ms/Partie. Enthält
+10 echte Kampagnen-Timelines und 5 vollständige Thread-Historien direkt
+aus Simulationsdaten (§Punkt 96/97, nicht erfunden). Bestehende
+Regressionstests weiterhin grün.
+
+**Beobachtete Grenzen, ehrlich dokumentiert (§Punkt 98-Analyse).**
+DYNASTIC_ALLIANCE dominiert mengenmäßig deutlich (210 von 415 Threads in
+den Metriken) — unverheiratete erwachsene Verwandte sind einfach häufig,
+die Erkennungsschwelle (Stärke ≥ 20) ist bewusst niedrig gehalten (§Punkt
+10 verlangt nur "keine Kleinigkeiten", keine hohe Schwelle). Nur 11 von
+415 Threads erreichen `importance >= 50` (Story Signal Ratio, §Punkt 101,
+nur gemessen, nicht manipuliert). Thread-`resolution` unterscheidet aktuell
+NICHT zwischen friedlichem Verblassen und eskalationsbedingtem Ende (immer
+"RESOLVED"/"FADED", nie z. B. "ESCALATED") — die zugrunde liegenden Event
+Chains selbst kennen diese Unterscheidung sehr wohl (RESOLVED/FAILED/
+EXPIRED, siehe Phase-5-Metriken: 61 %/39 % friedlich/eskaliert unter
+RANDOM_VALID_OPTION), sie wird nur noch nicht auf die Thread-Ebene
+durchgereicht — als bewusst offener Punkt in CODE_AUDIT.md vermerkt statt
+in dieser bereits sehr umfangreichen Phase zusätzlich vertieft.
+
+**UI-Erweiterungen (kein Redesign, §Punkt 102/53/54).** Zwei neue
+Debug-Panels: Story-Thread-Inspektor (alle Rohfelder + History für einen
+gewählten Thread) und Drama-Director-Panel (globale Tension-Aufschlüsselung,
+Pacing, Fokus-Thread, alle eligiblen Chains mit ihrem vollständigen
+Director-Score). Die bestehende Event-/Spiel-Oberfläche wurde NICHT
+verändert.
+
+**Bewusst NICHT umgesetzt (§Punkt 119):** Kaiserwahl 2.0, komplettes
+UI-Redesign, Kriegssystem-Erweiterung, politische Interessengruppen, neue
+Waren. Battle Engine (`battle-engine/*.js`, `js/battle-bridge.js`)
+technisch unverändert.

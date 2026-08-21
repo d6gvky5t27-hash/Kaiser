@@ -83,9 +83,32 @@ werden zuerst fertiggestellt/gefestigt, bevor neue Breite hinzukommt.
       RNG-Golden-Fixture erwartungsgemäß neu erzeugt (Phase-4-Fixture
       versioniert, nicht gelöscht) — Event Chains verbrauchen bewusst neue
       `rnd()`-Aufrufe, anders als Phase 4. Event-Chain-Debug-Panel +
-      "warum (nicht) gestartet?"-Prüfer. **Phase 6 (Story Threads + Drama
-      Director) wurde NICHT begonnen** — wartet auf ausdrückliche
-      Freigabe.
+      "warum (nicht) gestartet?"-Prüfer.
+- [x] **Phase 6 — Story Threads + Drama Director** (Ergebnisse:
+      GAME_DESIGN.md → "Story Threads & Drama Director (Phase 6)", Ablauf:
+      DEVELOPMENT.md "Phase 6"): neue Module `js/story-threads.js` (8
+      Thread-Typen, RNG-freie Signal-Erkennung, DORMANT→BUILDING→ACTIVE→
+      CLIMAX→AFTERMATH→RESOLVED/EXPIRED, Dedup pro Typ+Beteiligte,
+      Reaktivierung Jahrzehnte später möglich) und `js/drama-director.js`
+      (reiner Kurator — priorisiert nur bereits plausible Entwicklungen,
+      erfindet nie welche; konfigurierbare Tension-Formel statt Blackbox;
+      ersetzt Phase 5s feste Chain-Startreihenfolge durch einen
+      Director-Score, OHNE die Eligibility-Wahrheit anzutasten). Beide
+      zentralen Anti-Rubberbanding-Tests aus dem Auftrag bestanden: ein
+      durchweg stabiler, erfolgreicher Zustand erzeugt nachweislich keine
+      neue Chain/keinen neuen Konfliktthread; ein objektiv dramatischer
+      Zustand wird zuverlässig als Fokus-Thread mit hoher Tension erkannt.
+      Savegame-Migration v5→v6 (leere Speicher, keine retroaktive
+      Fiktion). RNG-Golden-Fixture erwartungsgemäß neu erzeugt
+      (Phase-5-Fixture versioniert, nicht gelöscht) — Thread
+      Discovery/Director selbst sind RNG-frei, aber die Director-basierte
+      Chain-Auswahl kann den bestehenden Phase-5-Timing-Wurf auf eine
+      andere Chain verschieben. Story-Thread- + Drama-Director-Debug-Panel.
+      Offen geblieben (bewusst dokumentiert, nicht in dieser bereits sehr
+      umfangreichen Phase zusätzlich vertieft): Thread-`resolution`
+      unterscheidet noch nicht zwischen friedlichem und eskalations-
+      bedingtem Ende. **Phase 7 wurde NICHT automatisch begonnen** —
+      wartet auf ausdrückliche Freigabe (§Phase-6-Punkt 113/119).
 
 ## NEXT (nach Freigabe, in der vom Master-Prompt vorgeschlagenen Reihenfolge)
 
@@ -94,14 +117,6 @@ werden zuerst fertiggestellt/gefestigt, bevor neue Breite hinzukommt.
       ob `tools/data-sync.js` um `TERRITORIES`/`START_REGIONS`/`TRAITS`/
       `MEMORY_TYPES` erweitert oder die JSON-Modding-Schicht bewusst als
       begrenzt dokumentiert wird (siehe CODE_AUDIT.md Abschnitt 6).
-- [ ] **Phase 6 — Story Threads + Drama Director** (§Phase-5-Punkt 94: nach
-      Phase 5 als NEXT vorgemerkt, aber noch NICHT begonnen — wartet auf
-      ausdrückliche Freigabe): Status-Zustandsautomat (dormant/building/
-      active/climax/resolved/aftermath) für langlebige Handlungsstränge,
-      plus ein Drama Director, der Spannungswerte aus dem echten
-      Weltzustand ableitet statt Krisen willkürlich zu erzeugen — explizit
-      erst NACH den 10 in Phase 5 gebauten Event Chains sinnvoll, da er
-      auf ihnen aufbaut statt sie zu ersetzen.
 - [ ] Phase 7 — Kaiserwahl 2.0: Wahlkampf, Versprechen, Kurfürsten-
       Interessen statt reiner Bestechung/Beziehungsschwelle.
 - [ ] Phase 8 — War & Peace 2.0: Friedensverhandlung statt automatischer
@@ -121,10 +136,9 @@ passivem Spiel (siehe `GAME_DESIGN.md` → "Narrative Density"/"Emergent
 Storytelling Gap"). Diese Gruppe war zuvor als Phase 4–6 unter NEXT
 eingeplant, wandert aber nach der Priorisierung von Phase 2 (Technical
 Stabilization) hierher — erst nach Phase 2/3 sinnvoll angehbar. **World
-Memory ist seit Phase 4 erledigt, Event Chains sind seit Phase 5 erledigt**
-(siehe CURRENT oben) und **Story Threads/Drama Director sind als Phase 6
-nach NEXT vorgezogen** (siehe oben) — alle drei daher hier nicht mehr
-aufgeführt:
+Memory ist seit Phase 4 erledigt, Event Chains sind seit Phase 5 erledigt,
+Story Threads/Drama Director sind seit Phase 6 erledigt** (siehe CURRENT
+oben) — alle vier daher hier nicht mehr aufgeführt:
 
 - [ ] Bedeutungsbasierte Chronik (WORLD LOG vs. DYNASTY CHRONICLE, siehe
       `GAME_DESIGN.md` → "Zukünftige Chronik-Architektur"): nur Ereignisse

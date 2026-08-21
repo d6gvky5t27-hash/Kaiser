@@ -1048,3 +1048,77 @@ Kohorten-Bevölkerungsmodell, Preisbildung, Ledger-System, kalibrierte
 CONFIG-Werte, Regierungsstil-/Regionalhandel-Balance, Beratermechanik aus
 Phase 3, World-Memory-Kern aus Phase 4). `battle-engine/*.js` und
 `js/battle-bridge.js` sind technisch unverändert (bestätigt per Diff).
+
+## 18. Ergänzende Audit-Ergebnisse — Phase 6 (Story Threads + Drama Director)
+
+Zwei neue Dateien `js/story-threads.js`/`js/drama-director.js` (siehe
+DEVELOPMENT.md für den vollständigen Funktionsumfang). Fünf neue,
+beobachtbare technische Punkte (§Phase-6-Punkt 112: Director/Chain-
+Kopplung, Thread-State-Wachstum, Pacing-Abhängigkeiten, Performance,
+mögliche Story-Loops):
+
+1. **Director/Chain-Kopplung ersetzt eine feste Reihenfolge durch
+   gegenseitige Abhängigkeit**: `startNewEventChainIfEligible()`
+   (js/event-chains.js) ruft jetzt `computeChainDirectorScore()`
+   (js/drama-director.js) auf, die wiederum `findExistingThreadForCandidate()`
+   (js/story-threads.js) und `state.drama.focusThreadId` liest. Alle drei
+   Module sind damit gegenseitig voneinander abhängig (nur durch Hoisting
+   im gemeinsamen Bundle-Scope funktionsfähig, keine echte Modul-Isolation
+   — dieselbe bereits in Abschnitt 5 dokumentierte Architektur-Eigenschaft
+   des gesamten Projekts, hier nur an einer neuen Stelle sichtbar). Bleibt
+   unkritisch, solange die Ladereihenfolge in `tools/build-bundle.js`
+   unverändert bleibt (durch den Laufzeit-Rauchtest jedes Builds
+   abgesichert) — aber ein künftiger Umbau in echte ES-Module müsste diese
+   drei Dateien als einen zusammenhängenden Abhängigkeitsblock behandeln,
+   nicht als unabhängig austauschbare Einheiten.
+2. **Thread-State-Wachstum**: `state.storyThreads.resolved` wächst wie
+   `state.memories.byId`/`state.eventChains.resolved` unbegrenzt (dieselbe
+   bewusste Nicht-Löschung, §Punkt 56 "die Kette verschwindet, die
+   Geschichte bleibt"). Bei den in `phase6_story_metrics_test.js`
+   gemessenen ~13,8 gestarteten Threads/100-Jahre-Partie unkritisch,
+   gehört aber zur selben, bereits in Abschnitt 16/17 dokumentierten
+   Beobachtungsreihe für deutlich längere Kampagnen.
+3. **Pacing-Abhängigkeiten**: `computePacingState()` liest
+   `state.drama.recoveryWindowUntilYear`/`tension`/`momentum`, die ihrerseits
+   von `computeDramaTensionBreakdown()` (u. a. `getAllStoryThreads()`,
+   `getImportantCharacterIds()`, `state.eventChains.active`) abhängen —
+   eine Änderung an einem dieser Unterzustände wirkt sich indirekt auf
+   Pacing UND (über `computeChainDirectorScore()`) auf die Chain-Auswahl
+   aus. Bewusst so belassen (additive, vollständig aufgeschlüsselte
+   Formel statt einer isolierten Blackbox, §Punkt 22), aber ein
+   Beobachtungspunkt, falls eine spätere Phase (Phase 7+) weitere
+   Tension-Komponenten ergänzt, ohne die bestehende Gewichtstabelle
+   `CONFIG.drama.tensionWeights` neu zu kalibrieren.
+4. **Performance**: `updateStoryThreads()` iteriert jährlich über alle 8
+   Thread-Typen × ihre jeweilige `detect()`-Funktion (überwiegend O(Anzahl
+   Charaktere) oder O(Anzahl KI-Regionen), keine verschachtelte O(n²)-
+   Schleife) plus alle aktiven Threads zur Fortschreibung. Gemessen in
+   `phase6_story_metrics_test.js`: ~155 ms/Partie (100 Jahre), eine
+   moderate, aber nicht dramatische Verschlechterung gegenüber Phase 5
+   (~126-131 ms/Partie) — plausibel angesichts der zusätzlichen
+   Thread-Discovery- und Tension-Berechnung, die nun jedes Jahr statt nur
+   bei Chain-Ereignissen läuft.
+5. **Mögliche Story-Loops — geprüft, nicht beobachtet**: ein theoretisches
+   Risiko wäre ein Thread, der RESOLVED → (durch eine neue Chain erneut)
+   ACTIVE → RESOLVED in kurzer Folge oszilliert. Tritt strukturell NICHT
+   auf, weil `resolveStoryThread()` den Thread endgültig aus
+   `state.storyThreads.active` nach `state.storyThreads.resolved`
+   verschiebt (terminal, siehe Abschnitt "Reaktivierung" in
+   DEVELOPMENT.md "Phase 6") — eine später erneut relevante Geschichte
+   erzeugt einen NEUEN Thread statt den alten wiederzubeleben, was einen
+   Oszillations-Loop architektonisch ausschließt. Der einzige verwandte,
+   bereits ehrlich dokumentierte Punkt (siehe GAME_DESIGN.md/DEVELOPMENT.md
+   "Phase 6", "Beobachtete Grenzen"): Thread-`resolution` unterscheidet
+   noch nicht zwischen friedlichem und eskalationsbedingtem Ende — kein
+   Loop-Risiko, aber eine Ungenauigkeit in der Ergebnis-Klassifizierung,
+   die eine spätere Phase beheben kann, ohne an der Zustandsmaschine
+   selbst etwas ändern zu müssen.
+
+**DO-NOT-TOUCH-Liste aus Abschnitt 12 bleibt unverändert gültig** — keines
+der geschützten Systeme wurde in Phase 6 verändert (Kampf-Engine,
+Kohorten-Bevölkerungsmodell, Preisbildung, Ledger-System, kalibrierte
+CONFIG-Werte, Regierungsstil-/Regionalhandel-Balance, Beratermechanik aus
+Phase 3, World-Memory-Kern aus Phase 4, Event-Chain-Eligibility aus Phase
+5 — der Drama Director wählt nachweislich nur unter bereits eligiblen
+Ketten, siehe `drama_director_test.js` §116/117). `battle-engine/*.js`
+und `js/battle-bridge.js` sind technisch unverändert (bestätigt per Diff).
