@@ -15,10 +15,40 @@
 // sie sind harmlos und ihre Entfernung war nicht Teil dieses Schritts.
 // ============================================================
 
+// §Character-Core-Punkt 25/26: ein einzelner Kandidat pro Vakanz wurde
+// durch eine echte Auswahl von 2-4 unterschiedlichen Personen ersetzt.
+// generateAdvisorCandidate() (ein Kandidat) bleibt als Baustein erhalten.
 function generateAdvisorCandidate(role) {
-  const c = createCharacter(rnd() < 0.5 ? "m" : "f", 28 + Math.floor(rnd()*30), "");
+  const gender = rnd() < 0.5 ? "m" : "f";
+  const age = 28 + Math.floor(rnd() * 30);
+  const c = createCharacter(gender, age, randomNobleHouse());
   c.advisorRole = role;
+  // Gehaltsforderung streut moderat um den bereits kalibrierten baseCost
+  // (§Punkt 25) — im Mittel über viele Kandidaten identisch zum bisherigen
+  // Fixpreis, keine stille Gesamtkostenverschiebung.
+  c.salaryDemand = Math.round(ADVISOR_ROLES[role].baseCost * (0.85 + rnd() * 0.3));
   return c;
+}
+
+// Mischt gelegentlich einen lebenden, erwachsenen, amtslosen Geschwisterteil
+// des Herrschers in den Kandidatenpool (§Punkt 1, das Wilhelm-Beispiel) —
+// wird er nicht gewählt, entsteht daraus eine echte, nachvollziehbare
+// "Amt verweigert"-Beziehungsspannung (siehe confirmAdvisorSelection unten).
+function generateAdvisorCandidates(state, role) {
+  const count = 2 + Math.floor(rnd() * 3); // 2-4
+  const candidates = [];
+  const ruler = state.characters[state.rulerId];
+  if (ruler && ruler.parentId && rnd() < 0.4) {
+    for (const id in state.characters) {
+      const c = state.characters[id];
+      if (c.alive && c.parentId === ruler.parentId && c !== ruler && c.age >= 18 && !c.advisorRole) {
+        candidates.push({ existingId: id });
+        break;
+      }
+    }
+  }
+  while (candidates.length < count) candidates.push({ generated: generateAdvisorCandidate(role) });
+  return candidates;
 }
 
 // Kosten, um ein Amt von currentLevel auf currentLevel+1 zu bringen (0 = Berufung
@@ -27,18 +57,47 @@ function advisorUpgradeCost(role, currentLevel) {
   return Math.round(ADVISOR_ROLES[role].baseCost * Math.pow(CONFIG.advisors.upgradeCostMultiplier, currentLevel));
 }
 
-function hireAdvisor(state, role) {
+// Öffnet die Kandidatenauswahl für ein vakantes Amt (Kosten werden erst bei
+// confirmAdvisorSelection() tatsächlich abgebucht).
+function openAdvisorSelection(state, role) {
   if (state.advisors[role]) return { ok: false, reason: "Dieses Amt ist bereits besetzt." };
   const cost = advisorUpgradeCost(role, 0);
   if (state.treasury < cost) return { ok: false, reason: "Nicht genug Taler, um jemanden zu berufen." };
-  const candidate = generateAdvisorCandidate(role);
-  const cid = nextCharId();
-  state.characters[cid] = candidate;
-  state.advisors[role] = cid;
-  state.advisorLevels[role] = 1;
-  state.treasury -= cost;
-  logLedger(state, `Berater berufen: ${ADVISOR_ROLES[role].name}`, -cost);
-  addChronicle(state, `${candidate.name} wurde zum ${ADVISOR_ROLES[role].name} ernannt.`);
+  state.pendingAdvisorSelection = { role, cost, candidates: generateAdvisorCandidates(state, role) };
+  return { ok: true };
+}
+
+function confirmAdvisorSelection(state, candidateIndex) {
+  const sel = state.pendingAdvisorSelection;
+  if (!sel) return { ok: false, reason: "Keine Kandidatenauswahl offen." };
+  const chosen = sel.candidates[candidateIndex];
+  if (!chosen) return { ok: false, reason: "Ungültige Auswahl." };
+  if (state.treasury < sel.cost) return { ok: false, reason: "Nicht genug Taler, um jemanden zu berufen." };
+
+  let cid, character;
+  if (chosen.existingId) {
+    cid = chosen.existingId;
+    character = state.characters[cid];
+  } else {
+    character = chosen.generated;
+    cid = nextCharId();
+    state.characters[cid] = character;
+  }
+  character.advisorRole = sel.role;
+  state.advisors[sel.role] = cid;
+  state.advisorLevels[sel.role] = 1;
+  state.treasury -= sel.cost;
+  logLedger(state, `Berater berufen: ${ADVISOR_ROLES[sel.role].name}`, -sel.cost);
+  addChronicle(state, `${character.name} ${character.surname || ""} wurde zum ${ADVISOR_ROLES[sel.role].name} ernannt.`.replace(/\s+/g, " "));
+
+  for (const other of sel.candidates) {
+    if (other === chosen || !other.existingId) continue;
+    const rejected = state.characters[other.existingId];
+    addPersistentRelationshipModifier(rejected, state.rulerId, "amt_verweigert", -20);
+    refreshRelationship(state, other.existingId, state.rulerId);
+    addChronicle(state, `${rejected.name} ${rejected.surname || ""} wurde bei der Vergabe des Amtes ${ADVISOR_ROLES[sel.role].name} übergangen.`.replace(/\s+/g, " "));
+  }
+  state.pendingAdvisorSelection = null;
   return { ok: true };
 }
 
@@ -60,14 +119,40 @@ function dismissAdvisor(state, role) {
   if (!state.advisors[role]) return { ok: false, reason: "Dieses Amt ist nicht besetzt." };
   const c = state.characters[state.advisors[role]];
   addChronicle(state, `${c ? c.name : "Der Amtsinhaber"} wurde als ${ADVISOR_ROLES[role].name} entlassen.`);
+  if (c) c.advisorRole = null;
   state.advisors[role] = null;
   state.advisorLevels[role] = 0;
   return { ok: true };
 }
 
-// Bonus aus dem relevanten Stat des Beraters, falls besetzt — skaliert linear mit
-// der Ausbaustufe (§Original-Vertiefung: Stufe 3 wirkt dreimal so stark wie Stufe 1).
+// §Character-Core-Punkt 30: Berater altern (bereits über die gemeinsame
+// Alterungsschleife in updateDynasty()) und sterben jetzt auch — dieselbe
+// Sterbewahrscheinlichkeits-Formel wie beim Herrscher (rollDeathChance() in
+// js/population-dynasty.js), keine zweite Alterungslogik. Tod macht das
+// Amt frei (§Punkt 41).
+function checkAdvisorDeaths(state) {
+  for (const role in state.advisors) {
+    const advId = state.advisors[role];
+    if (!advId) continue;
+    const adv = state.characters[advId];
+    if (!adv || !adv.alive) continue;
+    if (rnd() < rollDeathChance(adv)) {
+      adv.alive = false;
+      adv.advisorRole = null;
+      addChronicle(state, `${adv.name} ${adv.surname || ""}, ${ADVISOR_ROLES[role].name}, ist verstorben.`.replace(/\s+/g, " "));
+      state.advisors[role] = null;
+      state.advisorLevels[role] = 0;
+    }
+  }
+}
 
+// §Character-Core-Punkt 27: Beraterwirkung entsteht primär aus Skill,
+// Charaktereigenschaften und Loyalität — NICHT mehr aus "Stufe 3 = dreifache
+// Wirkung" (die bisherige reine ×level-Skalierung). Das bestehende
+// Ausbausystem (upgradeAdvisor(), baseCost, Ausbaukosten) bleibt technisch
+// vollständig erhalten (§Punkt 28/29: kein harter Cut) — die Stufe wirkt
+// jetzt als moderater Amtserfahrungsbonus (`tenureFactor`, per CONFIG neu
+// und separat kalibriert) statt als alleiniger linearer Multiplikator.
 function advisorEffectBonus(state, role) {
   const advisorId = state.advisors[role];
   if (!advisorId) return 0;
@@ -76,11 +161,15 @@ function advisorEffectBonus(state, role) {
   const cfg = CONFIG.advisors;
   const level = state.advisorLevels[role] || 1;
   const statVal = advisor.stats[ADVISOR_ROLES[role].statKey];
-  if (role === "schatzmeister") return Math.min(cfg.schatzmeisterMaxBonus * level, (statVal / 100) * level);
-  if (role === "marschall") return (statVal / cfg.marschallStrengthDivisor) * level;
-  if (role === "diplomat") return (statVal / cfg.diplomatRelationBonusDivisor) * level;
-  if (role === "handelsberater") return (statVal / cfg.handelsberaterProductionDivisor) * level;
-  if (role === "spionagemeister") return (statVal / cfg.spionagemeisterAccuracyDivisor) * level;
+  const tenureFactor = 1 + (level - 1) * cfg.tenureBonusPerLevel;
+  const traitFactor = 1 + traitEffectSum(advisor, "advisorEffectMod");
+  const loyaltyFactor = 0.7 + (advisor.loyalty / 100) * 0.3; // 0.7x (Loyalität 0) .. 1.0x (Loyalität 100)
+  const multiplier = tenureFactor * traitFactor * loyaltyFactor;
+  if (role === "schatzmeister") return Math.min(cfg.schatzmeisterMaxBonus * multiplier, (statVal / 100) * multiplier);
+  if (role === "marschall") return (statVal / cfg.marschallStrengthDivisor) * multiplier;
+  if (role === "diplomat") return (statVal / cfg.diplomatRelationBonusDivisor) * multiplier;
+  if (role === "handelsberater") return (statVal / cfg.handelsberaterProductionDivisor) * multiplier;
+  if (role === "spionagemeister") return (statVal / cfg.spionagemeisterAccuracyDivisor) * multiplier;
   return 0;
 }
 
