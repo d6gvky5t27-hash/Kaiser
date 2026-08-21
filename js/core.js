@@ -295,7 +295,7 @@ function logLedger(state, label, amount) {
 
 // ---------- Landwirtschaft (§18/§19) ----------
 
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 
 function serializeSave(state) {
   return JSON.stringify({
@@ -306,8 +306,34 @@ function serializeSave(state) {
   }, null, 0);
 }
 
+// §Character-Core-Punkt 44/45: neue Charakterfelder (Skills finanzen/
+// intrige, claims, relationships, loyalty, advisorRole, rivalIds,
+// pendingAdvisorSelection) bekommen beim Laden eines Spielstands aus
+// Version 2 feste, unmittelbar plausible Defaultwerte statt eines harten
+// Ladefehlers. Bewusst FESTE statt gewürfelte Werte (kein randomStat()
+// hier) — Migration läuft vor dem RNG-Wiederherstellen weiter unten, ein
+// rnd()-Aufruf an dieser Stelle würde den deterministischen Zufallsstrom
+// des geladenen Spielstands verfälschen.
+function migrateSaveV2ToV3(parsed) {
+  for (const id in parsed.state.characters) {
+    const c = parsed.state.characters[id];
+    if (c.stats && c.stats.finanzen === undefined) c.stats.finanzen = 10;
+    if (c.stats && c.stats.intrige === undefined) c.stats.intrige = 10;
+    if (!c.claims) c.claims = [];
+    if (!c.relationships) c.relationships = {};
+    if (c.loyalty === undefined) c.loyalty = 50;
+    if (c.advisorRole === undefined) c.advisorRole = null;
+    if (!c.rivalIds) c.rivalIds = [];
+    if (c.salaryDemand === undefined) c.salaryDemand = null;
+  }
+  if (parsed.state.pendingAdvisorSelection === undefined) parsed.state.pendingAdvisorSelection = null;
+  parsed.saveVersion = 3;
+  return parsed;
+}
+
 function deserializeSave(json) {
-  const parsed = JSON.parse(json);
+  let parsed = JSON.parse(json);
+  if (parsed.saveVersion === 2) parsed = migrateSaveV2ToV3(parsed);
   if (parsed.saveVersion !== SAVE_VERSION) {
     throw new Error("Inkompatible Spielstand-Version: " + parsed.saveVersion);
   }

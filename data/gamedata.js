@@ -201,6 +201,7 @@ const CONFIG = {
     handelsberaterProductionDivisor: 60, // Produktionsbonus = Handelswert / diesem Wert, pro Stufe
     spionagemeisterAccuracyDivisor: 40, // zusätzliche Aufklärungsgenauigkeit (Basiswert) = Intelligenzwert / diesem Wert, pro Stufe
     geistlicherSatBonus: 3,          // Zufriedenheitsbonus pro Stufe
+    tenureBonusPerLevel: 0.15,       // §Phase-3 Character Core: Amtserfahrungsbonus statt reiner ×Stufe-Skalierung (Stufe 3 = +30% statt +200%) — die eigentliche Wirkung kommt jetzt primär aus Skill/Traits/Loyalität des Beraters (advisorEffectBonus() in js/military.js)
   },
   election: {
     triggerChancePerYear: 0.25,
@@ -1313,10 +1314,19 @@ const FORMATIONS = {
 };
 
 // ---------- Berater (§42) ----------
+// §Phase-3-Punkt 6: statKey von schatzmeister/spionagemeister auf die neuen
+// Skills "finanzen"/"intrige" umgestellt, die exakt für diese beiden Ämter
+// beschrieben sind ("Finanzen beeinflusst Schatzmeisterwirkung", "Intrige
+// beeinflusst später Spionage"). Kein bestehender Balancewert geändert —
+// finanzen/intrige sind brandneue, bislang nirgends verwendete Felder ohne
+// eigene Kalibrierungshistorie (§Punkt 29/73: "neue Charakterwerte separat
+// kalibrieren"), derselbe Wertebereich (3-17) wie zuvor. Die anderen 4
+// Rollen (militaer/diplomatie/charisma/handel) passten bereits zur
+// Skill-Beschreibung und bleiben unverändert.
 const ADVISOR_ROLES = {
   "schatzmeister": {
     "name": "Schatzmeister",
-    "statKey": "verwaltung",
+    "statKey": "finanzen",
     "desc": "Erhöht die Steuereinnahmen.",
     "baseCost": 220
   },
@@ -1334,7 +1344,7 @@ const ADVISOR_ROLES = {
   },
   "spionagemeister": {
     "name": "Spionagemeister",
-    "statKey": "intelligenz",
+    "statKey": "intrige",
     "desc": "Verbessert die Aufklärungsgenauigkeit über Nachbarregionen.",
     "baseCost": 140
   },
@@ -1729,17 +1739,60 @@ const TITLES = [
 const MALE_NAMES = ["Friedrich","Wilhelm","Heinrich","Konrad","Albrecht","Ludwig","Otto","Rudolf","Gottfried","Sigismund","Bernhard","Eberhard"];
 const FEMALE_NAMES = ["Adelheid","Mathilde","Elisabeth","Kunigunde","Irmgard","Hedwig","Agnes","Gertrud","Luitgard","Ottilie","Beatrix","Ida"];
 
+// ---------- Traits (Phase 3: Character Core) ----------
+// Datengetrieben (§Phase-3-Punkt 7/9): jeder Trait trägt seine Wirkung
+// direkt als `effects`-Objekt, gelesen über die bereits bestehende, generische
+// `traitEffectSum(character, key)` (js/population-dynasty.js) — keine
+// if(trait === "...")-Ketten nötig, auch nicht für die neuen Systeme
+// (Loyalität/Beraterwirkung/Ansprüche/Beziehungen), die einfach neue
+// `key`s abfragen. Bestehende 10 Traits bleiben inhaltlich unverändert
+// (ihre bisherigen effects-Schlüssel prestigeGain/treasuryDrain/
+// satisfactionBonus/productionBonus bleiben exakt gleich gewichtet) —
+// vier von ihnen (ehrgeizig/großzügig/geizig/grausam) bekommen zusätzlich
+// neue, rein additive Phase-3-Schlüssel (siehe unten), die nichts an der
+// bisherigen Wirkung ändern, nur neue hinzufügen. 12 neue Traits ergänzt
+// (§Punkt 8: "12-16 neue Traits"), aus der empfohlenen Liste.
+//
+// Neue effects-Schlüssel (Phase 3, additiv zu den bisherigen vier):
+//   loyaltyMod        — flacher Bonus/Malus auf die Loyalitätsformel
+//   claimAggression    — erhöht/senkt, wie stark ein eigener Anspruch die
+//                        Loyalität drückt bzw. Rivalität begünstigt
+//   advisorEffectMod   — Bonus/Malus (Anteil, z.B. 0.08 = +8%) auf die
+//                        Wirkung, wenn dieser Charakter ein Amt bekleidet
+//   relationshipMod    — flacher Bonus, den ANDERE für die Beziehung ZU
+//                        diesem Charakter erhalten (Charisma-artig)
 const TRAITS = [
-  { id: "ehrgeizig",     name: "ehrgeizig",     effects: { prestigeGain: 0.15 } },
-  { id: "grosszuegig",   name: "großzügig",     effects: { satisfactionBonus: 5, treasuryDrain: 0.05 } },
-  { id: "geizig",        name: "geizig",        effects: { treasuryDrain: -0.05, satisfactionBonus: -5 } },
+  { id: "ehrgeizig",     name: "ehrgeizig",     effects: { prestigeGain: 0.15, loyaltyMod: -10, claimAggression: 15 } },
+  { id: "grosszuegig",   name: "großzügig",     effects: { satisfactionBonus: 5, treasuryDrain: 0.05, loyaltyMod: 5 } },
+  { id: "geizig",        name: "geizig",        effects: { treasuryDrain: -0.05, satisfactionBonus: -5, loyaltyMod: -5 } },
   { id: "gerecht",       name: "gerecht",       effects: { satisfactionBonus: 8 } },
-  { id: "grausam",       name: "grausam",       effects: { satisfactionBonus: -10, prestigeGain: 0.05 } },
+  { id: "grausam",       name: "grausam",       effects: { satisfactionBonus: -10, prestigeGain: 0.05, loyaltyMod: -8 } },
   { id: "fleissig",      name: "fleißig",       effects: { productionBonus: 0.05 } },
   { id: "faul",          name: "faul",          effects: { productionBonus: -0.05 } },
   { id: "diplomatisch",  name: "diplomatisch",  effects: { prestigeGain: 0.05 } },
   { id: "fromm",         name: "fromm",         effects: { satisfactionBonus: 4 } },
   { id: "verschwenderisch", name: "verschwenderisch", effects: { treasuryDrain: 0.1 } },
+  // --- neu in Phase 3 ---
+  { id: "loyal",         name: "loyal",         effects: { loyaltyMod: 15 } },
+  { id: "barmherzig",    name: "barmherzig",    effects: { loyaltyMod: 5 } },
+  { id: "mutig",         name: "mutig",         effects: { claimAggression: 5 } },
+  { id: "feige",         name: "feige",         effects: { loyaltyMod: 10, claimAggression: -10 } },
+  { id: "intelligent",   name: "intelligent",   effects: { advisorEffectMod: 0.08 } },
+  { id: "naiv",          name: "naiv",          effects: { advisorEffectMod: -0.05, loyaltyMod: 5 } },
+  { id: "charismatisch", name: "charismatisch", effects: { relationshipMod: 5 } },
+  { id: "paranoid",      name: "paranoid",      effects: { loyaltyMod: -10 } },
+  { id: "arrogant",      name: "arrogant",      effects: { loyaltyMod: -8, claimAggression: 8 } },
+  { id: "bescheiden",    name: "bescheiden",    effects: { loyaltyMod: 8, claimAggression: -10 } },
+  { id: "korrupt",       name: "korrupt",       effects: { advisorEffectMod: -0.1 } },
+  { id: "rachsuechtig",  name: "rachsüchtig",   effects: { claimAggression: 10 } },
+];
+
+// §Punkt 75: offensichtlich widersprüchliche Kombinationen vermeiden (nicht
+// überkomplizieren — nur die drei explizit genannten Beispielpaare).
+const CONTRADICTORY_TRAIT_PAIRS = [
+  ["mutig", "feige"],
+  ["grosszuegig", "geizig"],
+  ["bescheiden", "arrogant"],
 ];
 
 function randomTraits(count) {
@@ -1747,13 +1800,43 @@ function randomTraits(count) {
   const picked = [];
   for (let i = 0; i < count && pool.length; i++) {
     const idx = Math.floor(rnd() * pool.length);
-    picked.push(pool.splice(idx, 1)[0].id);
+    const chosen = pool.splice(idx, 1)[0];
+    // Widersprüchliches Gegenstück aus dem verbleibenden Pool entfernen,
+    // damit derselbe Charakter es nicht ebenfalls ziehen kann.
+    for (const pair of CONTRADICTORY_TRAIT_PAIRS) {
+      if (pair.includes(chosen.id)) {
+        const otherId = pair[0] === chosen.id ? pair[1] : pair[0];
+        const otherIdx = pool.findIndex(t => t.id === otherId);
+        if (otherIdx !== -1) pool.splice(otherIdx, 1);
+      }
+    }
+    picked.push(chosen.id);
   }
   return picked;
 }
 
 function randomStat() { return 3 + Math.floor(rnd() * 15); } // 3-17
 
+// ---------- Adelshäuser für Beraterkandidaten (Phase 3, §Punkt 25/39) ----------
+// Kleine, deterministisch wählbare Pool historisch plausibler Namen für
+// Berater, die nicht aus der eigenen Dynastie stammen — macht
+// "Hauszugehörigkeit" als Beziehungs-/Rivalitätsquelle sinnvoll nutzbar.
+const NOBLE_HOUSES = ["von Berg", "von Moers", "von der Mark", "von Jülich", "von Cleve", "von Limburg", "von Sayn", "von Waldeck"];
+
+function randomNobleHouse() { return NOBLE_HOUSES[Math.floor(rnd() * NOBLE_HOUSES.length)]; }
+
+// createCharacter() bleibt das EINE zentrale Charaktermodell (§Phase-3-Punkt 2:
+// kein zweites paralleles Modell) — um Skills/Traits/Claims/Beziehungen/
+// Loyalität/Rivalen erweitert, statt dupliziert. `stats` behält bewusst
+// seinen bisherigen Wertebereich (3-17) und seine bisherigen 6 Schlüssel
+// unverändert (jede bestehende Formel, die z.B. `stats.militaer` liest,
+// bleibt dadurch exakt gleich kalibriert) — `finanzen`/`intrige` sind rein
+// additive NEUE Schlüssel für die von Phase 3 geforderten Skills
+// "Finanzen"/"Intrige", die es vorher nicht gab. Kein Rescaling auf 0-100
+// (§Phase-3-Punkt 6 nennt das nur als Vorzugsbereich, §Punkt 4 erlaubt
+// ausdrücklich eine sinnvolle Anpassung an die bestehende Architektur statt
+// einer erzwungenen Komplettmigration — ein Rescaling hätte hingegen JEDE
+// bestehende, bereits kalibrierte Formel verändert, die `stats.*` nutzt).
 function createCharacter(gender, age, surname) {
   const pool = gender === "m" ? MALE_NAMES : FEMALE_NAMES;
   const name = pool[Math.floor(rnd() * pool.length)];
@@ -1764,11 +1847,18 @@ function createCharacter(gender, age, surname) {
     stats: {
       intelligenz: randomStat(), diplomatie: randomStat(), verwaltung: randomStat(),
       militaer: randomStat(), handel: randomStat(), charisma: randomStat(),
+      finanzen: randomStat(), intrige: randomStat(),
     },
     traits: randomTraits(2),
     spouseId: null,
     childrenIds: [],
     parentId: null,
+    // --- Phase 3: Character Core ---
+    claims: [],          // { titleId, strength: "weak"|"strong"|"primary", reason, inheritedFrom }
+    relationships: {},   // targetId -> { total, modifiers: [{source, value}] }, siehe js/characters.js
+    loyalty: 50,          // getrennt von "Beziehung" (§Punkt 16), siehe computeLoyalty()
+    advisorRole: null,
+    rivalIds: [],
   };
 }
 

@@ -101,6 +101,11 @@ function applyRulerAndDynastyEffects(state) {
   }
 
   updateDynasty(state);
+  // §Character-Core-Punkt 89: EIN Aufruf statt advanceYear() wieder
+  // aufzublasen — Beziehungen/Loyalität/Ansprüche/Rivalitäten/Berater-Tod
+  // laufen NACH updateDynasty(), damit eine in diesem Jahr eingetretene
+  // Erbfolge bereits mit dem neuen Herrscher berücksichtigt wird.
+  updateCharacterCore(state);
   const ruler = state.characters[state.rulerId];
   const prestigeGain = 1 + (ruler ? traitEffectSum(ruler, "prestigeGain") : 0);
   state.prestige += prestigeGain;

@@ -1,7 +1,7 @@
 {
   "schatzmeister": {
     "name": "Schatzmeister",
-    "statKey": "verwaltung",
+    "statKey": "finanzen",
     "desc": "Erhöht die Steuereinnahmen.",
     "baseCost": 220
   },
@@ -19,7 +19,7 @@
   },
   "spionagemeister": {
     "name": "Spionagemeister",
-    "statKey": "intelligenz",
+    "statKey": "intrige",
     "desc": "Verbessert die Aufklärungsgenauigkeit über Nachbarregionen.",
     "baseCost": 140
   },

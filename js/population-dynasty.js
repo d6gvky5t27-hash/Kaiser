@@ -80,6 +80,19 @@ function traitEffectSum(character, key) {
   return sum;
 }
 
+// Gemeinsame Sterbewahrscheinlichkeits-Formel für den Herrscher UND (seit
+// Phase 3) Berater — §Character-Core-Punkt 30: "wenn bereits Alters-/
+// Todessystem existiert: integrieren, keine zweite Alterungslogik bauen".
+// Reiner Formelbaustein ohne RNG-Verbrauch (der rnd()-Aufruf bleibt beim
+// jeweiligen Aufrufer) — verhält sich für den Herrscher exakt wie zuvor.
+function rollDeathChance(character) {
+  const cfg = CONFIG.dynasty;
+  let deathChance = cfg.deathBaseChance;
+  if (character.age > cfg.deathAgeThreshold) deathChance += (character.age - cfg.deathAgeThreshold) * cfg.deathAgeFactor;
+  if (character.health < cfg.deathLowHealthThreshold) deathChance += cfg.deathLowHealthBonus;
+  return deathChance;
+}
+
 function updateDynasty(state) {
   const ruler = state.characters[state.rulerId];
   if (!ruler || !ruler.alive) return;
@@ -123,10 +136,7 @@ function updateDynasty(state) {
   }
 
   // Sterbewahrscheinlichkeit
-  let deathChance = cfg.deathBaseChance;
-  if (ruler.age > cfg.deathAgeThreshold) deathChance += (ruler.age - cfg.deathAgeThreshold) * cfg.deathAgeFactor;
-  if (ruler.health < cfg.deathLowHealthThreshold) deathChance += cfg.deathLowHealthBonus;
-  if (rnd() < deathChance) {
+  if (rnd() < rollDeathChance(ruler)) {
     ruler.alive = false;
     addChronicle(state, `${ruler.name} ${ruler.surname} verstarb im Alter von ${ruler.age} Jahren.`);
     handleSuccession(state);
@@ -166,8 +176,42 @@ function handleSuccession(state) {
     }
   }
 
+  // §Character-Core-Punkt 22: bestehendes Erbfolge-Ergebnis (ältestes
+  // lebendes Kind erbt) bleibt unverändert. Zusätzlich (neu, Phase 3):
+  // übergangene Geschwister bekommen einen dauerhaften, nachvollziehbaren
+  // Groll (Anspruch wird auf "strong" angehoben und NICHT von
+  // updateClaims() wieder auf "weak" zurückgestuft, siehe js/characters.js)
+  // statt einfach zu verschwinden — die Grundlage für spätere
+  // Erbfolgekrisen-Eventketten (Phase 5+), noch OHNE automatischen
+  // Bürgerkrieg (§Punkt 22 ausdrücklich: "noch keinen vollständigen
+  // Bürgerkrieg automatisch auslösen").
+  for (const passedOver of heirs.slice(1)) {
+    const passedOverId = Object.keys(state.characters).find(id => state.characters[id] === passedOver);
+    if (!passedOverId) continue;
+    setClaim(passedOver, "player", "strong", "succession_passed_over");
+    addPersistentRelationshipModifier(passedOver, heirId, "erbfolge_uebergangen", -25);
+  }
+
   state.rulerId = heirId;
   addChronicle(state, `${heir.name} ${heir.surname} tritt im Alter von ${heir.age} Jahren die Nachfolge an.`);
+
+  // §Character-Core-Punkt 30: Berater können durch den Herrscherwechsel ihr
+  // Amt verlieren — abhängig von ihrer (zuletzt gegenüber dem alten
+  // Herrscher berechneten) Loyalität. Niedrige Loyalität = höheres Risiko,
+  // vom neuen Herrscher nicht übernommen zu werden.
+  for (const role in state.advisors) {
+    const advId = state.advisors[role];
+    if (!advId) continue;
+    const adv = state.characters[advId];
+    if (!adv || !adv.alive) continue;
+    const dismissChance = clamp((50 - adv.loyalty) / 100, 0, 0.4);
+    if (rnd() < dismissChance) {
+      addChronicle(state, `${adv.name} ${adv.surname || ""} verlor mit dem Herrscherwechsel das Amt des ${ADVISOR_ROLES[role].name}.`.replace(/\s+/g, " "));
+      state.advisors[role] = null;
+      state.advisorLevels[role] = 0;
+      adv.advisorRole = null;
+    }
+  }
 }
 
 // ---------- Diplomatie (§29/§30) ----------

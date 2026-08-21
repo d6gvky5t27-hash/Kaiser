@@ -44,6 +44,7 @@ const FILES = [
   "js/core.js",
   "js/economy.js",
   "js/population-dynasty.js",
+  "js/characters.js",
   "js/politics.js",
   "js/diplomacy.js",
   "js/military.js",
