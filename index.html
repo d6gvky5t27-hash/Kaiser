@@ -678,6 +678,17 @@
       <button onclick="doShowChainEligibility()">Prüfen</button>
       <div id="chainEligibilityOutput" style="margin-top:var(--sp-2); white-space:pre-line; border:2px solid #0a0c11; padding:6px; background:rgba(0,0,0,0.05);"></div>
     </div>
+    <div style="margin-top:var(--sp-2);">
+      <b>Story-Thread-Inspektor (§Phase-6-Punkt 53):</b><br>
+      <select id="threadDebugSelect"></select>
+      <button onclick="doShowThreadDebug()">Anzeigen</button>
+      <div id="threadDebugOutput" style="margin-top:var(--sp-2); white-space:pre-line; max-height:300px; overflow-y:auto; border:2px solid #0a0c11; padding:6px; background:rgba(0,0,0,0.05);"></div>
+    </div>
+    <div style="margin-top:var(--sp-2);">
+      <b>Drama-Director-Panel (§Phase-6-Punkt 54):</b><br>
+      <button onclick="doShowDramaDebug()">Anzeigen</button>
+      <div id="dramaDebugOutput" style="margin-top:var(--sp-2); white-space:pre-line; max-height:300px; overflow-y:auto; border:2px solid #0a0c11; padding:6px; background:rgba(0,0,0,0.05);"></div>
+    </div>
   </div>
 </div>
 
@@ -1285,6 +1296,44 @@ const CONFIG = {
     adultAge: 16,                // wie CONFIG.dynasty.marriageMinAge — "erwachsen" für Chain-Zwecke
     defaultCooldownYears: 15,   // §Punkt 41: eine gelöste Kette darf nicht sofort identisch neu starten
     defaultExpiryYears: 20,     // §Punkt 57: hängt eine Kette zu lange fest, läuft sie ab statt ewig zu bleiben
+  },
+  // ---------- Phase 6: Story Threads (§Punkt 6/10/33) ----------
+  storyThreads: {
+    dormancyYears: 5,           // §Punkt 33: keine neue Aktivität seit so vielen Jahren -> ACTIVE fällt auf DORMANT
+    aftermathYears: 2,          // Mindestdauer AFTERMATH, bevor RESOLVED möglich ist
+  },
+  // ---------- Phase 6: Drama Director (§Punkt 22/107 — konfigurierbare
+  // Gewichte statt verstreuter Magic Numbers, jede hier vollständig
+  // aufgelistet und in computeDramaTensionBreakdown() 1:1 nachvollziehbar) ----------
+  drama: {
+    recoveryWindowYears: 5,       // §Punkt 25: nach einem Großereignis werden NUR optionale Chains zurückgestaffelt
+    focusSwitchThreshold: 15,     // §Punkt 29: Fokus wechselt nur bei klar höherer Dringlichkeit
+    majorEventImportanceThreshold: 65, // Memory-Importance ab der ein Jahr als "Großereignis" zählt
+    chainThreadTensionFactor: 0.2,   // Anteil der Thread-Tension, der in den Chain-Score einfließt (§Punkt 43)
+    chainYearsSinceActivityFactor: 2, // pro Jahr seit letzter Thread-Aktivität, gedeckelt auf 10 Jahre
+    chainFocusBonus: 25,
+    chainRecoveryPenalty: -15,
+    tensionWeights: {
+      activeRivalryPerRival: 6, activeRivalryCap: 18,
+      lowLoyaltyPowerful: 10, lowLoyaltyThreshold: 40,
+      unresolvedClaim: 8,
+      hunger: 15,
+      weakEconomy: 8,
+      war: 15,
+      badRelations: 6, badRelationsThreshold: -20,
+      rulerHealth: 12, rulerHealthThreshold: 30,
+      uncertainSuccession: 10,
+      activeChainPerChain: 5, activeChainCap: 15,
+      upcomingElection: 8,
+      religiousTension: 6,
+      peaceBonus: -8,
+      stableDynastyBonus: -6,
+      fullGranariesBonus: -5, fullGranariesThreshold: 1.1,
+      goodEconomyBonus: -5, goodEconomyThreshold: 3000,
+      highLegitimacyBonus: -7, highLegitimacyThreshold: 80,
+      highLoyaltyBonus: -5, highLoyaltyThreshold: 70,
+      recentResolutionBonus: -4, recentResolutionYears: 3,
+    },
   },
 };
 
@@ -2603,6 +2652,10 @@ const MEMORY_TYPES = {
   DEMAND_ACCEPTED:           { importance: 45, decayRate: 0.04, direction: "target_to_actor", tags: ["politics", "gratitude"] },
   DEMAND_REFUSED:            { importance: 45, decayRate: 0.03, direction: "target_to_actor", tags: ["politics", "grievance"] },
   PUBLICLY_HUMILIATED:       { importance: 60, decayRate: 0.02, direction: "target_to_actor", tags: ["politics", "grievance", "betrayal"] },
+  // --- neu in Phase 6 (§Punkt 70): EIN generischer Typ für den Abschluss
+  // einer bedeutsamen Story-Thread-Geschichte, wiederverwendet über alle
+  // 8 Thread-Typen hinweg — keine Memory-Typ-Explosion.
+  MAJOR_STORY_RESOLVED:      { importance: 70, decayRate: 0, direction: "none", tags: ["story", "resolution"] },
 };
 
 // Event-System: TRIGGER/BEDINGUNGEN/TEXT/ENTSCHEIDUNGEN/KONSEQUENZEN (§38)
@@ -3277,6 +3330,12 @@ function newGame(options) {
     rulerId: null,
     memories: { byId: {}, nextId: 1 }, // §Phase-4 World Memory: state.memories.byId["m1"...], siehe js/memory.js
     eventChains: { active: {}, resolved: {}, nextId: 1, cooldowns: {} }, // §Phase-5 Event Chains, siehe js/event-chains.js
+    storyThreads: { active: {}, resolved: {}, nextId: 1 }, // §Phase-6 Story Threads, siehe js/story-threads.js
+    drama: { // §Phase-6 Drama Director, siehe js/drama-director.js — reiner Kurator
+      tension: 0, momentum: 0, yearsSinceMajorEvent: 0, lastMajorEventYear: null,
+      recentIntensity: [], focusThreadId: null, recoveryWindowUntilYear: null, pacing: "QUIET",
+      tensionBreakdown: [],
+    },
   };
 
   for (const ext of EXTRA_REGIONS) {
@@ -3315,7 +3374,7 @@ function logLedger(state, label, amount) {
 
 // ---------- Landwirtschaft (§18/§19) ----------
 
-const SAVE_VERSION = 5;
+const SAVE_VERSION = 6;
 
 function serializeSave(state) {
   return JSON.stringify({
@@ -3374,11 +3433,12 @@ function migrateSaveV3ToV4(parsed) {
 // KEINE rückwirkend erfundene Geschichte ("nach dem Laden eines alten Saves
 // darf nicht plötzlich behauptet werden: 'Diese Krise läuft seit 1512'",
 // §Punkt 62). Neue Ketten beginnen erst nach der Migration, ganz normal
-// über updateEventChains(). `character.appointedYear` (neu, für die
-// Korruptions-Kette, §Punkt 15) bleibt bei bereits amtierenden Beratern aus
-// Altspielständen bewusst `null` statt eines erfundenen Jahres — die
-// Amtsdauer-Prüfung behandelt `null` als "unbekannt, nicht blockierend"
-// statt als "gerade erst berufen" (siehe canStartCorruptTreasurerChain()).
+// über den in finalizeYear() verdrahteten Scheduler (js/event-chains.js).
+// `character.appointedYear` (neu, für die Korruptions-Kette, §Punkt 15)
+// bleibt bei bereits amtierenden Beratern aus Altspielständen bewusst
+// `null` statt eines erfundenen Jahres — die Amtsdauer-Prüfung behandelt
+// `null` als "unbekannt, nicht blockierend" statt als "gerade erst berufen"
+// (siehe canStartCorruptTreasurerChain()).
 function migrateSaveV4ToV5(parsed) {
   if (!parsed.state.eventChains) parsed.state.eventChains = { active: {}, resolved: {}, nextId: 1, cooldowns: {} };
   for (const id in parsed.state.characters) {
@@ -3388,11 +3448,45 @@ function migrateSaveV4ToV5(parsed) {
   return parsed;
 }
 
+// §Phase-6-Punkt 75-78: Story Threads/Drama Director erweitern den State um
+// `state.storyThreads`/`state.drama`. Alte Saves bekommen LEERE Speicher —
+// keine rückwirkend erfundenen Threads (§Punkt 76). Threads werden erst ab
+// dem nächsten normalen Simulationsschritt aus dem AKTUELLEN Weltzustand
+// entdeckt (discoverStoryThreads(), js/story-threads.js) — ein alter Save
+// kann dabei bereits Jahrzehnte alte Memories besitzen, die als reale
+// Historie in die Signal-Erkennung einfließen (das ist keine Fiktion, siehe
+// §Punkt 77), aber `startedYear` des neu ENTDECKTEN Threads ist immer das
+// aktuelle Jahr — es wird nie behauptet, ein Thread liefe "schon seit 20
+// Jahren", nur weil seine auslösende Memory alt ist (§Punkt 78: Ursprung
+// und Erkennungszeitpunkt sind unterschiedliche Dinge, siehe
+// `thread.memoryIds` vs. `thread.startedYear`). Bereits bestehende Event
+// Chains aus Version 5 bekommen `threadId: null` (werden erst bei ihrer
+// nächsten Fortschreibung/Auflösung ggf. nachträglich verknüpft).
+function migrateSaveV5ToV6(parsed) {
+  if (!parsed.state.storyThreads) parsed.state.storyThreads = { active: {}, resolved: {}, nextId: 1 };
+  if (!parsed.state.drama) {
+    parsed.state.drama = {
+      tension: 0, momentum: 0, yearsSinceMajorEvent: 0, lastMajorEventYear: null,
+      recentIntensity: [], focusThreadId: null, recoveryWindowUntilYear: null, pacing: "QUIET",
+      tensionBreakdown: [],
+    };
+  }
+  for (const id in parsed.state.eventChains.active) {
+    if (parsed.state.eventChains.active[id].threadId === undefined) parsed.state.eventChains.active[id].threadId = null;
+  }
+  for (const id in parsed.state.eventChains.resolved) {
+    if (parsed.state.eventChains.resolved[id].threadId === undefined) parsed.state.eventChains.resolved[id].threadId = null;
+  }
+  parsed.saveVersion = 6;
+  return parsed;
+}
+
 function deserializeSave(json) {
   let parsed = JSON.parse(json);
   if (parsed.saveVersion === 2) parsed = migrateSaveV2ToV3(parsed);
   if (parsed.saveVersion === 3) parsed = migrateSaveV3ToV4(parsed);
   if (parsed.saveVersion === 4) parsed = migrateSaveV4ToV5(parsed);
+  if (parsed.saveVersion === 5) parsed = migrateSaveV5ToV6(parsed);
   if (parsed.saveVersion !== SAVE_VERSION) {
     throw new Error("Inkompatible Spielstand-Version: " + parsed.saveVersion);
   }
@@ -4131,6 +4225,7 @@ function handleSuccession(state) {
   // "Phase 5" für die Begründung) — hier wird nur ein nachvollziehbarer
   // History-Eintrag ergänzt, keine ID-Umschreibung nötig.
   notifyEventChainsOfSuccession(state, oldRulerId, heirId);
+  notifyStoryThreadsOfSuccession(state, oldRulerId, heirId); // §Phase-6
 
   // §Character-Core-Punkt 30: Berater können durch den Herrscherwechsel ihr
   // Amt verlieren — abhängig von ihrer (zuletzt gegenüber dem alten
@@ -4620,6 +4715,618 @@ function updateCharacterCore(state) {
 }
 
 // ============================================================
+// STORY THREADS — Phase 6 "Aus einzelnen Geschichten wird eine lebendige
+// Kampagne": größere, mehrjährige Erzählbögen, die mehrere Event Chains,
+// Memories und Zustände zu EINER Geschichte bündeln (§Punkt 5/11). Eine
+// Chain erzählt "Der gekränkte Berater"; ein Thread kann über Jahrzehnte
+// "Der Konflikt zwischen Friedrich und Wilhelm" erzählen.
+//
+// KEIN RNG (§Punkt 37/38): Threads existieren, weil ihre Voraussetzungen
+// objektiv im Weltzustand vorhanden sind — discoverStoryThreads() würfelt
+// nie "entsteht ein Thread?".
+//
+// Architektur: 8 Thread-Typen (STORY_THREAD_TYPES), jeder mit genau einer
+// detect(state)-Funktion, die aktuelle Signal-Kandidaten liefert (Akteure/
+// Regionen/Memories + eine grobe Anfangsstärke). advanceStoryThread()
+// bewertet pro Jahr, ob das Signal noch besteht, aktualisiert Tension/
+// Momentum/Importance und die Statusmaschine DORMANT/BUILDING/ACTIVE/
+// CLIMAX/AFTERMATH/RESOLVED(/EXPIRED). discoverStoryThreads() legt für
+// noch nicht abgedeckte Kandidaten neue Threads an (§Punkt 12: Dedup pro
+// Typ+Beteiligte, keine Fast-Duplikate).
+// ============================================================
+
+// §Punkt 57: optionale, stark vereinfachte "Story Beats" — rein aus dem
+// Status abgeleitet, keine eigene Zustandsmaschine.
+const STAGE_FOR_STATUS = {
+  DORMANT: "SETUP", BUILDING: "SETUP", ACTIVE: "DEVELOPMENT",
+  CLIMAX: "CLIMAX", AFTERMATH: "RESOLUTION", RESOLVED: "RESOLUTION", EXPIRED: "RESOLUTION",
+};
+
+// §Punkt 47: welchem Thread-Typ eine Event Chain thematisch zugeordnet ist.
+const CHAIN_THREAD_TYPE = {
+  passed_over_heir: "SUCCESSION_CONFLICT",
+  rising_rival: "PERSONAL_RIVALRY",
+  grieved_advisor: "PERSONAL_RIVALRY",
+  corrupt_treasurer: "ECONOMIC_CRISIS",
+  trade_conflict: "ECONOMIC_CRISIS",
+  famine_crisis: "FOOD_CRISIS",
+  border_conflict: "FOREIGN_CONFLICT",
+  church_conflict: "RELIGIOUS_CONFLICT",
+  dynastic_marriage: "DYNASTIC_ALLIANCE",
+  imperial_ambition: "IMPERIAL_AMBITION",
+};
+
+// ---------- Signal-Erkennung je Thread-Typ (§Punkt 9/10, kein RNG) ----------
+// Jede detect()-Funktion liefert Kandidaten {actorIds, regionIds, memoryIds,
+// strength (0-100, grobe Anfangs-/Vergleichsstärke)} — nur für Zustände,
+// die bereits objektiv bestehen. Absichtlich an denselben Signalen wie die
+// jeweiligen Event-Chain-Eligibility-Prüfungen orientiert (§Punkt 11: eine
+// Chain IST Teil dessen, was ein Thread aggregiert), aber gröber/breiter,
+// da ein Thread eine ganze Geschichte statt eines einzelnen Ereignisses
+// beschreibt.
+
+function detectSuccessionConflictSignals(state) {
+  const out = [];
+  for (const id in state.characters) {
+    const c = state.characters[id];
+    if (!c.alive || id === state.rulerId) continue;
+    const claim = c.claims.find(cl => cl.titleId === "player" && cl.reason === "succession_passed_over");
+    if (!claim) continue;
+    const mems = getMemoriesByType(state, "PASSED_OVER_IN_SUCCESSION").filter(m => m.targetIds.includes(id));
+    if (!mems.length) continue;
+    const rel = computeRelationshipBreakdown(state, id, state.rulerId);
+    let strength = 30;
+    if (rel.total < -15) strength += 20;
+    if (c.loyalty < 45) strength += 15;
+    if (c.rivalIds.includes(state.rulerId)) strength += 20;
+    out.push({ actorIds: [id], regionIds: [], memoryIds: mems.map(m => m.id), strength: clamp(strength, 0, 100) });
+  }
+  return out;
+}
+
+// §Punkt 11-Abgrenzung: eine Rivalität MIT dynastischem Anspruch wird als
+// SUCCESSION_CONFLICT erkannt (oben), nicht zusätzlich hier — sonst
+// entstünden zwei fast identische Threads für dieselbe Person.
+function detectPersonalRivalrySignals(state) {
+  const out = [];
+  const ruler = state.characters[state.rulerId];
+  if (!ruler) return out;
+  for (const rid of ruler.rivalIds) {
+    const c = state.characters[rid];
+    if (!c || !c.alive) continue;
+    const hasSuccessionClaim = c.claims.some(cl => cl.titleId === "player" && cl.reason === "succession_passed_over");
+    if (hasSuccessionClaim) continue;
+    const mems = getMemoriesByType(state, "RIVALRY_BEGAN").filter(m => m.actorIds.includes(rid) || m.targetIds.includes(rid));
+    const rel = computeRelationshipBreakdown(state, rid, state.rulerId);
+    let strength = 35;
+    if (rel.total < -25) strength += 20;
+    if (c.advisorRole) strength += 10;
+    out.push({ actorIds: [rid], regionIds: [], memoryIds: mems.map(m => m.id), strength: clamp(strength, 0, 100) });
+  }
+  return out;
+}
+
+function detectEconomicCrisisSignals(state) {
+  const r = state.regions.player;
+  const debtBad = (state.debt || 0) > 500;
+  const tradeBad = r.taxRate > 0.3 && r.population.haendler.satisfaction < 30;
+  if (!debtBad && !tradeBad) return [];
+  let strength = 30;
+  if (debtBad) strength += 25;
+  if (tradeBad) strength += 20;
+  return [{ actorIds: [], regionIds: ["player"], memoryIds: [], strength: clamp(strength, 0, 100) }];
+}
+
+// §Punkt 10: keine künstliche Schwelle — nutzt dieselbe echte FAMINE-
+// Memory wie famine_crisis (js/event-chains.js) und js/memory.js.
+function detectFoodCrisisSignals(state) {
+  const mems = getMemoriesByType(state, "FAMINE").filter(m => m.year >= state.year - 3);
+  if (!mems.length) return [];
+  const regionIds = mems[0].regionIds.length ? mems[0].regionIds : ["player"];
+  return [{ actorIds: [], regionIds, memoryIds: mems.map(m => m.id), strength: 60 }];
+}
+
+function detectForeignConflictSignals(state) {
+  const out = [];
+  for (const aiId in state.diplomacy) {
+    const dip = state.diplomacy[aiId];
+    const atWar = !!(state.warState && state.warState[aiId]);
+    const badRelation = dip.relation < -25;
+    if (!atWar && !badRelation) continue;
+    out.push({ actorIds: [], regionIds: [aiId], memoryIds: [], strength: atWar ? 70 : 35 });
+  }
+  return out;
+}
+
+function detectReligiousConflictSignals(state) {
+  const infl = state.religiousInfluence !== undefined ? state.religiousInfluence : 55;
+  if (infl >= CONFIG.religion.lowInfluenceThreshold + 15) return [];
+  return [{ actorIds: [], regionIds: ["player"], memoryIds: [], strength: 40 }];
+}
+
+function detectImperialAmbitionSignals(state) {
+  const kurfuerstRank = TITLES.findIndex(t => t.id === "kurfuerst");
+  if (state.titleIndex < kurfuerstRank && state.prestige < 150) return [];
+  return [{ actorIds: [], regionIds: [], memoryIds: [], strength: 40 }];
+}
+
+function detectDynasticAllianceSignals(state) {
+  const cfg = CONFIG.eventChains;
+  const out = [];
+  const ruler = state.characters[state.rulerId];
+  if (!ruler) return out;
+  const familyIds = ruler.childrenIds.concat(
+    ruler.parentId ? Object.keys(state.characters).filter(id => state.characters[id].parentId === ruler.parentId && id !== state.rulerId) : []
+  );
+  for (const id of familyIds) {
+    const c = state.characters[id];
+    if (c && c.alive && c.age >= cfg.adultAge && !c.spouseId) out.push({ actorIds: [id], regionIds: [], memoryIds: [], strength: 25 });
+  }
+  return out;
+}
+
+const STORY_THREAD_TYPES = {
+  SUCCESSION_CONFLICT: { detect: detectSuccessionConflictSignals },
+  PERSONAL_RIVALRY: { detect: detectPersonalRivalrySignals },
+  ECONOMIC_CRISIS: { detect: detectEconomicCrisisSignals },
+  FOOD_CRISIS: { detect: detectFoodCrisisSignals },
+  FOREIGN_CONFLICT: { detect: detectForeignConflictSignals },
+  RELIGIOUS_CONFLICT: { detect: detectReligiousConflictSignals },
+  IMPERIAL_AMBITION: { detect: detectImperialAmbitionSignals },
+  DYNASTIC_ALLIANCE: { detect: detectDynasticAllianceSignals },
+};
+
+// ---------- Spielerfreundliche, dynamische Titel (§Punkt 51/52) ----------
+function generateThreadTitle(state, type, candidate) {
+  const nameOf = (id) => state.characters[id] ? `${state.characters[id].name} ${state.characters[id].surname || ""}`.trim() : id;
+  const regionOf = (id) => state.regions[id] ? state.regions[id].name : id;
+  switch (type) {
+    case "SUCCESSION_CONFLICT": return `Der Anspruch von ${nameOf(candidate.actorIds[0])}`;
+    case "PERSONAL_RIVALRY": return `Der Streit mit ${nameOf(candidate.actorIds[0])}`;
+    case "ECONOMIC_CRISIS": return `Die Wirtschaftsnot von ${state.regions.player.name}`;
+    case "FOOD_CRISIS": return `Die Hungerjahre von ${candidate.regionIds[0] ? regionOf(candidate.regionIds[0]) : state.regions.player.name}`;
+    case "FOREIGN_CONFLICT": return `Der Konflikt mit ${regionOf(candidate.regionIds[0])}`;
+    case "RELIGIOUS_CONFLICT": return `Der Zwist mit der Kirche`;
+    case "IMPERIAL_AMBITION": return `Der Weg zur Kaiserkrone`;
+    case "DYNASTIC_ALLIANCE": return `Das Heiratsbündnis von ${nameOf(candidate.actorIds[0])}`;
+    default: return type;
+  }
+}
+
+// ---------- Matching/Dedup (§Punkt 12) ----------
+function candidateMatchesThread(thread, candidate) {
+  if (candidate.actorIds && candidate.actorIds.length) return candidate.actorIds.some(id => thread.actorIds.includes(id));
+  if (candidate.regionIds && candidate.regionIds.length) return candidate.regionIds.some(id => thread.regionIds.includes(id));
+  return thread.actorIds.length === 0 && thread.regionIds.length === 0; // globaler Typ ohne feste Beteiligte
+}
+
+function findExistingThreadForCandidate(state, type, candidate) {
+  return Object.values(state.storyThreads.active).find(t => t.type === type && candidateMatchesThread(t, candidate));
+}
+
+function recordThreadHistory(thread, year, note) {
+  thread.history.push({ year, status: thread.status, note });
+}
+
+// ---------- Importance/Momentum (§Punkt 30/32) ----------
+function computeThreadImportance(state, thread) {
+  let imp = 20;
+  const ruler = state.characters[state.rulerId];
+  if (thread.actorIds.includes(state.rulerId)) imp += 20;
+  if (ruler && thread.actorIds.some(id => ruler.childrenIds.includes(id))) imp += 15; // Erbe beteiligt
+  if (thread.regionIds.includes("player")) imp += 10;
+  if (thread.type === "FOOD_CRISIS" || thread.type === "ECONOMIC_CRISIS") imp += 10; // betrifft die Bevölkerung
+  if (thread.type === "IMPERIAL_AMBITION") imp += 25; // Kaiserwahl, §Punkt 56 "sehr groß"
+  if (thread.type === "SUCCESSION_CONFLICT") imp += 20; // Thronfolge, §Punkt 56 "groß"
+  if (thread.type === "FOREIGN_CONFLICT" && thread.regionIds.some(id => state.warState && state.warState[id])) imp += 15; // echter Krieg
+  imp += Math.min(thread.memoryIds.length * 3, 15); // historischer Einfluss
+  return clamp(Math.round(imp), 0, 100);
+}
+
+function updateThreadMomentum(thread, gainedNewSignal) {
+  thread.momentum = gainedNewSignal ? clamp(thread.momentum + 30, 0, 100) : clamp(Math.round(thread.momentum * 0.8), 0, 100);
+}
+
+// ---------- Erzeugung ----------
+function createStoryThread(state, type, candidate) {
+  const id = "st" + state.storyThreads.nextId++;
+  const initialStatus = candidate.strength >= 55 ? "ACTIVE" : (candidate.strength >= 35 ? "BUILDING" : "DORMANT");
+  const title = generateThreadTitle(state, type, candidate);
+  const thread = {
+    id, type, title,
+    status: initialStatus, stage: STAGE_FOR_STATUS[initialStatus],
+    startedYear: state.year, lastActivityYear: state.year,
+    actorIds: (candidate.actorIds || []).slice(), regionIds: (candidate.regionIds || []).slice(),
+    memoryIds: (candidate.memoryIds || []).slice(), chainIds: [],
+    tension: candidate.strength, importance: 0, momentum: 25,
+    tags: [type.toLowerCase()],
+    history: [],
+    resolution: null,
+  };
+  thread.importance = computeThreadImportance(state, thread);
+  recordThreadHistory(thread, state.year, `${title} beginnt.`);
+  state.storyThreads.active[id] = thread;
+  return thread;
+}
+
+function threadParticipantsAlive(state, thread) {
+  return thread.actorIds.every(id => { const c = state.characters[id]; return c ? c.alive : true; });
+}
+
+function resolveStoryThread(state, thread, resolution) {
+  thread.status = "RESOLVED";
+  thread.stage = STAGE_FOR_STATUS.RESOLVED;
+  thread.resolution = resolution;
+  recordThreadHistory(thread, state.year, `${thread.title}: ${resolution}.`);
+  // §Punkt 70: nur wirklich bedeutsame Geschichten hinterlassen eine
+  // strukturierte Abschluss-Memory — keine Memory-Typ-/Mengen-Explosion.
+  if (thread.importance >= 50) {
+    const memory = recordWorldEvent(state, {
+      type: "MAJOR_STORY_RESOLVED", actorIds: thread.actorIds.slice(), regionIds: thread.regionIds.slice(),
+      importance: thread.importance, emotionalWeight: 0,
+      metadata: { threadId: thread.id, threadType: thread.type },
+      description: `${thread.title} findet ihren Abschluss.`,
+    });
+    thread.memoryIds.push(memory.id);
+  }
+  delete state.storyThreads.active[thread.id];
+  state.storyThreads.resolved[thread.id] = thread;
+}
+
+function expireStoryThread(state, thread, reason) {
+  thread.status = "EXPIRED";
+  thread.stage = STAGE_FOR_STATUS.EXPIRED;
+  thread.resolution = reason;
+  recordThreadHistory(thread, state.year, `${thread.title}: ${reason}.`);
+  delete state.storyThreads.active[thread.id];
+  state.storyThreads.resolved[thread.id] = thread;
+}
+
+// ---------- Jährliches Fortschreiben (§Punkt 14/15/33/34) ----------
+function advanceStoryThread(state, thread) {
+  if (!threadParticipantsAlive(state, thread)) { expireStoryThread(state, thread, "Ein Beteiligter ist verstorben"); return; }
+
+  const typeDef = STORY_THREAD_TYPES[thread.type];
+  const signals = typeDef ? typeDef.detect(state) : [];
+  const matching = signals.find(s => candidateMatchesThread(thread, s));
+
+  let gainedNewSignal = false;
+  if (matching) {
+    const newMemIds = (matching.memoryIds || []).filter(id => !thread.memoryIds.includes(id));
+    if (newMemIds.length) { thread.memoryIds.push(...newMemIds); gainedNewSignal = true; }
+    if (matching.strength > thread.tension) gainedNewSignal = true; // spürbare Verschärfung zählt ebenfalls als Aktivität
+    thread.tension = matching.strength;
+    if (gainedNewSignal) thread.lastActivityYear = state.year;
+  } else {
+    thread.tension = Math.round(thread.tension * 0.6); // Signal verschwunden -> klingt ab
+  }
+  updateThreadMomentum(thread, gainedNewSignal);
+  thread.importance = computeThreadImportance(state, thread);
+
+  const yearsSinceActivity = state.year - thread.lastActivityYear;
+  const prevStatus = thread.status;
+
+  if (!matching || thread.tension < 10) {
+    // §Punkt 15: friedliches/verschwindendes Signal -> Richtung Auflösung,
+    // kein erzwungener Klimax.
+    if (thread.status === "CLIMAX" || thread.status === "ACTIVE") {
+      thread.status = "AFTERMATH";
+    } else if (thread.status === "AFTERMATH") {
+      if (yearsSinceActivity >= CONFIG.storyThreads.aftermathYears) { resolveStoryThread(state, thread, "RESOLVED"); return; }
+    } else if (thread.status === "BUILDING" || thread.status === "DORMANT") {
+      resolveStoryThread(state, thread, "FADED"); // wurde nie zu einer richtigen Geschichte
+      return;
+    }
+  } else {
+    // Signal weiterhin vorhanden.
+    if (thread.status === "ACTIVE" && yearsSinceActivity > CONFIG.storyThreads.dormancyYears) {
+      thread.status = "DORMANT"; // §Punkt 33: lange keine neue Aktivität -> schläft, obwohl die Grundspannung bleibt
+    } else if (thread.status === "DORMANT" && gainedNewSignal) {
+      thread.status = "BUILDING"; // §Punkt 34: Reaktivierung durch neue passende Memory
+    } else if (thread.tension >= 80) {
+      thread.status = "CLIMAX";
+    } else if (thread.tension >= 55 && thread.status !== "DORMANT") {
+      thread.status = "ACTIVE";
+    } else if (thread.tension >= 35 && (thread.status === "DORMANT" || thread.status === "BUILDING")) {
+      thread.status = "BUILDING";
+    }
+  }
+  thread.stage = STAGE_FOR_STATUS[thread.status] || thread.stage;
+  if (thread.status !== prevStatus) recordThreadHistory(thread, state.year, `${thread.title}: ${prevStatus} -> ${thread.status}.`);
+}
+
+// §Punkt 37/38: Discovery liest nur den Zustand, kein rnd()-Aufruf.
+function discoverStoryThreads(state) {
+  for (const type in STORY_THREAD_TYPES) {
+    const signals = STORY_THREAD_TYPES[type].detect(state);
+    for (const candidate of signals) {
+      if (findExistingThreadForCandidate(state, type, candidate)) continue; // §Punkt 12: Dedup
+      if (candidate.strength < 20) continue; // §Punkt 10: keine Threads für Kleinigkeiten
+      createStoryThread(state, type, candidate);
+    }
+  }
+}
+
+function updateStoryThreads(state) {
+  for (const id of Object.keys(state.storyThreads.active)) {
+    const thread = state.storyThreads.active[id];
+    if (thread) advanceStoryThread(state, thread);
+  }
+  discoverStoryThreads(state);
+}
+
+// ---------- Verknüpfung mit Event Chains (§Punkt 47/48/49) ----------
+// Wird von js/event-chains.js beim Start bzw. Ende einer Kette aufgerufen.
+function attachChainToThread(state, chain) {
+  const type = CHAIN_THREAD_TYPE[chain.templateId];
+  if (!type) return null;
+  const candidate = { actorIds: chain.actorIds, regionIds: chain.regionIds };
+  let thread = findExistingThreadForCandidate(state, type, candidate);
+  if (!thread) {
+    thread = createStoryThread(state, type, {
+      actorIds: chain.actorIds, regionIds: chain.regionIds,
+      memoryIds: chain.originatingMemoryIds.slice(), strength: 45,
+    });
+  }
+  chain.threadId = thread.id;
+  if (!thread.chainIds.includes(chain.id)) thread.chainIds.push(chain.id);
+  thread.lastActivityYear = state.year;
+  recordThreadHistory(thread, state.year, `Neue Entwicklung: "${CHAIN_TEMPLATES[chain.templateId].name}" beginnt.`);
+  return thread;
+}
+
+function notifyThreadOfChainResolution(state, chain) {
+  if (!chain.threadId) return;
+  const thread = state.storyThreads.active[chain.threadId];
+  if (!thread) return; // Thread ggf. bereits aufgelöst
+  recordThreadHistory(thread, state.year, `${CHAIN_TEMPLATES[chain.templateId].name}: ${chain.resolution}.`);
+  thread.lastActivityYear = state.year;
+  // Die eigentliche Auflösungsprüfung übernimmt advanceStoryThread() im
+  // nächsten Zyklus anhand des jetzt veränderten Weltzustands (§Punkt 48).
+}
+
+// ---------- Migration/Erbfolge-Hook ----------
+// §Punkt 59-Analogon zu Event Chains: Threads referenzieren keine
+// eingefrorene Herrscher-ID (Signale werten state.rulerId live aus), daher
+// reicht ein History-Vermerk.
+function notifyStoryThreadsOfSuccession(state, oldRulerId, newRulerId) {
+  for (const id in state.storyThreads.active) {
+    const thread = state.storyThreads.active[id];
+    recordThreadHistory(thread, state.year, "Der Herrscher wechselte — die Geschichte läuft weiter.");
+  }
+}
+
+// ---------- Query-/Debug-Hilfsfunktionen (§Punkt 53/72/73) ----------
+function getActiveStoryThreads(state) { return Object.values(state.storyThreads.active); }
+function getAllStoryThreads(state) { return getActiveStoryThreads(state).concat(Object.values(state.storyThreads.resolved)); }
+
+function getThreadForChain(state, chainId) {
+  return getAllStoryThreads(state).find(t => t.chainIds.includes(chainId));
+}
+
+// §Punkt 72/73: templatebasierte, menschenlesbare Zusammenfassung aus der
+// bereits vorhandenen History — keine externe KI, keine Erfindung.
+function summarizeStoryThread(thread) {
+  const years = thread.status === "RESOLVED" || thread.status === "EXPIRED"
+    ? `${thread.startedYear}–${thread.history[thread.history.length - 1].year}`
+    : `${thread.startedYear}–`;
+  const lines = thread.history.map(h => `${h.year}:\n${h.note}`);
+  return `${thread.title.toUpperCase()}\n${years}\n` + lines.join("\n") +
+    (thread.resolution ? `\nERGEBNIS:\n${thread.resolution}` : "");
+}
+
+// §Punkt 45/46-Analogon: "warum (nicht) als Thread erkannt?"
+function explainThreadDiscovery(state, type) {
+  const typeDef = STORY_THREAD_TYPES[type];
+  if (!typeDef) return null;
+  const signals = typeDef.detect(state);
+  const covered = signals.filter(s => findExistingThreadForCandidate(state, type, s));
+  const uncovered = signals.filter(s => !findExistingThreadForCandidate(state, type, s) && s.strength >= 20);
+  return { type, signalCount: signals.length, coveredCount: covered.length, newCandidateCount: uncovered.length, signals };
+}
+
+// ============================================================
+// DRAMA DIRECTOR — Phase 6: KURATOR, NICHT AUTOR (§Punkt 2). Erfindet
+// keine Krisen, sondern bewertet ausschließlich bereits bestehende
+// plausible Entwicklungen (World Memories, Event Chains, Story Threads,
+// Wirtschaft, Diplomatie, Herrschergesundheit, Kaiserwahl, Hunger) und
+// entscheidet nur über PRIORISIERUNG:
+//   - welcher Story Thread gerade im Vordergrund steht (focusThreadId)
+//   - welche der bereits ELIGIBLEN Event Chains dieses Jahr den Vorzug
+//     bekommt (computeChainDirectorScore())
+// Eligibility bleibt unangetastet die alleinige Wahrheit (§Punkt 42) —
+// der Director kann niemals eine ineligible Kette starten, er wählt nur
+// unter den bereits plausiblen aus.
+//
+// Möglichst ohne RNG (§Punkt 39/40): Tension/Pacing/Fokus/Score sind reine
+// additive, konfigurierbare Formeln (§Punkt 22 "keine Blackbox") —
+// state.drama.tensionBreakdown macht jeden Punkt nachvollziehbar.
+// ============================================================
+
+// ---------- Globale Tension (§Punkt 18-21) ----------
+// KEINE Katastrophen-Wahrscheinlichkeit — eine reine Beschreibung, wie
+// angespannt die Welt gerade ist. Jede Komponente ist ein CONFIG-Gewicht
+// (§Punkt 107), keine verstreute Magic Number.
+function computeDramaTensionBreakdown(state) {
+  const w = CONFIG.drama.tensionWeights;
+  const components = [];
+  let total = 0;
+  const add = (label, value) => { if (value) { components.push({ label, value }); total += value; } };
+
+  const ruler = state.characters[state.rulerId];
+  if (ruler) {
+    const rivalCount = ruler.rivalIds.filter(id => state.characters[id] && state.characters[id].alive).length;
+    add(`Aktive Rivalitäten (${rivalCount})`, Math.min(rivalCount * w.activeRivalryPerRival, w.activeRivalryCap));
+
+    const importantOthers = getImportantCharacterIds(state).filter(id => id !== state.rulerId);
+    const lowLoyalty = importantOthers.some(id => state.characters[id].loyalty < w.lowLoyaltyThreshold);
+    add("Niedrige Loyalität einflussreicher Personen", lowLoyalty ? w.lowLoyaltyPowerful : 0);
+
+    let unresolvedClaim = false;
+    for (const id in state.characters) {
+      if (id === state.rulerId) continue;
+      const c = state.characters[id];
+      if (c.alive && c.claims.some(cl => cl.titleId === "player" && (cl.strength === "strong" || cl.strength === "primary"))) { unresolvedClaim = true; break; }
+    }
+    add("Ungeklärte starke Ansprüche", unresolvedClaim ? w.unresolvedClaim : 0);
+
+    add("Herrschergesundheit niedrig", ruler.health < w.rulerHealthThreshold ? w.rulerHealth : 0);
+    const livingHeirs = ruler.childrenIds.filter(id => state.characters[id] && state.characters[id].alive).length;
+    add("Unsichere Erbfolge (kein lebender Erbe)", livingHeirs === 0 ? w.uncertainSuccession : 0);
+    add("Stabile Dynastie", (livingHeirs > 0 && rivalCount === 0) ? w.stableDynastyBonus : 0);
+  }
+
+  const recentFamine = hasMemory(state, { type: "FAMINE", sinceYear: state.year - 3 });
+  add("Hungerkrise", recentFamine ? w.hunger : 0);
+
+  const r = state.regions.player;
+  add("Volle Kornspeicher", (r.grainRatio !== undefined ? r.grainRatio : 1) >= w.fullGranariesThreshold ? w.fullGranariesBonus : 0);
+
+  const weakEconomy = (state.debt || 0) > 0 || state.treasury < 0;
+  add("Schwache Wirtschaft", weakEconomy ? w.weakEconomy : 0);
+  add("Gute Wirtschaft", state.treasury >= w.goodEconomyThreshold ? w.goodEconomyBonus : 0);
+
+  const atWar = !!(state.warState && Object.values(state.warState).some(Boolean));
+  add("Krieg", atWar ? w.war : 0);
+  const relations = Object.values(state.diplomacy).map(d => d.relation);
+  add("Schlechte Beziehungen", relations.some(rel => rel < w.badRelationsThreshold) ? w.badRelations : 0);
+  add("Frieden", (!atWar && relations.length && relations.every(rel => rel >= 30)) ? w.peaceBonus : 0);
+
+  const activeChainCount = Object.keys(state.eventChains.active).length;
+  add(`Aktive Event Chains (${activeChainCount})`, Math.min(activeChainCount * w.activeChainPerChain, w.activeChainCap));
+
+  const kurfuerstRank = TITLES.findIndex(t => t.id === "kurfuerst");
+  const electionSoon = !!state.pendingElection || (state.titleIndex >= kurfuerstRank && (state.electionCooldown || 0) <= 1);
+  add("Bevorstehende Kaiserwahl", electionSoon ? w.upcomingElection : 0);
+
+  const infl = state.religiousInfluence !== undefined ? state.religiousInfluence : 55;
+  add("Religiöse Spannungen", infl < CONFIG.religion.lowInfluenceThreshold + 15 ? w.religiousTension : 0);
+
+  add("Hohe Legitimität", state.legitimacy >= w.highLegitimacyThreshold ? w.highLegitimacyBonus : 0);
+
+  const importantChars = getImportantCharacterIds(state).filter(id => id !== state.rulerId);
+  const avgLoyalty = importantChars.length ? importantChars.reduce((s, id) => s + state.characters[id].loyalty, 0) / importantChars.length : 100;
+  add("Hohe Loyalität am Hof", avgLoyalty >= w.highLoyaltyThreshold ? w.highLoyaltyBonus : 0);
+
+  const recentResolution = getAllStoryThreads(state).some(t => t.status === "RESOLVED" && t.history.length &&
+    (state.year - t.history[t.history.length - 1].year) <= w.recentResolutionYears);
+  add("Kürzlich gelöste Krise", recentResolution ? w.recentResolutionBonus : 0);
+
+  return { components, total: clamp(Math.round(total), 0, 100) };
+}
+
+// ---------- Pacing (§Punkt 23/92) — nur Priorisierungssignal, blockiert
+// nie echte Ereignisse (§Punkt 27). ----------
+function computePacingState(state) {
+  if (state.drama.recoveryWindowUntilYear && state.year <= state.drama.recoveryWindowUntilYear) return "RECOVERY";
+  const t = state.drama.tension;
+  if (t >= 70) return "CRISIS";
+  if (t >= 45) return "HIGH_TENSION";
+  if (t >= 20 || state.drama.momentum > 10) return "BUILDING";
+  return "QUIET";
+}
+
+// §Punkt 21/25/26: ein "Großereignis" ist ein Jahr mit einer hinreichend
+// bedeutsamen Memory — dieselbe importance-Skala aus js/memory.js, kein
+// zweiter Schwellenwert-Mechanismus.
+function detectMajorEventThisYear(state) {
+  return allMemories(state).some(m => m.year === state.year && m.importance >= CONFIG.drama.majorEventImportanceThreshold);
+}
+
+// ---------- Fokus (§Punkt 28/29) — wechselt nicht jedes Jahr ----------
+function computeFocusThread(state, currentFocusId) {
+  const candidates = getActiveStoryThreads(state).filter(t => t.status !== "DORMANT");
+  if (!candidates.length) return null;
+  const scored = candidates.map(t => ({
+    t,
+    score: t.importance + t.tension + t.momentum
+      + (t.actorIds.includes(state.rulerId) ? 20 : 0)
+      + (t.type === "SUCCESSION_CONFLICT" ? 15 : 0)
+      + (t.status === "CLIMAX" ? 20 : 0),
+  }));
+  scored.sort((a, b) => b.score - a.score || a.t.id.localeCompare(b.t.id)); // §Punkt 39: stabiler Tie-Break, kein RNG
+  const best = scored[0];
+  const currentEntry = currentFocusId ? scored.find(s => s.t.id === currentFocusId) : null;
+  if (!currentEntry) return best.t.id; // alter Fokus resolved/dormant/nicht mehr vorhanden -> neu wählen
+  if (best.t.id !== currentFocusId && best.score > currentEntry.score + CONFIG.drama.focusSwitchThreshold) return best.t.id;
+  return currentFocusId;
+}
+
+// ---------- Jährliches Update ----------
+function updateDramaDirector(state) {
+  const breakdown = computeDramaTensionBreakdown(state);
+  state.drama.tensionBreakdown = breakdown.components;
+  const prevTension = state.drama.tension;
+  state.drama.tension = breakdown.total;
+  state.drama.momentum = Math.round(clamp((state.drama.tension - prevTension) * 0.5 + state.drama.momentum * 0.5, -100, 100));
+  state.drama.recentIntensity.push(state.drama.tension);
+  if (state.drama.recentIntensity.length > 10) state.drama.recentIntensity.shift();
+
+  if (detectMajorEventThisYear(state)) {
+    state.drama.lastMajorEventYear = state.year;
+    state.drama.yearsSinceMajorEvent = 0;
+    state.drama.recoveryWindowUntilYear = state.year + CONFIG.drama.recoveryWindowYears; // §Punkt 25
+  } else {
+    state.drama.yearsSinceMajorEvent = state.drama.lastMajorEventYear !== null ? (state.year - state.drama.lastMajorEventYear) : (state.drama.yearsSinceMajorEvent + 1);
+  }
+  state.drama.pacing = computePacingState(state);
+  state.drama.focusThreadId = computeFocusThread(state, state.drama.focusThreadId);
+}
+
+// ---------- Chain-Priorisierung (§Punkt 41-46) ----------
+// Ersetzt Phase 5s feste CHAIN_PRIORITY_ORDER-Reihenfolge durch einen
+// deterministiven Score — Eligibility (js/event-chains.js,
+// collectEligibleChainCandidates()) bleibt dabei unverändert die einzige
+// Wahrheit, der Director wählt nur UNTER bereits eligiblen Ketten.
+// §Punkt 45/46 Entscheidung (dokumentiert, siehe DEVELOPMENT.md "Phase 6"):
+// Phase 5s `rnd() < startChance`-Wurf bleibt bestehen (bewusster
+// Bestandteil, steuert weiterhin NUR das Timing innerhalb eines bereits
+// plausiblen Jahres) — nur die Auswahl, WELCHE Kette diesen Wurf bekommt,
+// ist jetzt Score- statt Reihenfolge-basiert.
+function computeChainDirectorScore(state, templateId, payload) {
+  const tpl = CHAIN_TEMPLATES[templateId];
+  const cfg = CONFIG.drama;
+  const threadType = CHAIN_THREAD_TYPE[templateId];
+  const thread = threadType ? findExistingThreadForCandidate(state, threadType, { actorIds: payload.actorIds || [], regionIds: payload.regionIds || [] }) : null;
+  const breakdown = [{ label: "Basis", value: 30 }];
+  let total = 30;
+  if (thread) {
+    if (state.drama.focusThreadId === thread.id) { breakdown.push({ label: "Focus Thread", value: cfg.chainFocusBonus }); total += cfg.chainFocusBonus; }
+    const tensionBonus = Math.round(thread.tension * cfg.chainThreadTensionFactor);
+    if (tensionBonus) { breakdown.push({ label: `Thread-Tension ${thread.tension}`, value: tensionBonus }); total += tensionBonus; }
+    const yearsSince = Math.min(state.year - thread.lastActivityYear, 10);
+    const yearsBonus = yearsSince * cfg.chainYearsSinceActivityFactor;
+    if (yearsBonus) { breakdown.push({ label: `${yearsSince} Jahre seit Thread-Aktivität`, value: yearsBonus }); total += yearsBonus; }
+  }
+  const inRecovery = state.drama.recoveryWindowUntilYear && state.year <= state.drama.recoveryWindowUntilYear;
+  if (inRecovery && !tpl.systemCritical) { // §Punkt 26: nur OPTIONALE Ketten werden zurückgestaffelt
+    breakdown.push({ label: "Recovery Window (nur optionale Ketten)", value: cfg.chainRecoveryPenalty });
+    total += cfg.chainRecoveryPenalty;
+  }
+  return { total: Math.max(0, total), breakdown, threadId: thread ? thread.id : null };
+}
+
+// ---------- Debug-Erklärung (§Punkt 54/55/109) ----------
+function explainDramaState(state) {
+  return {
+    tension: state.drama.tension,
+    tensionBreakdown: computeDramaTensionBreakdown(state).components,
+    pacing: state.drama.pacing,
+    focusThreadId: state.drama.focusThreadId,
+    yearsSinceMajorEvent: state.drama.yearsSinceMajorEvent,
+    recoveryWindowUntilYear: state.drama.recoveryWindowUntilYear,
+    recentIntensity: state.drama.recentIntensity.slice(),
+  };
+}
+
+function explainEligibleChainScores(state) {
+  const candidates = collectEligibleChainCandidates(state); // js/event-chains.js
+  return candidates
+    .map(c => Object.assign({ templateId: c.templateId, name: CHAIN_TEMPLATES[c.templateId].name }, computeChainDirectorScore(state, c.templateId, c.result.payload)))
+    .sort((a, b) => b.total - a.total);
+}
+
+// ============================================================
 // EVENT CHAINS — Phase 5 "Aus Simulation werden Geschichten": mehrjährige
 // Handlungsstränge, die aus bereits bestehenden Zuständen (Charaktere,
 // Traits, Beziehungen, Loyalität, Claims, Rivalitäten, World Memory)
@@ -4681,10 +5388,12 @@ function startEventChain(state, templateId, payload, historyNote) {
     urgency: payload.urgency || "normal",
     expiresYear: payload.expiresYear || (state.year + CONFIG.eventChains.defaultExpiryYears),
     resolution: null,
+    threadId: null, // §Phase-6-Punkt 47: vom zugehörigen Story Thread gesetzt, siehe attachChainToThread()
   };
   state.eventChains.active[id] = chain;
   state.eventChains.cooldowns[chainCooldownKey(templateId, chain.actorIds, chain.targetIds)] =
     state.year + (tpl.cooldownYears || CONFIG.eventChains.defaultCooldownYears);
+  attachChainToThread(state, chain); // js/story-threads.js
   return chain;
 }
 
@@ -4694,6 +5403,7 @@ function endEventChain(state, chain, status, outcome, note) {
   chain.history.push({ year: state.year, stage: chain.stage, event: status.toLowerCase(), outcome, note });
   delete state.eventChains.active[chain.id];
   state.eventChains.resolved[chain.id] = chain;
+  notifyThreadOfChainResolution(state, chain); // js/story-threads.js (§Phase-6-Punkt 48)
 }
 function resolveEventChain(state, chain, outcome, note) { endEventChain(state, chain, "RESOLVED", outcome, note); }
 function failEventChain(state, chain, outcome, note) { endEventChain(state, chain, "FAILED", outcome, note); }
@@ -4747,7 +5457,10 @@ const CHAIN_PRIORITY_ORDER = [
   "church_conflict", "imperial_ambition",
 ];
 
-function updateEventChains(state) {
+// §Phase-6-Punkt 41: aktive Ketten fortschreiben bleibt unverändert von der
+// Priorisierung getrennt — Fortsetzung hat immer Vorrang vor Neustarts,
+// unabhängig vom Drama Director.
+function advanceActiveEventChains(state) {
   for (const id of Object.keys(state.eventChains.active)) {
     const chain = state.eventChains.active[id];
     if (!chain || chain.status !== "ACTIVE") continue;
@@ -4764,10 +5477,15 @@ function updateEventChains(state) {
     tpl.advance(state, chain);
     chain.lastAdvancedYear = state.year;
   }
+}
 
-  if (state.pendingEvent) return; // dieses Jahr ist die Event-Anzeige bereits belegt
-  if (Object.keys(state.eventChains.active).length >= CONFIG.eventChains.maxActive) return;
-
+// §Phase-6-Punkt 42: Eligibility bleibt UNVERÄNDERT die einzige Wahrheit —
+// diese Funktion liefert exakt dieselben Kandidaten wie Phase 5s
+// Festreihenfolge-Schleife, nur ohne bereits eine Auswahl zu treffen. Wird
+// sowohl vom Scheduler unten als auch vom Drama-Director-Debug-Panel
+// genutzt (js/drama-director.js, explainEligibleChainScores()).
+function collectEligibleChainCandidates(state) {
+  const out = [];
   for (const templateId of CHAIN_PRIORITY_ORDER) {
     const tpl = CHAIN_TEMPLATES[templateId];
     const result = tpl.checkEligibility(state);
@@ -4775,11 +5493,33 @@ function updateEventChains(state) {
     const people = (result.payload.actorIds || []).concat(result.payload.targetIds || []);
     if (people.some(pid => characterInActiveChain(state, pid))) continue;
     if (isChainOnCooldown(state, templateId, result.payload.actorIds, result.payload.targetIds)) continue;
-    // §Punkt 52/53: erst alle Bedingungen (oben), DANN genau EIN gezielter Wurf
-    if (rnd() < (tpl.startChance !== undefined ? tpl.startChance : CONFIG.eventChains.startChance)) {
-      startEventChain(state, templateId, result.payload);
-    }
-    break; // höchstens eine neue Kette pro Jahr (§Punkt 40)
+    out.push({ templateId, result });
+  }
+  return out;
+}
+
+// §Phase-6-Punkt 43/45: unter den bereits eligiblen Kandidaten wählt der
+// Drama Director per Score (js/drama-director.js) statt per fester
+// Reihenfolge — CHAIN_PRIORITY_ORDER dient nur noch als stabiler
+// Tie-Break bei Score-Gleichstand (§Punkt 39 "stabile feste
+// Tie-Break-Regel"). Der Phase-5-Zufallswurf, OB die gewählte Kette
+// dieses Jahr tatsächlich beginnt, bleibt bewusst bestehen (siehe
+// DEVELOPMENT.md "Phase 6" für die dokumentierte Entscheidung, §Punkt 46).
+function startNewEventChainIfEligible(state) {
+  if (state.pendingEvent) return; // dieses Jahr ist die Event-Anzeige bereits belegt
+  if (Object.keys(state.eventChains.active).length >= CONFIG.eventChains.maxActive) return;
+
+  const candidates = collectEligibleChainCandidates(state);
+  if (!candidates.length) return;
+
+  const scored = candidates.map(c => Object.assign({}, c, { score: computeChainDirectorScore(state, c.templateId, c.result.payload) }));
+  scored.sort((a, b) => b.score.total - a.score.total || CHAIN_PRIORITY_ORDER.indexOf(a.templateId) - CHAIN_PRIORITY_ORDER.indexOf(b.templateId));
+  const chosen = scored[0];
+  const tpl = CHAIN_TEMPLATES[chosen.templateId];
+  // §Punkt 52/53: erst alle Bedingungen (oben, inkl. Director-Score), DANN
+  // genau EIN gezielter Wurf, ob es dieses Jahr tatsächlich losgeht.
+  if (rnd() < (tpl.startChance !== undefined ? tpl.startChance : CONFIG.eventChains.startChance)) {
+    startEventChain(state, chosen.templateId, chosen.result.payload);
   }
 }
 
@@ -5179,6 +5919,7 @@ function canStartFamineCrisisChain(state) {
 const CHAIN_FAMINE_CRISIS = {
   id: "famine_crisis", name: "Hungerkrise", category: "wirtschaft",
   initialStage: "decision", cooldownYears: 8, startChance: 0.6,
+  systemCritical: true, // §Phase-6-Punkt 26: echte Hungersnot ist NICHT staffelbar, anders als optionale Chains
   checkEligibility: canStartFamineCrisisChain,
   advance(state, chain) {
     if (chain.stage === "decision") {
@@ -7074,11 +7815,20 @@ function finalizeYear(state) {
   state.stats.maxTreasury = Math.max(state.stats.maxTreasury, state.treasury);
   state.stats.highestTitleIndex = Math.max(state.stats.highestTitleIndex, state.titleIndex);
 
-  // §Phase-5 Event Chains: laufende Ketten fortschreiben und ggf. genau
-  // EINE neue Kette anstoßen (siehe js/event-chains.js) — VOR den
-  // gewöhnlichen Flavour-Events, damit eine bedeutsame Chain-Entscheidung
-  // Vorrang vor einem beliebigen Wetter-/Kleinevent hat (§Punkt 39/40).
-  updateEventChains(state);
+  // §Phase-6-Punkt 41: aktive Chains IMMER zuerst fortschreiben (kann neue
+  // Memories/Thread-Signale erzeugen), DANN Story Threads mit dem
+  // aktualisierten Weltzustand fortschreiben/entdecken (js/story-threads.js),
+  // DANN der Drama Director seine Tension/Pacing/Fokus-Bewertung
+  // aktualisieren (js/drama-director.js, reiner Kurator, erfindet nichts),
+  // ERST DANN darf höchstens eine neue Chain starten — jetzt Director-
+  // priorisiert statt fester Reihenfolge (§Punkt 42: Eligibility bleibt
+  // dabei unverändert die einzige Wahrheit). Alles VOR den gewöhnlichen
+  // Flavour-Events, damit eine bedeutsame Chain-Entscheidung Vorrang vor
+  // einem beliebigen Wetter-/Kleinevent hat (§Punkt 39/40 aus Phase 5).
+  advanceActiveEventChains(state);
+  updateStoryThreads(state);
+  updateDramaDirector(state);
+  startNewEventChainIfEligible(state);
 
   // Event auswerten: erstes zutreffendes Event der Spielerregion (nur,
   // wenn nicht bereits eine Event-Chain-Entscheidung das Fenster belegt)
@@ -8491,7 +9241,7 @@ document.getElementById('langSelect').addEventListener('change', (e) => setLocal
 document.getElementById('langSelectTitle').addEventListener('change', (e) => setLocale(e.target.value));
 document.getElementById('debugToggle').addEventListener('change', (e) => {
   document.getElementById('debugPanel').style.display = e.target.checked ? 'block' : 'none';
-  if (e.target.checked) { populateDebugEventSelect(); populateCharacterDebugSelect(); populateMemoryDebugFilters(); populateChainDebugSelect(); populateChainEligibilitySelect(); }
+  if (e.target.checked) { populateDebugEventSelect(); populateCharacterDebugSelect(); populateMemoryDebugFilters(); populateChainDebugSelect(); populateChainEligibilitySelect(); populateThreadDebugSelect(); }
 });
 
 // §Character-Core-Punkt 58-62: technischer Charakter-Inspektor — zeigt für
@@ -8696,6 +9446,75 @@ function doShowChainEligibility() {
 ${checkLines}
 
 ERGEBNIS: ${result.eligible ? 'ELIGIBLE (könnte dieses Jahr starten, vorbehaltlich des Zufallswurfs)' : 'NOT ELIGIBLE'}`;
+}
+
+// §Phase-6-Punkt 53: Story-Thread-Inspektor — alle Rohfelder inklusive
+// kompletter History für einen gewählten Thread, keine Blackbox.
+function populateThreadDebugSelect() {
+  const sel = document.getElementById('threadDebugSelect');
+  if (!state) return;
+  const all = getAllStoryThreads(state).sort((a, b) => b.startedYear - a.startedYear);
+  sel.innerHTML = all.map(t =>
+    `<option value="${t.id}">${t.id} — ${t.title} (${t.startedYear}, ${t.status})</option>`
+  ).join('') || '<option value="">— keine Story Threads vorhanden —</option>';
+}
+
+function doShowThreadDebug() {
+  const id = document.getElementById('threadDebugSelect').value;
+  const thread = state.storyThreads.active[id] || state.storyThreads.resolved[id];
+  const out = document.getElementById('threadDebugOutput');
+  if (!thread) { out.textContent = 'Kein Thread ausgewählt.'; return; }
+  const nameOf = (cid) => state.characters[cid] ? `${state.characters[cid].name} ${state.characters[cid].surname || ''}`.trim() + ` (${cid})` : cid;
+  const regionOf = (rid) => state.regions[rid] ? state.regions[rid].name : rid;
+  const historyLines = thread.history.map(h => `  ${h.year} [${h.status}] ${h.note}`).join('\n') || '  (leer)';
+  out.textContent =
+`ID: ${thread.id}
+Titel: ${thread.title}
+Typ: ${thread.type}
+Status: ${thread.status} (Stage: ${thread.stage})${thread.resolution ? ' — ' + thread.resolution : ''}
+Startjahr: ${thread.startedYear} · letzte Aktivität: ${thread.lastActivityYear}
+
+Tension: ${thread.tension} · Importance: ${thread.importance} · Momentum: ${thread.momentum}
+
+BETEILIGTE
+Charaktere: ${thread.actorIds.map(nameOf).join(', ') || '–'}
+Regionen: ${thread.regionIds.map(regionOf).join(', ') || '–'}
+
+EVENT CHAINS
+${thread.chainIds.length ? thread.chainIds.join(', ') : '(keine)'}
+
+MEMORIES
+${thread.memoryIds.length ? thread.memoryIds.join(', ') : '(keine)'}
+
+VERLAUF (History)
+${historyLines}`;
+}
+
+// §Phase-6-Punkt 54: Drama-Director-Panel — globale Tension-Aufschlüsselung,
+// Pacing, Fokus, alle eligiblen Chains mit ihrem Director-Score.
+function doShowDramaDebug() {
+  const out = document.getElementById('dramaDebugOutput');
+  const info = explainDramaState(state);
+  const breakdownLines = info.tensionBreakdown.map(c => `  ${c.value >= 0 ? '+' : ''}${c.value}  ${c.label}`).join('\n') || '  (keine Komponenten aktiv)';
+  const focusThread = info.focusThreadId ? (state.storyThreads.active[info.focusThreadId] || state.storyThreads.resolved[info.focusThreadId]) : null;
+  const scores = explainEligibleChainScores(state);
+  const scoreLines = scores.length ? scores.map(s =>
+    `  ${s.name} (${s.templateId}): ${s.total}\n` + s.breakdown.map(b => `      ${b.value >= 0 ? '+' : ''}${b.value}  ${b.label}`).join('\n')
+  ).join('\n') : '  (aktuell keine eligible Chain)';
+  out.textContent =
+`GLOBAL TENSION: ${info.tension}
+
+${breakdownLines}
+
+PACING STATE: ${info.pacing}
+Recovery-Fenster bis: ${info.recoveryWindowUntilYear !== null ? info.recoveryWindowUntilYear : '–'}
+Jahre seit letztem Großereignis: ${info.yearsSinceMajorEvent}
+Tension der letzten Jahre: ${info.recentIntensity.join(', ') || '–'}
+
+FOKUS-THREAD: ${focusThread ? focusThread.title + ' (' + focusThread.id + ')' : '(kein Fokus)'}
+
+ELIGIBLE CHAINS MIT DIRECTOR-SCORE
+${scoreLines}`;
 }
 
 function doDebug(fn) {
