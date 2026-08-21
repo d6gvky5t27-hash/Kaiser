@@ -197,11 +197,11 @@ moderater Amtserfahrungsbonus erhalten). Berater altern und sterben (Tod
 macht das Amt frei), und können durch einen Herrscherwechsel ihr Amt
 verlieren, abhängig von ihrer Loyalität zum alten Herrscher.
 
-**Bewusst NICHT Teil von Phase 3**: World Memory (folgte in Phase 4, siehe
-unten), Drama Director, Event Chains, ein automatischer Bürgerkrieg bei
-einer Erbfolgekrise (der Claim/die Beziehungsspannung entstehen, eine
-Eskalation daraus bleibt einer späteren Phase vorbehalten),
-Battle-Engine-Integration des Militär-Skills.
+**Bewusst NICHT Teil von Phase 3**: World Memory (folgte in Phase 4),
+Event Chains (folgte in Phase 5), Drama Director, ein automatischer
+Bürgerkrieg bei einer Erbfolgekrise (der Claim/die Beziehungsspannung
+entstehen, eine Eskalation daraus bleibt einer späteren Phase
+vorbehalten), Battle-Engine-Integration des Militär-Skills.
 
 ## World Memory (Phase 4)
 
@@ -239,22 +239,84 @@ Gedächtnis für Wetter oder einzelne Preisschwankungen.
   Kandidaten-Text für eine spätere, bedeutungsbasierte Chronik — das
   bestehende 95%-Wetter-Problem (siehe „Narrative Density" unten) bleibt in
   dieser Phase bewusst unangetastet.
-- **Bewusst NICHT Teil von Phase 4**: Event Chains, Drama Director, Story
-  Threads, UI-Redesign. Vorbereitete, aber ungenutzte API-Oberflächen
-  (`hasMemory()`, `getNegativeMemoryPressure()`, `getDynastyMemoryPressure()`,
-  `getRecentConflictMemories()`) warten auf eine spätere, gesondert
-  freigegebene Phase.
+- **Bewusst NICHT Teil von Phase 4**: Event Chains (folgte in Phase 5,
+  siehe unten), Drama Director, Story Threads, UI-Redesign.
+
+## Event Chains (Phase 5)
+
+Aus Simulation werden Geschichten: eine Entscheidung im Jahr 1518 kann im
+Jahr 1524 noch Konsequenzen haben. Ausdrücklich KEIN Drama Director — jede
+Kette braucht plausible, tatsächlich erfüllte Voraussetzungen aus World
+Memory, Charakteren, Traits, Beziehungen, Loyalität und Claims; der Zufall
+entscheidet höchstens WANN, nie OB die Welt reif für eine Geschichte ist.
+Nicht jede Kette eskaliert — viele Geschichten enden friedlich, das ist
+genauso legitim.
+
+Eine Kette durchläuft Auslöser → Entwicklung → Entscheidung → Konsequenzen
+→ (mögliche Folge) → Auflösung → Nachwirkungen, wobei nicht jede Stufe
+gebraucht wird. Entscheidungen laufen über das bestehende Event-Fenster
+(kein zweites Eventsystem) und bieten 2-4 Optionen mit echten Trade-offs
+(nie eine eindeutig gute/eindeutig schlechte). Höchstens 3 Ketten laufen
+gleichzeitig, höchstens eine neue Kette pro Jahr startet.
+
+**Die 10 implementierten Ketten:**
+
+- **Der übergangene Erbe** (Dynastie): ein bei der Erbfolge übergangenes,
+  erwachsenes Geschwisterteil mit starkem Anspruch, schlechter Beziehung
+  und niedriger Loyalität fordert Anerkennung — Amt gewähren, Kompromiss
+  oder Ablehnung; abgelehnt kann sich der Streit zur offenen Rivalität
+  auswachsen oder in letzter Minute versöhnt werden.
+- **Der gekränkte Berater** (Hof): ein abgelehnter oder entlassener
+  Amtsanwärter mit einem provokanten Wesenszug fordert Wiedergutmachung —
+  zahlen, ein höheres Amt versprechen oder zurückweisen (Rücktritt oder
+  Seitenwechsel als Folge).
+- **Unregelmäßigkeiten in der Staatskasse** (Hof): ein korrupter
+  Schatzmeister mit hinreichender Amtsdauer, niedriger Loyalität und
+  schwacher herrscherlicher Kontrolle gerät unter Verdacht — ignorieren,
+  diskret prüfen, öffentlich anklagen oder still entlassen; eine unbewiesene
+  öffentliche Anklage kann selbst zum Skandal werden.
+- **Hungerkrise** (Wirtschaft): setzt eine ECHTE, bereits von World Memory
+  erfasste Hungersnot voraus (keine künstliche zweite Schwelle) — Korn
+  kaufen, Reserven öffnen, Preise begrenzen oder nichts tun.
+- **Die Händlergilde beschwert sich** (Wirtschaft): hohe Zölle oder ein
+  angespannter Handelspartner — Zölle senken, ein Sonderprivileg gewähren
+  oder die Beschwerde abweisen.
+- **Zwischenfall an der Grenze** (Diplomatie): schlechte Beziehung plus
+  spürbare militärische Spannung zu einem Nachbarn, aber noch kein
+  offener Krieg — Entschuldigung fordern, Entschädigung verlangen,
+  mobilisieren oder deeskalieren.
+- **Ein Heiratsangebot** (Dynastie): ein erwachsenes, unverheiratetes
+  Familienmitglied und ein politisch sinnvoller Kandidat — annehmen,
+  eine höhere Mitgift aushandeln oder ablehnen.
+- **Die Kirche erhebt Einspruch** (Politik): niedriger kirchlicher
+  Einfluss — Zugeständnis, Kompromiss oder Ablehnung.
+- **Der aufsteigende Rivale** (Hof): ein bereits bestehender Rivale
+  gewinnt ein Amt oder einen starken Anspruch — versöhnen, isolieren oder
+  beobachten (keine Attentats-/Hinrichtungsmechanik).
+- **Kaiserliche Ambitionen** (Politik): hoher Titel und Prestige — offen
+  kandidieren, diskret um Unterstützung werben oder vorerst verzichten
+  (Vorbereitung auf eine mögliche spätere Kaiserwahl 2.0, ohne diese
+  bereits umzusetzen).
+
+**World Memory als Ursache UND Folge.** Alle Eligibility-Prüfungen nutzen
+die bestehenden Memory-Queries direkt; wichtige Entscheidungen erzeugen
+selbst neue Memories (`DEMAND_ACCEPTED`/`DEMAND_REFUSED`/
+`PUBLICLY_HUMILIATED`, die einzigen 3 neuen Typen). Ketten speichern, aus
+welcher Erinnerung sie entstanden — nachvollziehbar, warum eine
+Geschichte begann.
+
+**Bewusst NICHT Teil von Phase 5**: Drama Director, Story Threads
+außerhalb dessen, was die Ketten intern brauchen, UI-Redesign, Kaiserwahl
+2.0.
 
 ## Bekannte, bewusste Vereinfachungen (nicht implementiert, siehe ROADMAP.md)
 
-Keine Eventketten (23 isolierte Events statt verketteter Handlungsstränge,
-World Memory aus Phase 4 liefert dafür erst die Datengrundlage), keine
-differenzierten Herrscher-Todesursachen (nur Alter/Gesundheit — Berater
-sterben seit Phase 3 zwar auch, aber mit derselben undifferenzierten
-Formel). Diese Lücken sind absichtlich hier dokumentiert, weil sie genau
-die Bereiche sind, die der "Next Generation"-Master-Prompt als nächste
-Vertiefungsrichtung vorschlägt — siehe ROADMAP.md, Abschnitt LATER
-("Narrative Systems").
+Keine differenzierten Herrscher-Todesursachen (nur Alter/Gesundheit —
+Berater sterben seit Phase 3 zwar auch, aber mit derselben
+undifferenzierten Formel), keine Story Threads/Drama Director (siehe
+ROADMAP.md, Abschnitt LATER "Narrative Systems"), keine bedeutungsbasierte
+Chronik (Event Chains liefern seit Phase 5 chronikwürdige Momente, werden
+aber bewusst noch nicht automatisch in die Chronik geschrieben).
 
 ## Narrative Density
 
@@ -319,13 +381,18 @@ nicht sichtbar ab.
 Dies soll **später** durch folgende Systeme adressiert werden (siehe
 ROADMAP.md → LATER → Narrative Systems für die Reihenfolge):
 
-- Event Chains
+- Event Chains — **seit Phase 5 erledigt** (siehe Abschnitt „Event Chains
+  (Phase 5)" oben)
 - World Memory — **die Datengrundlage ist seit Phase 4 vorhanden**
   (`js/memory.js`, siehe Abschnitt „World Memory (Phase 4)" oben), aber
   bewusst noch NICHT an die Chronik angeschlossen (`memoryToChronicleCandidate()`
   ist nur vorbereitet) — dieser Abschnitt bleibt daher als offene Lücke
   stehen, bis eine spätere Phase die bedeutungsbasierte Chronik tatsächlich
-  umsetzt
+  umsetzt. Event Chains erzeugen seit Phase 5 zwar chronikwürdige Momente
+  (`addChronicle()` beim Anbieten einer Entscheidung), aber das ist ein
+  Nebeneffekt der bestehenden Event-UI-Wiederverwendung, keine bewusste
+  bedeutungsbasierte Chronik-Selektion — diese Lücke bleibt also trotzdem
+  offen
 - Story Threads
 - Drama Director
 - aktivere KI-Dynastien

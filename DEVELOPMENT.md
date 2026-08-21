@@ -2269,3 +2269,178 @@ Entscheidung).
 **Bewusst NICHT umgesetzt (§Punkt 101):** Event Chains, Drama Director,
 Story Threads, UI-Redesign. Die vorbereiteten API-Oberflächen
 (`hasMemory()` etc.) warten auf eine spätere, gesondert freigegebene Phase.
+
+## 2026-08-21 – Phase 5 (KAISERREICH-Next-Generation-Master-Prompt): Event Chains
+
+Ziel laut Auftrag: aus Simulation werden Geschichten — eine Entscheidung im
+Jahr 1518 soll im Jahr 1524 noch Konsequenzen besitzen. Ausdrücklich KEIN
+Drama Director (§Punkt 2): keine Funktion "Spiel ist langweilig -> erzeuge
+Krise". Jede Kette braucht plausible, tatsächlich erfüllte
+Simulationsvoraussetzungen aus World Memory/Charakteren/Beziehungen.
+
+**Architektur.** Neues, schlankes Modul `js/event-chains.js` (keine
+God-Class, §Punkt 6): jede der 10 Ketten ist ein Eintrag in
+`CHAIN_TEMPLATES` mit zwei Funktionen — `checkEligibility(state)` liefert
+`{checks, eligible, payload}` (dieselbe Struktur dient sowohl dem
+Runtime-Scheduler als auch dem Debug-Panel, §Punkt 45/46 "eine Quelle der
+Wahrheit"), `advance(state, chain)` schreibt eine bereits aktive Kette
+fort (Verzögerungen prüfen, ggf. eine Entscheidung anbieten, auflösen/
+ablaufen lassen). Texte/Optionen sind Daten, komplexe Bedingungen bleiben
+JS (§Punkt 11) — keine generische Story-DSL. `state.eventChains = {active,
+resolved, nextId, cooldowns}`. Chain-Objekt exakt wie im Auftrag
+vorgeschlagen (`id, templateId, status, startedYear, lastAdvancedYear,
+actorIds, targetIds, regionIds, stage, variables, originatingMemoryIds,
+history, urgency, expiresYear`), plus `resolution` (Endergebnis, z. B.
+`RECONCILED`/`ESCALATED`/`MARRIED`).
+
+**Wiederverwendung der bestehenden Event-UI (§Punkt 63/64/86).** Kein
+zweites Eventsystem: Chain-Entscheidungen laufen über exakt dasselbe
+`state.pendingEvent`/`showEvent()`/`resolveEvent()`-Fenster wie die
+bisherigen 23 Flavour-Events — `index.html` musste dafür NICHT verändert
+werden. `queueChainDecision()` baut ein `{title, text, source:
+"EVENT_CHAIN", chainId, options: [{label, apply}]}`-Objekt, dessen
+`apply()`-Funktionen die Kette fortschreiben (History-Eintrag, Memory
+erzeugen, ggf. auflösen). Reguläre Events tragen jetzt `source: "RANDOM"`
+zur Unterscheidung. In `finalizeYear()` (`js/advance-year.js`) läuft
+`updateEventChains(state)` VOR der bestehenden EVENTS-Schleife — eine
+bedeutsame Chain-Entscheidung hat Vorrang vor einem beliebigen Wetter-/
+Kleinevent; die EVENTS-Schleife läuft nur noch, wenn `state.pendingEvent`
+noch nicht belegt ist.
+
+**Priorität ohne Drama Director (§Punkt 39/40).** Jedes Jahr: (1) ALLE
+bereits aktiven Ketten zuerst fortschreiben (Fortsetzung hat Vorrang vor
+Neustarts), (2) höchstens EINE neue Kette pro Jahr, nach einer festen
+Priorität (`CHAIN_PRIORITY_ORDER`), nur wenn `CONFIG.eventChains.maxActive`
+(3) noch nicht erreicht ist UND dieses Jahr noch keine Entscheidung das
+Event-Fenster belegt. Cooldowns (`state.eventChains.cooldowns`, Schlüssel
+Template+beteiligte Charaktere) verhindern sofortige Neustarts derselben
+Geschichte (§Punkt 41); Charakter-Bindung (`characterInActiveChain()`)
+verhindert, dass eine Person gleichzeitig in mehreren Ketten gebunden ist
+(§Punkt 42).
+
+**Sparsamer RNG-Verbrauch (§Punkt 52-54).** Erst alle Bedingungen prüfen
+(keine RNG), DANN höchstens ein gezielter Wurf, ob eine bereits als
+plausibel erkannte Kette dieses Jahr tatsächlich beginnt. Ein
+Implementierungsfehler wurde dabei selbst gefunden und behoben: zwei der
+`checkEligibility()`-Funktionen (passed_over_heir, grieved_advisor)
+würfelten ursprünglich bereits beim reinen Prüfen (Verzögerungsjahr für
+die Nutzlast) — das widersprach der eigenen Sparsamkeits-Regel, weil dann
+auch bei einem gescheiterten Start-Wurf schon ein rnd()-Aufruf verbraucht
+war. Behoben: die Verzögerung wird jetzt erst beim ersten tatsächlichen
+`advance()`-Aufruf einer bereits gestarteten Kette gewürfelt.
+
+**Die 10 implementierten Ketten** (Details siehe `GAME_DESIGN.md` →
+"Event Chains (Phase 5)"): Der übergangene Erbe (`passed_over_heir`), Der
+gekränkte Berater (`grieved_advisor`), Unregelmäßigkeiten in der
+Staatskasse (`corrupt_treasurer`), Hungerkrise (`famine_crisis`), Die
+Händlergilde beschwert sich (`trade_conflict`), Zwischenfall an der
+Grenze (`border_conflict`), Ein Heiratsangebot (`dynastic_marriage`), Die
+Kirche erhebt Einspruch (`church_conflict`), Der aufsteigende Rivale
+(`rising_rival`), Kaiserliche Ambitionen (`imperial_ambition`).
+
+**World Memory als Ursache UND Folge (§Punkt 31/32/33).** Alle
+Eligibility-Prüfungen nutzen die Phase-4-Query-API direkt
+(`hasMemory()`, `getMemoriesByType()`) — z. B. `famine_crisis` startet
+NUR, wenn tatsächlich eine echte `FAMINE`-Memory aus `js/memory.js`
+existiert (keine eigene, zweite Hungersnot-Schwelle, §Punkt 16 "keine
+künstliche Hungersnot"). Wichtige Entscheidungen erzeugen wiederum neue
+Memories — drei neue, wirklich benötigte Typen (§Punkt 32, keine
+Memory-Typ-Explosion): `DEMAND_ACCEPTED`, `DEMAND_REFUSED`,
+`PUBLICLY_HUMILIATED`. Ketten speichern `originatingMemoryIds` (§Punkt 33
+— nachvollziehbar, warum eine Geschichte begann).
+
+**Charaktere: Traits/Loyalität/Beziehungen sind echte Faktoren, keine
+Determinismus (§Punkt 34-37).** Beispiel `passed_over_heir`: die
+Eskalations-vs-Versöhnungs-Wahrscheinlichkeit in der `escalation`-Stufe
+kombiniert `ehrgeizig`/`rachsüchtig` (erhöht Eskalationschance) und
+`loyal`/`bescheiden` (erhöht Versöhnungschance) mit der aktuellen, live
+aus World Memory berechneten Beziehung — ein Bruder mit starkem Claim,
+aber Beziehung +75 und Loyalität 90 (Trait `loyal`) erreicht in
+`canStartPassedOverHeirChain()` schon die Eligibility-Schwelle nicht
+(Beziehung muss < -15 UND Loyalität < 45 sein) und rebelliert nicht
+grundlos (§Punkt 37, per Test verifiziert — siehe unten).
+
+**Savegame-Migration.** `SAVE_VERSION` 4 → 5. `migrateSaveV4ToV5()` legt
+für alte Spielstände einen LEEREN `state.eventChains`-Speicher an (§Punkt
+61/62: ausdrückliches Verbot retroaktiver Fiktion — nach dem Laden eines
+alten Saves wird NICHT plötzlich behauptet, eine Krise liefe schon seit
+Jahren) und ergänzt `character.appointedYear = null` (neues Feld für die
+Amtsdauer-Prüfung der Korruptions-Kette — `null` bedeutet "unbekannt,
+nicht blockierend", nicht "gerade erst berufen").
+
+**Herrscherwechsel/Tod (§Punkt 58/59).** Ketten referenzieren "den
+Herrscher" bewusst LIVE über `state.rulerId` statt einer eingefrorenen
+ID — ein Herrscherwechsel überträgt eine laufende Geschichte dadurch von
+selbst, ohne ID-Umschreibung (`notifyEventChainsOfSuccession()` in
+`handleSuccession()` ergänzt nur einen nachvollziehbaren History-Eintrag).
+Stirbt ein anderer Beteiligter, prüft `updateEventChains()` jedes Jahr
+zuerst `chainParticipantsAlive()` und beendet die Kette sauber als
+`EXPIRED` — keine Events über tote Charaktere.
+
+**Test-Policies (§Punkt 72/73, NICHT die KI des fertigen Spiels).**
+`resolvePendingEventWithPolicy(state, policy)` mit vier Policies
+(`FIRST_OPTION`, `RANDOM_VALID_OPTION`, `CONCILIATORY`, `AGGRESSIVE`) —
+alle 10 Chain-Templates sortieren ihre Optionen bewusst von großzügig zu
+hart, wodurch "erste Option" = CONCILIATORY und "letzte Option" =
+AGGRESSIVE eine sinnvolle Näherung sind, ohne dass Optionen einen eigenen
+Metadaten-Tag brauchen. Nebenbefund beim Verdrahten: die bestehenden
+Langzeittests (`ai_vs_ai_test.js`, `phase3_metrics_test.js`,
+`baseline_analysis.js`, `economy_test.js`) hatten `state.pendingEvent`
+zuvor NIE aufgelöst — reguläre Events waren dort seit jeher rein
+dekorativ (ihre `apply()`-Effekte wurden nie tatsächlich angewendet). Da
+`updateEventChains()` jetzt vor der EVENTS-Schleife läuft und diese nur
+noch bei freiem `pendingEvent` startet, hätte eine unaufgelöste
+Chain-Entscheidung ab ihrem ersten Auftreten ALLE weiteren Events/Ketten
+einer Partie dauerhaft blockiert. Behoben, indem alle vier genannten
+Headless-Tests nach jedem `advanceMonth()` `resolvePendingEventWithPolicy(state,
+"FIRST_OPTION")` aufrufen — das aktiviert nebenbei erstmals auch die
+`apply()`-Effekte der regulären Events in diesen Tests, was einzelne
+Metriken (insbesondere die `no_heir`-Rate, siehe unten) spürbar
+verschiebt.
+
+**RNG-Auswirkung, ausdrücklich erlaubt (§Punkt 50/51/91).** Anders als
+Phase 4 verbraucht Phase 5 bewusst neue `rnd()`-Aufrufe. Golden-Fixture
+neu erzeugt (Phase-4-Fixture archiviert unter
+`tests/fixtures/advance_year_snapshot_golden_phase4.json`). Die
+`no_heir`-Rate in `phase3_metrics_test.js` sank spürbar (53 % → 20 % über
+dieselben 30 Seeds) — per Vergleichslauf (Event Chains testweise
+deaktiviert, aber mit derselben neuen Test-Policy) verifiziert, dass dies
+ÜBERWIEGEND aus der oben beschriebenen erstmaligen Aktivierung reguläre
+Event-Effekte in Headless-Tests stammt (ohne Chains: 37 % über dieselben
+Seeds; mit Chains: 20 % — der Rest ist der erwartete
+Schmetterlingseffekt aus zusätzlichem `rnd()`-Verbrauch, kein
+Logikfehler). Keine der 10 Ketten greift mechanisch in
+Heirat/Geburt/Tod des Herrschers ein.
+
+**Neue Tests.** `tests/event_chain_test.js` (§Punkt 74-82, 10
+Fallgruppen: positiver Charakter-Chain-Test, Negativtest gegen
+grundlose Rebellion, Hunger-Test gegen künstliche Hungersnot,
+Korruptions-Test gegen Automatismus, Determinismus, Save/Load mitten in
+einer Kette, Chain-History, Memory-Erzeugung ohne Duplikate,
+Beziehungswirkung — plus ein ergänzender Smoke-Test, der alle 10
+Templates × jede Option synthetisch durchspielt, weil reines Passivspiel
+nur 4 der 10 Ketten je erreicht) — alle grün.
+`tests/phase5_event_chain_metrics_test.js` (30×100 Jahre, Policy
+FIRST_OPTION, plus ein 15×100-Jahre-Vergleichslauf mit
+RANDOM_VALID_OPTION): Ø 9,7 gestartete Ketten/Partie, 100 % friedliche
+Lösung mit FIRST_OPTION vs. 61 %/39 % friedlich/eskaliert mit
+RANDOM_VALID_OPTION (Beweis: das System KANN eskalieren, tut es aber
+nicht zwangsläufig, §Punkt 24), Ø 1,85 chronikwürdige Chain-Ereignisse
+pro Jahrzehnt, Ø Kettendauer 2,5 Jahre, ~126 ms/Partie (keine spürbare
+Verschlechterung). Enthält außerdem 8 echte, aus der Simulation gezogene
+Beispielgeschichten (§Punkt 98) im exakt geforderten Format ("1521 –
+Hungerkrise", "1522 – buy_grain", "1524 – Die Versorgungslage hat sich
+erholt."). Bestehende Regressionstests weiterhin grün.
+
+**UI-Erweiterungen (kein Redesign, §Punkt 86/44-46).** Zwei neue
+Debug-Panels: Event-Chain-Inspektor (alle Rohfelder inkl. History für
+eine gewählte aktive/abgeschlossene Kette) und ein "warum (nicht)
+gestartet?"-Prüfer, der für jedes der 10 Templates dieselbe
+`checkEligibility()`-Logik wie der Runtime-Scheduler anzeigt (eine
+Quelle der Wahrheit statt zweier Debug-Implementierungen). Die bestehende
+Event-Anzeige selbst wurde NICHT verändert.
+
+**Bewusst NICHT umgesetzt (§Punkt 100):** Drama Director, Story Threads
+außerhalb dessen, was die Ketten intern brauchen, UI-Redesign, Kaiserwahl
+2.0. Battle Engine (`battle-engine/*.js`, `js/battle-bridge.js`) technisch
+unverändert.

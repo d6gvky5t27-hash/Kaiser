@@ -983,3 +983,68 @@ CONFIG-Werte, Regierungsstil-/Regionalhandel-Balance, Beratermechanik aus
 Phase 3). World Memory verbraucht nachweislich keinen zusätzlichen
 `rnd()`-Aufruf (Golden-Snapshot-Test bestätigt exakte RNG-Gleichheit zu
 Phase 3, siehe DEVELOPMENT.md "Phase 4").
+
+## 17. Ergänzende Audit-Ergebnisse — Phase 5 (Event Chains)
+
+Neue Datei `js/event-chains.js` (siehe DEVELOPMENT.md für den vollständigen
+Funktionsumfang). Vier neue, beobachtbare technische Punkte (§Phase-5-
+Punkt 95: Eventsystem-Kopplung/Performance/State-Wachstum/
+Save-Kompatibilität):
+
+1. **Eventsystem-Kopplung statt eines zweiten Systems**: Event Chains
+   nutzen bewusst dasselbe `state.pendingEvent`/`showEvent()`/
+   `resolveEvent()`-Fenster wie die 23 bestehenden Flavour-Events
+   (§Punkt 63/64/86) — `index.html` musste dafür nicht verändert werden.
+   Kehrseite: `state.pendingEvent` ist damit eine gemeinsam genutzte, EINE
+   globale Ressource für beide Systeme. `finalizeYear()` prüft deshalb
+   `if (!state.pendingEvent)`, bevor die reguläre EVENTS-Schleife läuft —
+   eine unaufgelöste Chain-Entscheidung blockiert dadurch für den Rest
+   dieses Jahres auch neue reguläre Events (nicht aber Heirat/Geburt/Tod,
+   die über eigene `pendingMarriage`/`pendingBirth`-Felder laufen). In der
+   interaktiven UI löst der Spieler das Event-Fenster immer auf, bevor er
+   weiterspielen kann (Modal blockiert `btnAdvance` optisch); in
+   automatisierten Headless-Tests musste dafür eigens eine Test-Policy
+   (`resolvePendingEventWithPolicy()`) ergänzt werden — siehe Punkt 3
+   unten für den dabei gefundenen Nebenbefund.
+2. **Performance**: `updateEventChains()` iteriert jährlich über alle
+   aktiven Ketten (max. `CONFIG.eventChains.maxActive = 3`) plus, falls
+   noch Kapazität frei ist, über `CHAIN_PRIORITY_ORDER` (10 Einträge) bis
+   zur ersten eligiblen Vorlage — linear, keine verschachtelte O(n²)-
+   Schleife über alle Charaktere. Gemessen in
+   `phase5_event_chain_metrics_test.js`: ~126 ms/Partie (100 Jahre) mit
+   der Test-Policy, keine spürbare Verschlechterung gegenüber Phase 4
+   (~103 ms/Partie).
+3. **RNG-Nebenbefund beim Verdrahten der Test-Policy**: Die bereits
+   bestehenden Headless-Langzeittests (`ai_vs_ai_test.js`,
+   `phase3_metrics_test.js`, `baseline_analysis.js`, `economy_test.js`)
+   hatten `state.pendingEvent` seit jeher NIE aufgelöst — reguläre Events
+   waren dort rein dekorativ, ihre `apply()`-Effekte wurden nie
+   tatsächlich angewendet (ein latenter, aber bislang folgenloser Zustand
+   der bestehenden Test-Infrastruktur, kein Phase-5-Fehler). Die für
+   Event Chains nötige Test-Policy (`resolvePendingEventWithPolicy()`)
+   aktiviert diese Effekte in denselben Tests jetzt erstmals — was
+   einzelne Metriken (insbesondere die `no_heir`-Rate in
+   `phase3_metrics_test.js`, 53 % → 20 % über dieselben 30 Seeds) deutlich
+   verschiebt. Per Vergleichslauf verifiziert: der überwiegende Teil davon
+   stammt aus dieser erstmaligen Aktivierung reguläre Event-Effekte (ohne
+   Event Chains, aber mit derselben Test-Policy: 37 %), der Rest ist der
+   erwartete Schmetterlingseffekt aus dem zusätzlichen `rnd()`-Verbrauch
+   der Ketten selbst (§Punkt 50/51, ausdrücklich erlaubt). Kein
+   Logikfehler, aber ein wichtiger Kontext für jeden künftigen Vergleich
+   mit älteren Metrik-Läufen dieser Tests.
+4. **State-Wachstum**: `state.eventChains.resolved` wächst wie
+   `state.memories.byId` unbegrenzt (abgeschlossene Ketten werden nie
+   gelöscht, analog zur bewussten Nicht-Löschung von Memories, §Punkt 56
+   "die Kette verschwindet, die Geschichte bleibt"). Bei den in
+   `phase5_event_chain_metrics_test.js` gemessenen ~9,7 gestarteten
+   Ketten/100-Jahre-Partie unkritisch; für deutlich längere Kampagnen
+   gilt dieselbe, bereits in Abschnitt 16 Punkt 1 dokumentierte
+   Beobachtung zu `state.memories.byId` — erst messen, falls eine
+   spätere Phase Kampagnen über 100 Jahre hinaus deutlich verlängert.
+
+**DO-NOT-TOUCH-Liste aus Abschnitt 12 bleibt unverändert gültig** — keines
+der geschützten Systeme wurde in Phase 5 verändert (Kampf-Engine,
+Kohorten-Bevölkerungsmodell, Preisbildung, Ledger-System, kalibrierte
+CONFIG-Werte, Regierungsstil-/Regionalhandel-Balance, Beratermechanik aus
+Phase 3, World-Memory-Kern aus Phase 4). `battle-engine/*.js` und
+`js/battle-bridge.js` sind technisch unverändert (bestätigt per Diff).

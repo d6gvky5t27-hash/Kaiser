@@ -65,11 +65,27 @@ werden zuerst fertiggestellt/gefestigt, bevor neue Breite hinzukommt.
       Fixture versioniert, nicht gelöscht). Memory-Debug-Panel +
       Charakter-Inspektor-Erweiterung ("ERINNERUNGEN"-Abschnitt). World
       Memory bleibt ausdrücklich getrennt von der Chronik (95%-Wetter-
-      Problem aus `BASELINE.md` unangetastet). **Phase 5 (Event Chains)
-      wurde NICHT begonnen** — wartet auf ausdrückliche Freigabe. Offen
-      geblieben (bewusst außerhalb des Phase-4-Scopes): `MEMORY_TYPES`
-      nicht in `tools/data-sync.js` aufgenommen (dieselbe offene Frage
-      wie bei `TRAITS`, siehe Tech-Debt-Punkt unten).
+      Problem aus `BASELINE.md` unangetastet). Offen geblieben (bewusst
+      außerhalb des Phase-4-Scopes): `MEMORY_TYPES` nicht in
+      `tools/data-sync.js` aufgenommen (dieselbe offene Frage wie bei
+      `TRAITS`, siehe Tech-Debt-Punkt unten).
+- [x] **Phase 5 — Event Chains** (Ergebnisse: GAME_DESIGN.md → "Event
+      Chains (Phase 5)", Ablauf: DEVELOPMENT.md "Phase 5"): neues Modul
+      `js/event-chains.js` mit 10 hochwertigen, mehrjährigen Ketten (Der
+      übergangene Erbe, Der gekränkte Berater, Unregelmäßigkeiten in der
+      Staatskasse, Hungerkrise, Handelskonflikt, Grenzzwischenfall,
+      Heiratsangebot, Kirchlicher Konflikt, Aufsteigender Rivale,
+      Kaiserliche Ambitionen) statt der bisherigen 23 isolierten
+      Einzelevents. Läuft über die bestehende Event-UI (kein zweites
+      Eventsystem), nutzt World Memory als Auslöser UND Folge, höchstens
+      3 aktive Ketten gleichzeitig, KEIN Drama Director. Savegame-
+      Migration v4→v5 (leerer Chain-Speicher, keine retroaktive Fiktion).
+      RNG-Golden-Fixture erwartungsgemäß neu erzeugt (Phase-4-Fixture
+      versioniert, nicht gelöscht) — Event Chains verbrauchen bewusst neue
+      `rnd()`-Aufrufe, anders als Phase 4. Event-Chain-Debug-Panel +
+      "warum (nicht) gestartet?"-Prüfer. **Phase 6 (Story Threads + Drama
+      Director) wurde NICHT begonnen** — wartet auf ausdrückliche
+      Freigabe.
 
 ## NEXT (nach Freigabe, in der vom Master-Prompt vorgeschlagenen Reihenfolge)
 
@@ -78,12 +94,14 @@ werden zuerst fertiggestellt/gefestigt, bevor neue Breite hinzukommt.
       ob `tools/data-sync.js` um `TERRITORIES`/`START_REGIONS`/`TRAITS`/
       `MEMORY_TYPES` erweitert oder die JSON-Modding-Schicht bewusst als
       begrenzt dokumentiert wird (siehe CODE_AUDIT.md Abschnitt 6).
-- [ ] Phase 5 — Event Chains: 23 isolierte Events → mindestens 10
-      hochwertige, mehrjährige Eventketten mit echten Vorbedingungen/
-      Folgeevents statt vieler neuer Einzelevents. Kann jetzt auf der in
-      Phase 4 geschaffenen World-Memory-Datengrundlage aufbauen
-      (`hasMemory()`/`getRecentConflictMemories()` u. a. sind bereits als
-      API-Oberfläche vorbereitet, siehe DEVELOPMENT.md "Phase 4").
+- [ ] **Phase 6 — Story Threads + Drama Director** (§Phase-5-Punkt 94: nach
+      Phase 5 als NEXT vorgemerkt, aber noch NICHT begonnen — wartet auf
+      ausdrückliche Freigabe): Status-Zustandsautomat (dormant/building/
+      active/climax/resolved/aftermath) für langlebige Handlungsstränge,
+      plus ein Drama Director, der Spannungswerte aus dem echten
+      Weltzustand ableitet statt Krisen willkürlich zu erzeugen — explizit
+      erst NACH den 10 in Phase 5 gebauten Event Chains sinnvoll, da er
+      auf ihnen aufbaut statt sie zu ersetzen.
 - [ ] Phase 7 — Kaiserwahl 2.0: Wahlkampf, Versprechen, Kurfürsten-
       Interessen statt reiner Bestechung/Beziehungsschwelle.
 - [ ] Phase 8 — War & Peace 2.0: Friedensverhandlung statt automatischer
@@ -103,15 +121,11 @@ passivem Spiel (siehe `GAME_DESIGN.md` → "Narrative Density"/"Emergent
 Storytelling Gap"). Diese Gruppe war zuvor als Phase 4–6 unter NEXT
 eingeplant, wandert aber nach der Priorisierung von Phase 2 (Technical
 Stabilization) hierher — erst nach Phase 2/3 sinnvoll angehbar. **World
-Memory ist seit Phase 4 erledigt** (siehe CURRENT oben) und **Event Chains
-sind nach Phase 4 nach NEXT vorgezogen** (siehe oben) — beide daher hier
-nicht mehr aufgeführt:
+Memory ist seit Phase 4 erledigt, Event Chains sind seit Phase 5 erledigt**
+(siehe CURRENT oben) und **Story Threads/Drama Director sind als Phase 6
+nach NEXT vorgezogen** (siehe oben) — alle drei daher hier nicht mehr
+aufgeführt:
 
-- [ ] Story Threads: Status-Zustandsautomat (dormant/building/active/
-      climax/resolved/aftermath) für langlebige Handlungsstränge
-      (Erbfolgekrise, Rivalität, Kaiserwahl, Krieg, …).
-- [ ] Drama Director: Spannungswerte aus echtem Weltzustand ableiten,
-      plausible Krisen priorisieren statt willkürlich erzeugen.
 - [ ] Bedeutungsbasierte Chronik (WORLD LOG vs. DYNASTY CHRONICLE, siehe
       `GAME_DESIGN.md` → "Zukünftige Chronik-Architektur"): nur Ereignisse
       mit echter Wirkung (Hungersnot, Kriegseinfluss, große Verluste,
