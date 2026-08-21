@@ -39,6 +39,19 @@
 // unter `tests/fixtures/advance_year_snapshot_golden_phase4.json`
 // archiviert.
 //
+// PHASE 6 STORY THREADS + DRAMA DIRECTOR BASELINE (§Punkt 79/91): Phase 6
+// fügt selbst keine neuen rnd()-Aufrufe hinzu (Thread Discovery und der
+// Drama Director sind ausdrücklich RNG-frei, §Punkt 37-40) — aber der
+// bestehende Phase-5-Zufallswurf "startet die gewählte Chain dieses Jahr
+// tatsächlich?" (rnd() < startChance) bezieht sich jetzt auf eine andere,
+// Director-score-basierte statt fest-reihenfolge-basierte Chain-Auswahl
+// (js/drama-director.js, computeChainDirectorScore()) — bei mehreren
+// gleichzeitig eligiblen Chains kann sich dadurch verschieben, WELCHE
+// Chain den Wurf bekommt, was den nachfolgenden Zufallsstrom verschiebt.
+// Golden-Fixture daher neu erzeugt; das Phase-5-Fixture wurde NICHT
+// gelöscht, sondern versioniert unter
+// `tests/fixtures/advance_year_snapshot_golden_phase5.json` archiviert.
+//
 // Nutzung:
 //   node tests/advance_year_snapshot_test.js            vergleicht gegen
 //                                                        das gespeicherte
@@ -66,7 +79,7 @@ const SEEDS = [101, 202, 303]; // Seed A, B, C
 const MAX_YEARS = 100;
 
 const gamedata = fs.readFileSync(path.join(ROOT, "data/gamedata.js"), "utf8");
-const simModules = ["core", "economy", "population-dynasty", "memory", "characters", "event-chains", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
+const simModules = ["core", "economy", "population-dynasty", "memory", "characters", "story-threads", "drama-director", "event-chains", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
 const sim = simModules.map(m => fs.readFileSync(path.join(ROOT, "js", m + ".js"), "utf8")).join("\n");
 
 const testBody = `
