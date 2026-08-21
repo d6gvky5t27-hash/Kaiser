@@ -1,11 +1,19 @@
-// Determinismus-/Snapshot-Regressionstest für advanceYear() (Phase 2:
-// Technical Stabilization). Zweck: bei identischem Seed muss der
+// Determinismus-/Snapshot-Regressionstest für advanceYear() (ursprünglich
+// Phase 2: Technical Stabilization). Zweck: bei identischem Seed muss der
 // simulierte Zustand JAHR FÜR JAHR identisch bleiben, unabhängig davon,
 // wie advanceYear() intern strukturiert ist (Extract-Method-Refactorings
 // dürfen daran nichts ändern). Dieser Test bleibt dauerhaft im Projekt —
-// jede künftige Änderung an advanceYear() (oder an den von ihr
-// aufgerufenen Fachfunktionen) kann damit sofort erkennen, ob sich
+// jede künftige Änderung kann damit sofort erkennen, ob sich
 // Simulationsergebnisse ungewollt verschoben haben.
+//
+// PHASE 3 CHARACTER CORE BASELINE (§Punkt 91): Phase 3 hat bewusst neue
+// RNG-Aufrufe hinzugefügt (Charaktere bekommen 2 zusätzliche Skill-Würfe
+// für finanzen/intrige — bereits beim allerersten Charakter in newGame(),
+// daher verschiebt sich der GESAMTE nachfolgende Zufallsstrom). Das
+// Golden-Fixture wurde daher nach Phase 3 neu erzeugt (§Punkt 47/48 des
+// Phase-3-Auftrags erlaubt das ausdrücklich). Das alte, aus Phase 2
+// stammende Fixture wurde NICHT gelöscht, sondern versioniert unter
+// `tests/fixtures/advance_year_snapshot_golden_phase2.json` archiviert.
 //
 // Nutzung:
 //   node tests/advance_year_snapshot_test.js            vergleicht gegen
@@ -34,7 +42,7 @@ const SEEDS = [101, 202, 303]; // Seed A, B, C
 const MAX_YEARS = 100;
 
 const gamedata = fs.readFileSync(path.join(ROOT, "data/gamedata.js"), "utf8");
-const simModules = ["core", "economy", "population-dynasty", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
+const simModules = ["core", "economy", "population-dynasty", "characters", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
 const sim = simModules.map(m => fs.readFileSync(path.join(ROOT, "js", m + ".js"), "utf8")).join("\n");
 
 const testBody = `
