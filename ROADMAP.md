@@ -33,17 +33,32 @@ werden zuerst fertiggestellt/gefestigt, bevor neue Breite hinzukommt.
       `START_REGIONS` in `tools/data-sync.js` aufgenommen werden sollen.
       **Phase 3 wurde NICHT begonnen** — wartet auf ausdrückliche
       Freigabe.
+- [x] **Phase 3 — Character Core** (Ergebnisse: CODE_AUDIT.md Abschnitt 15,
+      GAME_DESIGN.md → "Character Core", Ablauf: DEVELOPMENT.md "Phase 3"):
+      bestehendes Charaktermodell additiv erweitert (kein zweites
+      paralleles Modell) — Beziehungen mit nachvollziehbaren Einzelgründen,
+      Loyalität getrennt von Beziehung, vereinfachtes Claim-System (ein
+      Titel, primary/strong/weak), Rivalitäten (selten, ~1,2/100-Jahre-
+      Partie), 12 neue datengetriebene Traits, Berater mit echter
+      Kandidatenauswahl (2-4 Personen statt Auto-Zuweisung) und
+      skill/trait/loyalitätsbasierter Wirkung statt reiner Stufen-
+      Multiplikation, Savegame-Migration v2→v3, neuer Charakter-Inspektor
+      im Debug-Bereich. RNG-Golden-Fixture erwartungsgemäß neu erzeugt
+      (altes Fixture versioniert, nicht gelöscht). Keine bestehenden
+      Balance-/CONFIG-Werte außerhalb der Beratermechanik verändert,
+      Kampf-Engine unangetastet. **Phase 4 (World Memory) wurde NICHT
+      begonnen** — wartet auf ausdrückliche Freigabe. Offen geblieben
+      (bewusst außerhalb des Phase-3-Scopes): `TRAITS` nicht in
+      `tools/data-sync.js` aufgenommen (dieselbe offene Frage wie bei
+      `TERRITORIES`/`START_REGIONS`, siehe Tech-Debt-Punkt unten).
 
 ## NEXT (nach Freigabe, in der vom Master-Prompt vorgeschlagenen Reihenfolge)
 
-- [ ] Tech Debt (klein, aus Phase 2 zurückgestellt): Entscheiden, ob
-      `tools/data-sync.js` um `TERRITORIES`/`START_REGIONS` erweitert
-      oder die JSON-Modding-Schicht bewusst als auf 9 Tabellen begrenzt
-      dokumentiert wird (siehe CODE_AUDIT.md Abschnitt 6).
-- [ ] Phase 3 — Character Core: Berater-Kandidatenauswahl (3 Kandidaten
-      statt automatischer Zuweisung — `generateAdvisorCandidate()` existiert
-      bereits als Baustein), Beziehungs-Ursachen-Log statt eines einzelnen
-      Zahlenwerts, Rivalen-Grundgerüst.
+- [ ] Tech Debt (klein, aus Phase 2 zurückgestellt, um `TRAITS` seit
+      Phase 3 erweitert): Entscheiden, ob `tools/data-sync.js` um
+      `TERRITORIES`/`START_REGIONS`/`TRAITS` erweitert oder die
+      JSON-Modding-Schicht bewusst als begrenzt dokumentiert wird (siehe
+      CODE_AUDIT.md Abschnitt 6).
 - [ ] Phase 7 — Kaiserwahl 2.0: Wahlkampf, Versprechen, Kurfürsten-
       Interessen statt reiner Bestechung/Beziehungsschwelle.
 - [ ] Phase 8 — War & Peace 2.0: Friedensverhandlung statt automatischer
@@ -97,11 +112,17 @@ aktueller Auftrag.
       automatisierte Chronik-Langweiligkeits-Prüfung.
 - [ ] Dynastie-Aussterberate senken oder bewusst als Spielhebel gestalten
       (Baseline: 53% aller rein passiven 100-Jahre-Partien enden mit
-      `no_heir` — siehe BASELINE.md). Erst nach Phase 3 (Character Core)
-      sinnvoll angehbar.
-- [ ] Savegame-Migrationslogik (aktuell wirft `deserializeSave()` bei
-      Versionsmismatch nur einen harten Fehler, siehe CODE_AUDIT.md
-      Abschnitt 4/6).
+      `no_heir` — siehe BASELINE.md, unverändert nach Phase 3, siehe
+      `phase3_metrics_test.js`). Jetzt sinnvoll angehbar (Phase 3
+      Character Core ist abgeschlossen, liefert Claims/Loyalität/
+      Rivalitäten als Bausteine für z. B. Heiratspolitik-Entscheidungen),
+      aber bewusst NICHT in Phase 3 selbst gefixt (§Punkt 57: kein
+      künstlicher "kein Erbe → Kind erzeugen"-Fix).
+- [x] Savegame-Migrationslogik — seit Phase 3 teilweise vorhanden
+      (`migrateSaveV2ToV3()` in `js/core.js`, getestet). Bleibt als
+      offener Punkt, falls eine generische Mehrschritt-Migration (statt
+      des aktuellen fest verdrahteten Einzelschritts v2→v3) für spätere
+      Versionssprünge gewünscht ist.
 - [ ] Größere KI-Regionsanzahl (30–50 politische Einheiten) mit
       Level-of-Simulation (nahe Regionen voll simuliert, entfernte
       vereinfacht) — deutlich später, nach Konsolidierung der bestehenden

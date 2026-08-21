@@ -150,18 +150,68 @@ rein passivem Spiel. Kein Spielerhebel, das aktiv zu beeinflussen (Heirat/
 Geburt sind nicht steuerbar) — ein bewusst dokumentierter Designpunkt für
 eine mögliche spätere Vertiefung, kein aktueller Bug.
 
+## Character Core (Phase 3)
+
+Charaktere sind mehr als Namen mit Zufallszahlen. Jeder wichtige Charakter
+(Herrscher, Ehepartner, Kinder, Geschwister des Herrschers, aktuelle
+Berater — nicht die Kohorten-Bevölkerung) besitzt zusätzlich zu den
+bestehenden 6 Werten (`stats`, Bereich 3-17, unverändert — plus zwei neue,
+`finanzen`/`intrige`) und 2 Traits:
+
+- **Beziehungen** (`character.relationships[targetId]`): kein nackter
+  Gesamtwert, sondern eine nachvollziehbare Liste von Gründen (Geschwister
+  +15, Ehepartner +25, gleiches Haus +5, Amt inne +10, Charisma-Trait +5 —
+  strukturell, jedes Jahr frisch berechnet; sowie dauerhaft gespeicherte
+  Ereignisse: Amt verweigert −20, bei der Erbfolge übergangen −25, Rivalität
+  −30), geklammert auf −100..100.
+- **Loyalität** (`character.loyalty`): bewusst getrennt von "Beziehung" —
+  Basis 50, plus 0,3× Beziehung zum Herrscher, plus Trait-Modifikatoren,
+  plus Amtsbonus, plus Legitimitätsfaktor, minus ein Malus abhängig vom
+  eigenen Thronanspruch (verstärkt durch Ehrgeiz/Rachsucht/Arroganz). Ein
+  Charakter kann eine gute Beziehung, aber niedrige Loyalität haben — z. B.
+  ein Geschwisterteil, das den Herrscher mag, sich selbst aber für den
+  besseren Herrscher hält.
+- **Ansprüche/Claims** (`character.claims`): vereinfacht auf den einzigen
+  im Spiel mechanisch existierenden Titel ("player", die eigene Provinz)
+  statt eines vollen Mehrtitel-Erbrechtsgraphen. Ältestes lebendes Kind des
+  Herrschers = primary, weitere Kinder = strong, Geschwister des Herrschers
+  = weak (dauerhaft auf strong angehoben, falls bei einer Erbfolge
+  übergangen).
+- **Rivalitäten** (`character.rivalIds`): bewusst selten — entsteht nur bei
+  einem echten, spürbaren Groll (Beziehung ≤ −25) oder bei einem
+  ehrgeizigen Charakter mit starkem eigenem Anspruch und bereits
+  angespannter Beziehung. ~1,2 pro 100-Jahre-Partie im Schnitt.
+- **12 neue Traits** (loyal, barmherzig, mutig, feige, intelligent, naiv,
+  charismatisch, paranoid, arrogant, bescheiden, korrupt, rachsüchtig)
+  zusätzlich zu den bestehenden 10, alle mit echter Gameplay-Wirkung über
+  die bestehende `traitEffectSum()` — keine rein kosmetischen Traits.
+
+**Berater sind jetzt echte Personen mit echter Auswahl.** Bei einer Vakanz
+werden 2-4 unterschiedliche Kandidaten erzeugt (Skill/Traits/Loyalität/
+Gehaltsforderung/Haus streuen bewusst, keine "Kandidat A/B/C = 80/50/20"-
+Uniformität), der Spieler wählt. Die Wirkung eines Beraters kommt primär
+aus Skill × Trait-Modifikator × Loyalitätsfaktor — nicht mehr aus einer
+reinen Ausbaustufen-Multiplikation (das bestehende Ausbausystem bleibt als
+moderater Amtserfahrungsbonus erhalten). Berater altern und sterben (Tod
+macht das Amt frei), und können durch einen Herrscherwechsel ihr Amt
+verlieren, abhängig von ihrer Loyalität zum alten Herrscher.
+
+**Bewusst NICHT Teil von Phase 3**: World Memory, Drama Director, Event
+Chains, ein automatischer Bürgerkrieg bei einer Erbfolgekrise (der Claim/
+die Beziehungsspannung entstehen, eine Eskalation daraus bleibt einer
+späteren Phase vorbehalten), Battle-Engine-Integration des Militär-Skills.
+
 ## Bekannte, bewusste Vereinfachungen (nicht implementiert, siehe ROADMAP.md)
 
-Charaktereigenschaften mit spürbaren Effekten existieren bereits (10
-Traits), aber kein Beziehungs-Ursachen-Log zwischen einzelnen Charakteren,
-kein Rivalensystem über Generationen, keine World-Memory-Struktur, keine
-Eventketten (23 isolierte Events statt verketteter Handlungsstränge), keine
-Berater-Kandidatenauswahl (ein Kandidat wird automatisch zugewiesen statt
-mehrerer zur Wahl), keine differenzierten Herrscher-Todesursachen (nur
-Alter/Gesundheit). Diese Lücken sind absichtlich hier dokumentiert, weil sie
-genau die Bereiche sind, die der "Next Generation"-Master-Prompt als
-nächste Vertiefungsrichtung vorschlägt — siehe ROADMAP.md, Abschnitt
-EXPERIMENTAL.
+Keine World-Memory-Struktur (Erinnerungen zerfallen nicht über die Zeit,
+Rivalitäten vererben sich noch nicht über Generationen), keine Eventketten
+(23 isolierte Events statt verketteter Handlungsstränge), keine
+differenzierten Herrscher-Todesursachen (nur Alter/Gesundheit — Berater
+sterben seit Phase 3 zwar auch, aber mit derselben undifferenzierten
+Formel). Diese Lücken sind absichtlich hier dokumentiert, weil sie genau
+die Bereiche sind, die der "Next Generation"-Master-Prompt als nächste
+Vertiefungsrichtung vorschlägt — siehe ROADMAP.md, Abschnitt LATER
+("Narrative Systems").
 
 ## Narrative Density
 

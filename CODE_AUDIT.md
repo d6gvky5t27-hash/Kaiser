@@ -891,3 +891,47 @@ mustern):
 
 Keine dieser Funktionen wurde angelegt — reine Dokumentation für eine
 spätere, separat freizugebende Phase.
+
+---
+
+## 15. Ergänzende Audit-Ergebnisse — Phase 3 (Character Core)
+
+Neue Datei `js/characters.js` (siehe DEVELOPMENT.md für den vollständigen
+Funktionsumfang). Keine Architektur-Regression, aber drei neue,
+beobachtbare technische Punkte:
+
+1. **O(n²)-Beziehungsaktualisierung**: `updateCharacterCore()` berechnet
+   pro wichtigem Charakter die Beziehung zu jedem anderen wichtigen
+   Charakter neu (verschachtelte Schleife über `getImportantCharacterIds()`).
+   Bei der aktuellen Größenordnung (typischerweise 5-10 wichtige Charaktere:
+   Herrscher, Ehepartner, Kinder, Geschwister, bis zu 6 Berater) unkritisch
+   (siehe `phase3_metrics_test.js`: ~70ms/Partie bei 100 Jahren, keine
+   spürbare Verschlechterung gegenüber Phase 2). Ein Beobachtungspunkt,
+   falls "wichtige Charaktere" in einer späteren Phase deutlich wächst
+   (z. B. durch mehr KI-Dynastien, §Punkt 42 des Master-Prompts).
+2. **`advisor.loyalty` ist bis zu ein Jahr "veraltet"**: `loyalty` wird nur
+   einmal jährlich in `updateCharacterCore()` neu berechnet, nicht bei
+   jeder Aktion. Ein frisch berufener Berater hat daher bis zum nächsten
+   Jahreswechsel den Default-Wert 50 (statt seiner tatsächlichen, aus
+   Familie/Ereignissen abgeleiteten Loyalität) — beeinflusst
+   `advisorEffectBonus()` geringfügig (Faktor 0,7-1,0×) im ersten Amtsjahr.
+   Bewusst so belassen (kein zusätzlicher Rechenaufwand pro Monat für einen
+   Randfall), aber hier dokumentiert, falls es später verwirrend auffällt.
+3. **RNG-Verschiebung durch neue Charakterfelder**: `createCharacter()`
+   würfelt jetzt 2 zusätzliche Skills (`finanzen`/`intrige`) — verschiebt
+   den gesamten nachfolgenden Zufallsstrom ab dem ersten erzeugten
+   Charakter. Erwartet und laut Phase-3-Auftrag ausdrücklich erlaubt
+   (§Punkt 47), das alte Golden-Fixture wurde versioniert statt gelöscht
+   (`tests/fixtures/advance_year_snapshot_golden_phase2.json`), ein neues
+   erzeugt. Interessanter Nebenbefund: in rein passivem Spiel (keine
+   Spieleraktion) werden nie Berater angeworben, wodurch die neuen
+   Todes-/Kandidaten-Würfe dort nie ausgelöst werden — die reine
+   Passivspiel-`no_heir`-Rate blieb dadurch exakt bei den bekannten 53%.
+
+**DO-NOT-TOUCH-Liste aus Abschnitt 12 bleibt unverändert gültig** — keines
+der geschützten Systeme wurde in Phase 3 verändert (Kampf-Engine,
+Kohorten-Bevölkerungsmodell, Preisbildung, Ledger-System, kalibrierte
+CONFIG-Werte, Regierungsstil-/Regionalhandel-Balance). Neu kalibrierte
+CONFIG-Werte in Phase 3 (`CONFIG.advisors.tenureBonusPerLevel`) sind
+ausschließlich Beratermechanik-intern und betreffen keinen der
+geschützten Bereiche.

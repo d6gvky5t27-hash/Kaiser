@@ -1980,3 +1980,142 @@ Kampf-Engine (`battle-engine/*.js`) unangetastet.
 `build: add validated bundle build tool + module dependency overview` →
 diese Dokumentation. Working Tree nach jedem Schritt sauber, alle Tests
 zwischendurch grün.
+
+## 2026-08-21 – Phase 3 (KAISERREICH-Next-Generation-Master-Prompt): Character Core
+
+Erste Phase mit bewusst neuen/vertieften Gameplay-Mechaniken (kein reines
+Refactoring mehr wie Phase 2). Ziel laut Auftrag: "Der Spieler soll Personen
+statt nur Zahlen wahrnehmen." Kein zweites paralleles Charaktermodell — das
+bestehende `state.characters`/`createCharacter()` wurde additiv erweitert.
+
+**Architektur zuerst.** Vor der Umsetzung geprüft: Charaktere lebten bereits
+als flaches `state.characters`-Dictionary mit stabilen IDs (`c1`, `c2`, …,
+nie wiederverwendet — erfüllte die geforderte dauerhafte ID bereits ohne
+Änderung), 6 Werten (`stats`, Bereich 3-17), 2 zufälligen Traits, Eltern-/
+Kinder-/Ehepartner-Links. Berater waren technisch bereits vollständige
+Charaktere (`generateAdvisorCandidate()` rief `createCharacter()` auf),
+wurden aber ohne Auswahl automatisch zugewiesen, und ihre Wirkung kam
+ausschließlich aus einer reinen `× Ausbaustufe`-Multiplikation. Kein
+Beziehungs-Ursachen-Log, kein Loyalitätsbegriff getrennt von "Beziehung",
+kein Claim-System, keine Rivalitäten — das waren die tatsächlichen Lücken.
+
+**Neues Modul `js/characters.js`.** Beziehungen (`computeRelationshipBreakdown`
+kombiniert dauerhaft gespeicherte Ereignis-Modifikatoren mit jährlich frisch
+berechneten strukturellen — Geschwister/Ehepartner/gleiches Haus/Charisma),
+Loyalität (`computeLoyalty`, bewusst getrennt von Beziehung: Basis 50 +
+0,3×Beziehung + Trait-Modifikatoren + Amtsbonus + Legitimitätsfaktor − Claim-
+Malus), Claims (`updateClaims`, vereinfacht auf den einzigen im Spiel
+mechanisch existierenden Titel "player" statt eines vollen Mehrtitel-Graphen
+— primary/strong/weak je nach Verwandtschaftsgrad), Rivalitäten
+(`updateRivalries`, zwei Auslösepfade: echter Groll allein, oder Ehrgeiz +
+starker Claim bei bereits angespannter statt zwingend tiefer Beziehung —
+erste Kalibrierung war zu streng, siehe unten). Alles läuft über EINEN
+neuen Aufruf `updateCharacterCore(state)` direkt nach `updateDynasty()` in
+`applyRulerAndDynastyEffects()` — `advanceYear()` selbst bleibt bei 6 Zeilen
+(Phase-2-Struktur unangetastet, §Punkt 89).
+
+**Traits datengetrieben erweitert.** 12 neue Traits ergänzt (loyal,
+barmherzig, mutig, feige, intelligent, naiv, charismatisch, paranoid,
+arrogant, bescheiden, korrupt, rachsüchtig) zu den 10 bestehenden — 4 davon
+(ehrgeizig/großzügig/geizig/grausam) bekamen zusätzliche, rein additive
+neue `effects`-Schlüssel (`loyaltyMod`/`claimAggression`/`advisorEffectMod`/
+`relationshipMod`), ihre bisherige Wirkung (`prestigeGain` etc.) bleibt
+exakt gleich. Alles über die bereits bestehende, generische
+`traitEffectSum(character, key)` gelesen — keine neue if-Kette. Offensicht­
+lich widersprüchliche Kombinationen (mutig+feige, großzügig+geizig,
+bescheiden+arrogant) werden bei der Vergabe ausgeschlossen.
+
+**Skills: bewusst kein Rescaling.** `stats` behält den bestehenden
+Wertebereich 3-17 und seine 6 bisherigen Schlüssel exakt bei — jede
+bestehende, kalibrierte Formel bleibt dadurch unverändert. Zwei neue,
+bislang nicht existierende Felder (`finanzen`, `intrige`) ergänzt für die
+vom Auftrag geforderten Skills "Finanzen"/"Intrige". `ADVISOR_ROLES.
+schatzmeister`/`.spionagemeister` wurden von `verwaltung`/`intelligenz` auf
+diese neuen, thematisch treffenderen Felder umgestellt (keine bestehenden
+Werte verändert — beide Felder hatten zuvor keine Kalibrierungshistorie).
+
+**Berater: echte Kandidatenauswahl statt Level-Skalierung.** Bei einer
+Vakanz werden jetzt 2-4 echte, unterschiedliche Kandidaten erzeugt
+(`generateAdvisorCandidates`/`openAdvisorSelection`/
+`confirmAdvisorSelection`), der Spieler wählt über ein neues Modal
+(`#advisorCandidatesModal`). Gelegentlich (40%-Chance) ist ein lebender,
+erwachsener, amtsloser Geschwisterteil des Herrschers unter den Kandidaten
+— wird er nicht gewählt, entsteht eine dauerhafte "Amt verweigert"-Spannung
+(exakt das Wilhelm-Beispiel aus dem Auftrag). Das bisherige Ausbausystem
+(`upgradeAdvisor`, `baseCost`, Kosten) bleibt vollständig erhalten, wirkt
+aber jetzt als moderater Amtserfahrungsbonus (`tenureBonusPerLevel: 0.15`,
+neuer, separat kalibrierter CONFIG-Wert) statt einer reinen
+`× Ausbaustufe`-Skalierung — die eigentliche Wirkung
+(`advisorEffectBonus()`) kommt jetzt primär aus Skill × Trait-Modifikator ×
+Loyalitätsfaktor (0,7-1,0×). Berater altern (liefen bereits über die
+gemeinsame Alterungsschleife) und sterben jetzt auch (`checkAdvisorDeaths()`,
+dieselbe `rollDeathChance()`-Formel wie beim Herrscher — keine zweite
+Alterungslogik). Herrscherwechsel kann Berater je nach ihrer zuletzt
+berechneten Loyalität zum alten Herrscher das Amt kosten.
+
+**Erbfolge unangetastet, nur ergänzt.** Das bestehende Ergebnis (ältestes
+lebendes Kind erbt) wurde nicht verändert. Neu: übergangene Geschwister
+bekommen einen dauerhaften Claim-Upgrade (`strong`, reason
+"succession_passed_over") plus einen persistenten Beziehungs-Malus
+("erbfolge_uebergangen": −25) — die Grundlage für spätere Erbfolgekrisen
+(Phase 5+), noch ohne automatischen Bürgerkrieg.
+
+**Kalibrierungsrunde (Rivalitäten).** Erste Fassung der Rivalitäts-
+Bedingung (Beziehung ≤ −30 UND starker Claim/Ehrgeiz) löste in 30×100-Jahre-
+Testläufen NIE aus — die familiäre Grundsympathie (Geschwister +15 +
+gleiches Haus +5 = +20 Basis) machte −30 praktisch unerreichbar ohne
+mehrere zusätzliche Grollereignisse. Nach `tests/phase3_metrics_test.js`
+angepasst auf zwei Pfade (echter Groll ≤ −25 allein, ODER Ehrgeiz + starker
+Claim bei einer bereits angespannten statt zwingend tief negativen
+Beziehung) — liefert jetzt realistisch ~1,2 Rivalitäten pro 100-Jahre-Partie
+im Schnitt (§Punkt 85: weder "nie" noch "Flut").
+
+**Savegame-Migration.** `SAVE_VERSION` 2 → 3. `migrateSaveV2ToV3()` füllt
+fehlende Felder (`stats.finanzen`/`.intrige`, `claims`, `relationships`,
+`loyalty`, `advisorRole`, `rivalIds`) mit festen (nicht gewürfelten —
+`rnd()` während der Migration würde den deterministischen Zufallsstrom des
+geladenen Spielstands verfälschen) Defaultwerten. Getestet: ein simulierter
+"echter" Version-2-Spielstand (Felder manuell entfernt) lädt fehlerfrei und
+lässt sich danach weiterspielen.
+
+**RNG-Auswirkung (§Punkt 47, ausdrücklich erlaubt).** `createCharacter()`
+würfelt jetzt 2 zusätzliche Skills (`finanzen`/`intrige`) — das verschiebt
+den GESAMTEN nachfolgenden Zufallsstrom ab dem allerersten erzeugten
+Charakter (dem Herrscher in `newGame()`). Das alte Phase-2-Golden-Fixture
+wurde daher NICHT einfach überschrieben, sondern nach
+`tests/fixtures/advance_year_snapshot_golden_phase2.json` archiviert; ein
+neues Fixture wurde erzeugt und ist gegen sich selbst erneut deterministisch
+(3 Seeds, bis zu 100 Jahre, jahrgenau byte-identisch). Interessanter
+Nebenbefund: in rein PASSIVEM Spiel (keine Spieleraktion, wie in
+`ai_vs_ai_test.js`/`baseline_analysis.js`) werden nie Berater angeworben —
+`checkAdvisorDeaths()` durchläuft dann nur leere Ämter und verbraucht keinen
+einzigen `rnd()`-Aufruf, wodurch die reine Passivspiel-`no_heir`-Rate exakt
+bei den bekannten 53% blieb (nicht künstlich gefixt, §Punkt 57).
+
+**Neue Tests.** `tests/character_core_test.js` (22 Einzelfälle: Charakter-
+generator-Determinismus, Beziehungssumme/-gründe/-klammerung, 5 Traits mit
+tatsächlicher Wirkung, 4 Claim-Szenarien, Loyalitätsvergleich A/B, 8
+Berater-Fälle inkl. Tod-macht-Amt-frei) — alle grün.
+`tests/phase3_metrics_test.js` (30×100 Jahre): ~7 aktive Charaktere am
+Spielende, Ø 2,00 Traits/Charakter, ~1,2 Rivalitäten/Partie, Ø Loyalität
+~48, no_heir-Rate unverändert 53%. Performance: `ai_vs_ai_test.js` (100×100
+Jahre) läuft in ~7s (~70ms/Partie) — keine spürbare Verschlechterung.
+
+**UI-Erweiterungen (kein Redesign).** Neues Kandidatenauswahl-Modal
+(`#advisorCandidatesModal`), Berater-Panel zeigt jetzt Alter/Haus/
+Eigenschaften/Loyalität, ein technischer Charakter-Inspektor im
+bestehenden Debug-Bereich (Auswahl-Dropdown + vollständige Aufschlüsselung:
+Skills/Traits/Claims/Beziehung-zum-Herrscher mit Einzelgründen/Loyalität/
+Rivalen — keine Blackbox, §Punkt 62).
+
+**Data-Sync.** `ADVISOR_ROLES` neu extrahiert (die zwei `statKey`-Änderungen
+nachgezogen), Roundtrip-stabil (byte-identisch) verifiziert. `TRAITS`
+bewusst NICHT in `tools/data-sync.js` aufgenommen (keine neue Tabelle ohne
+sauberen Extract→Build-Support, §Punkt 70 — bleibt als offener Punkt für
+eine spätere, bewusste Entscheidung dokumentiert, analog zu
+`TERRITORIES`/`START_REGIONS` aus Phase 2).
+
+**Bewusst NICHT umgesetzt (§Punkt 35-37, 99):** World Memory, Drama
+Director, Event Chains, große UI-Überarbeitung. Battle Engine
+(`battle-engine/*.js`) unverändert — Charakter-Militärskill wird noch nicht
+in die Kampf-Engine eingespeist.
