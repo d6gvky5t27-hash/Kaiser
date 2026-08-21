@@ -26,6 +26,19 @@
 // sondern versioniert unter
 // `tests/fixtures/advance_year_snapshot_golden_phase3.json` archiviert.
 //
+// PHASE 5 EVENT CHAINS BASELINE (§Punkt 50/51/91): Phase 5 verbraucht
+// bewusst NEUE rnd()-Aufrufe — anders als Phase 4 ist das hier
+// AUSDRÜCKLICH erwartet (§Punkt 50 "alle Chain-Zufallsentscheidungen über
+// rnd()"): pro Jahr höchstens ein gezielter Wurf, ob eine bereits als
+// plausibel erkannte neue Kette tatsächlich beginnt (updateEventChains()
+// in js/event-chains.js), plus vereinzelte Würfe innerhalb aktiver Ketten
+// (Eskalation/Beweisfindung). Das verschiebt den GESAMTEN nachfolgenden
+// Zufallsstrom, sobald erstmals eine Kette plausibel wird — ein erwarteter
+// Schmetterlingseffekt, kein Fehler. Das Golden-Fixture wurde daher neu
+// erzeugt; das Phase-4-Fixture wurde NICHT gelöscht, sondern versioniert
+// unter `tests/fixtures/advance_year_snapshot_golden_phase4.json`
+// archiviert.
+//
 // Nutzung:
 //   node tests/advance_year_snapshot_test.js            vergleicht gegen
 //                                                        das gespeicherte
@@ -53,7 +66,7 @@ const SEEDS = [101, 202, 303]; // Seed A, B, C
 const MAX_YEARS = 100;
 
 const gamedata = fs.readFileSync(path.join(ROOT, "data/gamedata.js"), "utf8");
-const simModules = ["core", "economy", "population-dynasty", "memory", "characters", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
+const simModules = ["core", "economy", "population-dynasty", "memory", "characters", "event-chains", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
 const sim = simModules.map(m => fs.readFileSync(path.join(ROOT, "js", m + ".js"), "utf8")).join("\n");
 
 const testBody = `

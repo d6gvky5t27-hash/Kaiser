@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 
 const gamedata = fs.readFileSync(path.join(__dirname, "..", "data/gamedata.js"), "utf8");
-const simModules = ["core", "economy", "population-dynasty", "memory", "characters", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
+const simModules = ["core", "economy", "population-dynasty", "memory", "characters", "event-chains", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
 const sim = simModules.map(m => fs.readFileSync(path.join(__dirname, "..", "js", m + ".js"), "utf8")).join("\n");
 
 const testBody = `
@@ -18,7 +18,7 @@ for (let run = 0; run < RUNS; run++) {
   const state = newGame();
   let years = 0;
   for (; years < YEARS; years++) {
-    for (let m = 0; m < 12; m++) { advanceMonth(state); if (state.gameOver) break; } // Monatstakt: 12x advanceMonth() = 1 Jahr, inkl. monatlicher Finanzen
+    for (let m = 0; m < 12; m++) { advanceMonth(state); resolvePendingEventWithPolicy(state, "FIRST_OPTION"); if (state.gameOver) break; } // Monatstakt: 12x advanceMonth() = 1 Jahr, inkl. monatlicher Finanzen
     if (state.gameOver) break;
   }
   const r = state.regions.player;
