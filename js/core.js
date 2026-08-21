@@ -258,6 +258,7 @@ function newGame(options) {
     characters: {},
     rulerId: null,
     memories: { byId: {}, nextId: 1 }, // §Phase-4 World Memory: state.memories.byId["m1"...], siehe js/memory.js
+    eventChains: { active: {}, resolved: {}, nextId: 1, cooldowns: {} }, // §Phase-5 Event Chains, siehe js/event-chains.js
   };
 
   for (const ext of EXTRA_REGIONS) {
@@ -296,7 +297,7 @@ function logLedger(state, label, amount) {
 
 // ---------- Landwirtschaft (§18/§19) ----------
 
-const SAVE_VERSION = 4;
+const SAVE_VERSION = 5;
 
 function serializeSave(state) {
   return JSON.stringify({
@@ -350,10 +351,30 @@ function migrateSaveV3ToV4(parsed) {
   return parsed;
 }
 
+// §Phase-5-Punkt 60-62: Event Chains erweitern den State um
+// `state.eventChains`. Alte Saves bekommen einen LEEREN Chain-Speicher —
+// KEINE rückwirkend erfundene Geschichte ("nach dem Laden eines alten Saves
+// darf nicht plötzlich behauptet werden: 'Diese Krise läuft seit 1512'",
+// §Punkt 62). Neue Ketten beginnen erst nach der Migration, ganz normal
+// über updateEventChains(). `character.appointedYear` (neu, für die
+// Korruptions-Kette, §Punkt 15) bleibt bei bereits amtierenden Beratern aus
+// Altspielständen bewusst `null` statt eines erfundenen Jahres — die
+// Amtsdauer-Prüfung behandelt `null` als "unbekannt, nicht blockierend"
+// statt als "gerade erst berufen" (siehe canStartCorruptTreasurerChain()).
+function migrateSaveV4ToV5(parsed) {
+  if (!parsed.state.eventChains) parsed.state.eventChains = { active: {}, resolved: {}, nextId: 1, cooldowns: {} };
+  for (const id in parsed.state.characters) {
+    if (parsed.state.characters[id].appointedYear === undefined) parsed.state.characters[id].appointedYear = null;
+  }
+  parsed.saveVersion = 5;
+  return parsed;
+}
+
 function deserializeSave(json) {
   let parsed = JSON.parse(json);
   if (parsed.saveVersion === 2) parsed = migrateSaveV2ToV3(parsed);
   if (parsed.saveVersion === 3) parsed = migrateSaveV3ToV4(parsed);
+  if (parsed.saveVersion === 4) parsed = migrateSaveV4ToV5(parsed);
   if (parsed.saveVersion !== SAVE_VERSION) {
     throw new Error("Inkompatible Spielstand-Version: " + parsed.saveVersion);
   }

@@ -225,6 +225,12 @@ function handleSuccession(state) {
     emotionalWeight: 20, metadata: { heirsPassedOver: heirs.length - 1 },
     description: `${heir.name} ${heir.surname} trat im Alter von ${heir.age} Jahren die Nachfolge an.`,
   });
+  // §Phase-5-Punkt 59: aktive Event Chains über den Herrscherwechsel
+  // informieren. Ketten referenzieren "den Herrscher" bewusst live über
+  // state.rulerId statt über eine eingefrorene ID (siehe DEVELOPMENT.md
+  // "Phase 5" für die Begründung) — hier wird nur ein nachvollziehbarer
+  // History-Eintrag ergänzt, keine ID-Umschreibung nötig.
+  notifyEventChainsOfSuccession(state, oldRulerId, heirId);
 
   // §Character-Core-Punkt 30: Berater können durch den Herrscherwechsel ihr
   // Amt verlieren — abhängig von ihrer (zuletzt gegenüber dem alten

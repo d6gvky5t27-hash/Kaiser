@@ -160,12 +160,22 @@ function finalizeYear(state) {
   state.stats.maxTreasury = Math.max(state.stats.maxTreasury, state.treasury);
   state.stats.highestTitleIndex = Math.max(state.stats.highestTitleIndex, state.titleIndex);
 
-  // Event auswerten: erstes zutreffendes Event der Spielerregion
-  for (const ev of EVENTS) {
-    if (ev.condition(r, state) && rnd() < 0.6) {
-      state.pendingEvent = ev;
-      if (["seuche", "rebellion", "brand_in_der_stadt"].includes(ev.id)) state.stats.disastersCount++;
-      break;
+  // §Phase-5 Event Chains: laufende Ketten fortschreiben und ggf. genau
+  // EINE neue Kette anstoßen (siehe js/event-chains.js) — VOR den
+  // gewöhnlichen Flavour-Events, damit eine bedeutsame Chain-Entscheidung
+  // Vorrang vor einem beliebigen Wetter-/Kleinevent hat (§Punkt 39/40).
+  updateEventChains(state);
+
+  // Event auswerten: erstes zutreffendes Event der Spielerregion (nur,
+  // wenn nicht bereits eine Event-Chain-Entscheidung das Fenster belegt)
+  if (!state.pendingEvent) {
+    for (const ev of EVENTS) {
+      if (ev.condition(r, state) && rnd() < 0.6) {
+        state.pendingEvent = ev;
+        state.pendingEvent.source = state.pendingEvent.source || "RANDOM";
+        if (["seuche", "rebellion", "brand_in_der_stadt"].includes(ev.id)) state.stats.disastersCount++;
+        break;
+      }
     }
   }
 

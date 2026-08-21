@@ -460,6 +460,14 @@ const CONFIG = {
     demandTerritoryHectares: 500,
     demandTerritoryFailRelationPenalty: -20,
   },
+  // ---------- Phase 5: Event Chains (§Punkt 39/40/48/53) ----------
+  eventChains: {
+    maxActive: 3,               // §Punkt 40: Richtwert, damit der Spieler nicht überflutet wird
+    startChance: 0.35,          // §Punkt 52/53: EIN gezielter Wurf, NACHDEM alle Bedingungen bereits erfüllt sind
+    adultAge: 16,                // wie CONFIG.dynasty.marriageMinAge — "erwachsen" für Chain-Zwecke
+    defaultCooldownYears: 15,   // §Punkt 41: eine gelöste Kette darf nicht sofort identisch neu starten
+    defaultExpiryYears: 20,     // §Punkt 57: hängt eine Kette zu lange fest, läuft sie ab statt ewig zu bleiben
+  },
 };
 
 // §65/§79: die reinen Datentabellen (GOODS bis TITLES weiter unten) werden ab
@@ -1772,6 +1780,11 @@ const MEMORY_TYPES = {
   ELECTION_PROMISE_BROKEN:   { importance: 55, decayRate: 0.015, direction: "none", tags: ["politics", "election", "betrayal"] },
   RIVALRY_BEGAN:             { importance: 55, decayRate: 0.01, direction: "symmetric", tags: ["rivalry"] },
   FAMINE:                    { importance: 55, decayRate: 0.03, direction: "none", tags: ["disaster", "famine"] },
+  // --- neu in Phase 5 (§Punkt 32): nur die drei tatsächlich von Event
+  // Chains benötigten neuen Typen, keine Memory-Typ-Explosion (§Punkt 32).
+  DEMAND_ACCEPTED:           { importance: 45, decayRate: 0.04, direction: "target_to_actor", tags: ["politics", "gratitude"] },
+  DEMAND_REFUSED:            { importance: 45, decayRate: 0.03, direction: "target_to_actor", tags: ["politics", "grievance"] },
+  PUBLICLY_HUMILIATED:       { importance: 60, decayRate: 0.02, direction: "target_to_actor", tags: ["politics", "grievance", "betrayal"] },
 };
 
 // Event-System: TRIGGER/BEDINGUNGEN/TEXT/ENTSCHEIDUNGEN/KONSEQUENZEN (§38)
@@ -1900,6 +1913,7 @@ function createCharacter(gender, age, surname) {
     advisorRole: null,
     rivalIds: [],
     rivalryOrigin: {},    // §Phase-4-Punkt 32: rivalId -> Memory-ID des auslösenden Ereignisses
+    appointedYear: null,  // §Phase-5-Punkt 15: seit wann im aktuellen Amt (nur für Berater relevant, siehe confirmAdvisorSelection())
   };
 }
 

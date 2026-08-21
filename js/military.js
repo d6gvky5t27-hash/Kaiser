@@ -84,6 +84,7 @@ function confirmAdvisorSelection(state, candidateIndex) {
     state.characters[cid] = character;
   }
   character.advisorRole = sel.role;
+  character.appointedYear = state.year; // §Phase-5-Punkt 15: Amtsdauer-Grundlage für die Korruptions-Kette
   state.advisors[sel.role] = cid;
   state.advisorLevels[sel.role] = 1;
   state.treasury -= sel.cost;
