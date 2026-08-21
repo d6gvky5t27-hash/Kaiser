@@ -247,6 +247,15 @@ function checkRegionConquest(state, aiId) {
   state.treasury += cfg.conquestTreasuryGain;
   state.stats.warsWon++;
   addChronicle(state, `${region.name} ist vollständig erobert und unterwirft sich als Vasall!`);
+  // §Punkt 38: die vollständige Eroberung einer Region ist das klarste
+  // definierte Kriegsergebnis der Kriegskarte und daher bedeutsam genug
+  // für eine eigene Erinnerung (die einzelnen Gebietsscharmützel selbst
+  // bleiben bewusst unterhalb der Bedeutsamkeitsschwelle).
+  recordWorldEvent(state, {
+    type: "MAJOR_BATTLE_WON", actorIds: [state.rulerId], regionIds: [aiId],
+    importance: 85, emotionalWeight: 45, metadata: { conquest: true },
+    description: `${state.characters[state.rulerId].name} eroberte ${region.name} vollständig und machte es zum Vasallen.`,
+  });
   return true;
 }
 

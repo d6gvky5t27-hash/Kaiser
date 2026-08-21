@@ -120,25 +120,44 @@ function updateDynasty(state) {
     spouse.spouseId = state.rulerId;
     addChronicle(state, `${ruler.name} ${ruler.surname} vermählte sich mit ${spouse.name}.`);
     state.pendingMarriage = sid;
+    recordWorldEvent(state, {
+      type: "MARRIAGE", actorIds: [state.rulerId, sid], targetIds: [state.rulerId, sid],
+      emotionalWeight: 40,
+      description: `${ruler.name} ${ruler.surname} vermählte sich mit ${spouse.name}.`,
+    });
   }
 
   // Geburt eines Kindes — der voreingestellte Zufallsname bleibt als Fallback
   // (z.B. für die Node-Tests ohne UI), state.pendingBirth lässt die Oberfläche
   // aber ein Fenster zum eigenen Umbenennen anzeigen (auf Nutzerwunsch).
   if (ruler.spouseId && ruler.age >= cfg.birthMinAge && ruler.age <= cfg.birthMaxAge && rnd() < cfg.birthChance) {
+    const isFirstChild = ruler.childrenIds.length === 0; // §Punkt 8: Geburt DES Thronfolgers vs. eines weiteren Kindes
     const child = createCharacter(rnd() < 0.5 ? "m" : "f", 0, ruler.surname);
     child.parentId = state.rulerId;
     const cid = nextCharId();
     state.characters[cid] = child;
     ruler.childrenIds.push(cid);
-    addChronicle(state, `${ruler.gender === "m" ? "Dem Herrscherpaar" : "Der Herrscherin"} wurde ein Kind geboren: ${child.name} ${ruler.surname}.`);
+    const birthDesc = `${ruler.gender === "m" ? "Dem Herrscherpaar" : "Der Herrscherin"} wurde ein Kind geboren: ${child.name} ${ruler.surname}.`;
+    addChronicle(state, birthDesc);
     state.pendingBirth = cid;
+    recordWorldEvent(state, {
+      type: isFirstChild ? "HEIR_BORN" : "CHILD_BORN",
+      actorIds: [state.rulerId, ruler.spouseId], targetIds: [cid],
+      emotionalWeight: isFirstChild ? 45 : 25,
+      description: birthDesc,
+    });
   }
 
   // Sterbewahrscheinlichkeit
   if (rnd() < rollDeathChance(ruler)) {
     ruler.alive = false;
-    addChronicle(state, `${ruler.name} ${ruler.surname} verstarb im Alter von ${ruler.age} Jahren.`);
+    const deathDesc = `${ruler.name} ${ruler.surname} verstarb im Alter von ${ruler.age} Jahren.`;
+    addChronicle(state, deathDesc);
+    recordWorldEvent(state, {
+      type: "RULER_DIED", actorIds: [state.rulerId], targetIds: [],
+      emotionalWeight: -50, metadata: { age: ruler.age },
+      description: deathDesc,
+    });
     handleSuccession(state);
   }
 }
@@ -185,15 +204,27 @@ function handleSuccession(state) {
   // Erbfolgekrisen-Eventketten (Phase 5+), noch OHNE automatischen
   // Bürgerkrieg (§Punkt 22 ausdrücklich: "noch keinen vollständigen
   // Bürgerkrieg automatisch auslösen").
+  const oldRulerId = state.rulerId;
   for (const passedOver of heirs.slice(1)) {
     const passedOverId = Object.keys(state.characters).find(id => state.characters[id] === passedOver);
     if (!passedOverId) continue;
     setClaim(passedOver, "player", "strong", "succession_passed_over");
-    addPersistentRelationshipModifier(passedOver, heirId, "erbfolge_uebergangen", -25);
+    const memory = recordWorldEvent(state, {
+      type: "PASSED_OVER_IN_SUCCESSION", actorIds: [heirId], targetIds: [passedOverId],
+      emotionalWeight: -45, metadata: { titleId: "player" },
+      description: `${passedOver.name} ${passedOver.surname || ""} wurde bei der Nachfolge von ${heir.name} übergangen.`.replace(/\s+/g, " "),
+    });
+    refreshRelationship(state, passedOverId, heirId);
+    addChronicle(state, memory.description);
   }
 
   state.rulerId = heirId;
   addChronicle(state, `${heir.name} ${heir.surname} tritt im Alter von ${heir.age} Jahren die Nachfolge an.`);
+  recordWorldEvent(state, {
+    type: "SUCCESSION", actorIds: [oldRulerId], targetIds: [heirId],
+    emotionalWeight: 20, metadata: { heirsPassedOver: heirs.length - 1 },
+    description: `${heir.name} ${heir.surname} trat im Alter von ${heir.age} Jahren die Nachfolge an.`,
+  });
 
   // §Character-Core-Punkt 30: Berater können durch den Herrscherwechsel ihr
   // Amt verlieren — abhängig von ihrer (zuletzt gegenüber dem alten

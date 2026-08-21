@@ -17,6 +17,13 @@ function checkTitleProgress(state) {
   if (totalPop >= next.reqPop && state.treasury >= next.reqWealth && state.prestige >= next.reqPrestige) {
     state.titleIndex = nextIdx;
     addChronicle(state, `Du wurdest zum ${next.name} erhoben!`);
+    // §Punkt 36: je höher der Titel, desto höher die Bedeutung.
+    recordWorldEvent(state, {
+      type: "TITLE_GAINED", actorIds: [state.rulerId], targetIds: [],
+      importance: Math.min(100, 45 + nextIdx * 6),
+      emotionalWeight: 35, metadata: { titleId: next.id },
+      description: `${state.characters[state.rulerId].name} wurde zum ${next.name} erhoben.`,
+    });
     return next;
   }
   return null;
@@ -91,8 +98,17 @@ function resolveElection(state) {
   for (const aiId in state.diplomacy) {
     const dip = state.diplomacy[aiId];
     const votedFor = state.pendingElection.bribed[aiId] || dip.relation >= cfg.knownElectorVoteRelationThreshold;
-    if (votedFor) votesFor++;
-    else {
+    if (votedFor) {
+      votesFor++;
+      // §Punkt 79: Kaiserwahl-Unterstützung als Memory festhalten (regionsbasiert,
+      // da KI-Regionen aktuell keinen individuellen Herrscher-Charakter besitzen —
+      // KEINE Kaiserwahl 2.0, nur eine Beobachtung des bestehenden Ergebnisses).
+      recordWorldEvent(state, {
+        type: "ELECTION_SUPPORT_GIVEN", actorIds: [state.rulerId], regionIds: [aiId],
+        emotionalWeight: 20, metadata: { bribed: !!state.pendingElection.bribed[aiId] },
+        description: `${state.regions[aiId].name} unterstützte dich bei der Kaiserwahl.`,
+      });
+    } else {
       dip.relation = clamp(dip.relation + cfg.lossRelationPenalty, -100, 100);
     }
     details.push(`${state.regions[aiId].name}: ${votedFor ? "dafür" : "dagegen"}`);

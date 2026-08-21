@@ -89,13 +89,22 @@ function confirmAdvisorSelection(state, candidateIndex) {
   state.treasury -= sel.cost;
   logLedger(state, `Berater berufen: ${ADVISOR_ROLES[sel.role].name}`, -sel.cost);
   addChronicle(state, `${character.name} ${character.surname || ""} wurde zum ${ADVISOR_ROLES[sel.role].name} ernannt.`.replace(/\s+/g, " "));
+  recordWorldEvent(state, {
+    type: "APPOINTED_TO_OFFICE", actorIds: [state.rulerId], targetIds: [cid],
+    emotionalWeight: 25, metadata: { role: sel.role },
+    description: `${character.name} ${character.surname || ""} wurde zum ${ADVISOR_ROLES[sel.role].name} ernannt.`.replace(/\s+/g, " "),
+  });
 
   for (const other of sel.candidates) {
     if (other === chosen || !other.existingId) continue;
     const rejected = state.characters[other.existingId];
-    addPersistentRelationshipModifier(rejected, state.rulerId, "amt_verweigert", -20);
+    const memory = recordWorldEvent(state, {
+      type: "DENIED_OFFICE", actorIds: [state.rulerId], targetIds: [other.existingId],
+      emotionalWeight: -35, metadata: { role: sel.role },
+      description: `${rejected.name} ${rejected.surname || ""} wurde bei der Vergabe des Amtes ${ADVISOR_ROLES[sel.role].name} übergangen.`.replace(/\s+/g, " "),
+    });
     refreshRelationship(state, other.existingId, state.rulerId);
-    addChronicle(state, `${rejected.name} ${rejected.surname || ""} wurde bei der Vergabe des Amtes ${ADVISOR_ROLES[sel.role].name} übergangen.`.replace(/\s+/g, " "));
+    addChronicle(state, memory.description);
   }
   state.pendingAdvisorSelection = null;
   return { ok: true };
@@ -117,9 +126,18 @@ function upgradeAdvisor(state, role) {
 
 function dismissAdvisor(state, role) {
   if (!state.advisors[role]) return { ok: false, reason: "Dieses Amt ist nicht besetzt." };
-  const c = state.characters[state.advisors[role]];
+  const advId = state.advisors[role];
+  const c = state.characters[advId];
   addChronicle(state, `${c ? c.name : "Der Amtsinhaber"} wurde als ${ADVISOR_ROLES[role].name} entlassen.`);
-  if (c) c.advisorRole = null;
+  if (c) {
+    c.advisorRole = null;
+    recordWorldEvent(state, {
+      type: "DISMISSED_FROM_OFFICE", actorIds: [state.rulerId], targetIds: [advId],
+      emotionalWeight: -30, metadata: { role },
+      description: `${c.name} ${c.surname || ""} wurde als ${ADVISOR_ROLES[role].name} entlassen.`.replace(/\s+/g, " "),
+    });
+    refreshRelationship(state, advId, state.rulerId);
+  }
   state.advisors[role] = null;
   state.advisorLevels[role] = 0;
   return { ok: true };
@@ -139,7 +157,13 @@ function checkAdvisorDeaths(state) {
     if (rnd() < rollDeathChance(adv)) {
       adv.alive = false;
       adv.advisorRole = null;
-      addChronicle(state, `${adv.name} ${adv.surname || ""}, ${ADVISOR_ROLES[role].name}, ist verstorben.`.replace(/\s+/g, " "));
+      const desc = `${adv.name} ${adv.surname || ""}, ${ADVISOR_ROLES[role].name}, ist verstorben.`.replace(/\s+/g, " ");
+      addChronicle(state, desc);
+      recordWorldEvent(state, {
+        type: "DIED_IN_OFFICE", actorIds: [advId], targetIds: [],
+        emotionalWeight: -15, metadata: { role },
+        description: desc,
+      });
       state.advisors[role] = null;
       state.advisorLevels[role] = 0;
     }
@@ -341,6 +365,7 @@ function declareWar(state, aiId) {
     : `${result.name} bleibt neutral.`
   );
 
+  const wasAllied = dip.treaties.allianz;
   dip.treaties.nichtangriff = false;
   dip.treaties.allianz = false;
   dip.treaties.handel = false;
@@ -350,5 +375,26 @@ function declareWar(state, aiId) {
   state.warState[aiId] = true;
   const report = `Krieg gegen ${region.name} erklärt! Die Kampagne beginnt — erobere ihre Gebiete auf der Kriegskarte.\n${allyLines.join(" ")}`;
   addChronicle(state, report.replace(/\n/g, " "));
+
+  recordWorldEvent(state, {
+    type: "WAR_DECLARED", actorIds: [state.rulerId], regionIds: [aiId],
+    emotionalWeight: -20, metadata: { targetRegion: aiId },
+    description: `${state.characters[state.rulerId].name} erklärte ${region.name} den Krieg.`,
+  });
+  if (wasAllied) {
+    recordWorldEvent(state, {
+      type: "ALLIANCE_BROKEN", actorIds: [state.rulerId], regionIds: [aiId],
+      emotionalWeight: -40, metadata: { targetRegion: aiId },
+      description: `Das Bündnis mit ${region.name} wurde durch die Kriegserklärung gebrochen.`,
+    });
+  }
+  for (const result of allyResults) {
+    if (result.stance !== "supportPlayer") continue;
+    recordWorldEvent(state, {
+      type: "AID_GRANTED", actorIds: [state.rulerId], regionIds: [result.aiId],
+      emotionalWeight: 30, metadata: { war: aiId },
+      description: `${result.name} unterstützte dich im Krieg gegen ${region.name}.`,
+    });
+  }
   return { ok: true, report, allyLines };
 }

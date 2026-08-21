@@ -43,6 +43,11 @@ function proposeAlliance(state, aiId) {
   dip.relation = clamp(dip.relation + cfg.allianceRelationGain, -100, 100);
   state.prestige += cfg.alliancePrestigeGain;
   addChronicle(state, `Ein Bündnis mit ${state.regions[aiId].name} wurde geschlossen.`);
+  recordWorldEvent(state, {
+    type: "ALLIANCE_FORMED", actorIds: [state.rulerId], regionIds: [aiId],
+    emotionalWeight: 30,
+    description: `Ein Bündnis mit ${state.regions[aiId].name} wurde geschlossen.`,
+  });
   return { ok: true };
 }
 
@@ -101,6 +106,11 @@ function demandTribute(state, aiId) {
   } else {
     dip.relation = clamp(dip.relation + cfg.demandTributeFailRelationPenalty, -100, 100);
     addChronicle(state, `${state.regions[aiId].name} weigerte sich, Tribut zu zahlen — die Beziehungen leiden.`);
+    recordWorldEvent(state, {
+      type: "AID_REFUSED", actorIds: [state.rulerId], regionIds: [aiId],
+      emotionalWeight: -15,
+      description: `${state.regions[aiId].name} verweigerte die geforderte Tributzahlung.`,
+    });
     return { ok: true, success: false };
   }
 }
@@ -162,6 +172,11 @@ function proposePeaceTreaty(state, aiId) {
   // (bereits eroberte Gebiete bleiben beim Eroberer, kein Rückzug).
   if (state.warState && state.warState[aiId]) state.warState[aiId] = false;
   addChronicle(state, `Ein Friedensvertrag mit ${state.regions[aiId].name} wurde für ${cost} Taler geschlossen.`);
+  recordWorldEvent(state, {
+    type: "PEACE_SIGNED", actorIds: [state.rulerId], regionIds: [aiId],
+    emotionalWeight: 15, metadata: { cost },
+    description: `Ein Friedensvertrag mit ${state.regions[aiId].name} wurde geschlossen.`,
+  });
   return { ok: true, cost };
 }
 

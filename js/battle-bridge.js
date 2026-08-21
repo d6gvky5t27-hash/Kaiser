@@ -179,6 +179,13 @@ function applyBattleResultToGame(state, aiId, battleResult) {
     }
     addChronicle(state, `Sieg in der Schlacht gegen ${region.name}! Beute: ${loot} Taler.` +
       (conqueredHectares > 0 ? ` Zudem werden ${conqueredHectares} Hektar Land erobert.` : ""));
+    // §Punkt 37/38: eine entscheidende Feldschlacht ist ein klar definiertes
+    // Kriegsereignis und damit bedeutsam genug für eine Erinnerung.
+    recordWorldEvent(state, {
+      type: "MAJOR_BATTLE_WON", actorIds: [state.rulerId], regionIds: [aiId],
+      emotionalWeight: 30, metadata: { loot },
+      description: `${state.characters[state.rulerId].name} errang einen entscheidenden Sieg gegen ${region.name}.`,
+    });
   } else {
     state.prestige = Math.max(0, state.prestige - cfg.defeatPrestigeLoss);
     state.stats.warsLost++;
@@ -186,6 +193,11 @@ function applyBattleResultToGame(state, aiId, battleResult) {
       state.regions.player.population[pid].satisfaction = clamp(state.regions.player.population[pid].satisfaction - cfg.loseSatisfactionPenalty, 0, 100);
     }
     addChronicle(state, `Niederlage in der Schlacht gegen ${region.name}. Schwere Verluste.`);
+    recordWorldEvent(state, {
+      type: "MAJOR_BATTLE_LOST", actorIds: [state.rulerId], regionIds: [aiId],
+      emotionalWeight: -30,
+      description: `${state.characters[state.rulerId].name} erlitt eine schwere Niederlage gegen ${region.name}.`,
+    });
   }
   checkAlternativeVictory(state);
 }

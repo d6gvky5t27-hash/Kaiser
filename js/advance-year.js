@@ -53,6 +53,7 @@ function processAllRegions(state) {
     r.grainDistributed = r.grainAvailable - (r.warehouse.getreide || 0); // tatsächlich ans Volk abgegeben (Grundbedarf + Kornausgabe)
     applyGrainSpoilage(r); // Schwund/Verderb des Restbestands oberhalb der Lagerkapazität
     updatePopulation(r);
+    checkFamineMemory(state, id, r); // §Punkt 8/38: schwere Hungerkrise als Erinnerung festhalten
     if (r._manipulationYears > 0) r._manipulationYears -= 1; // §32 politische Manipulation klingt ab
     if (!r.isPlayer) aiRegionDevelops(r, state);
 
