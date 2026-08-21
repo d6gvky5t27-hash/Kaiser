@@ -2,31 +2,37 @@
   "schatzmeister": {
     "name": "Schatzmeister",
     "statKey": "verwaltung",
-    "desc": "Erhöht die Steuereinnahmen."
+    "desc": "Erhöht die Steuereinnahmen.",
+    "baseCost": 220
   },
   "marschall": {
     "name": "Marschall",
     "statKey": "militaer",
-    "desc": "Stärkt die Armee."
+    "desc": "Stärkt die Armee.",
+    "baseCost": 220
   },
   "diplomat": {
     "name": "Diplomat",
     "statKey": "diplomatie",
-    "desc": "Verbessert diplomatische Erfolge."
+    "desc": "Verbessert diplomatische Erfolge.",
+    "baseCost": 160
   },
   "spionagemeister": {
     "name": "Spionagemeister",
     "statKey": "intelligenz",
-    "desc": "Grundlage für künftige Aufklärung (Beta)."
+    "desc": "Verbessert die Aufklärungsgenauigkeit über Nachbarregionen.",
+    "baseCost": 140
   },
   "geistlicher": {
     "name": "Geistlicher",
     "statKey": "charisma",
-    "desc": "Hebt die Zufriedenheit leicht."
+    "desc": "Hebt die Zufriedenheit.",
+    "baseCost": 120
   },
   "handelsberater": {
     "name": "Handelsberater",
     "statKey": "handel",
-    "desc": "Steigert die Produktion."
+    "desc": "Steigert die Produktion.",
+    "baseCost": 160
   }
 }
