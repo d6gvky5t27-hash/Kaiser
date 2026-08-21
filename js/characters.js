@@ -4,30 +4,24 @@
 // Charaktermodell (state.characters, createCharacter() in data/gamedata.js)
 // additiv — KEIN zweites paralleles Modell (§Phase-3-Punkt 2).
 //
-// Persistente vs. strukturelle Beziehungsgründe: die meisten Modifikatoren
-// (Geschwister/Ehepartner/gleiches Haus/Charisma) werden jedes Jahr NEU aus
-// dem aktuellen Zustand berechnet (rein deterministisch, kein RNG, immer
-// konsistent — kein Risiko einer stillen Divergenz). Drei Gründe sind
-// dagegen echte, einmalige Ereignisse und werden dauerhaft auf dem
-// Charakter gespeichert (PERSISTENT_MODIFIER_SOURCES unten): Amt
-// verweigert, bei der Erbfolge übergangen, Rivalität — diese verschwinden
-// nicht wieder, wenn sich der strukturelle Zustand ändert.
+// Seit Phase 4 (World Memory): Beziehungsgründe kommen aus zwei Quellen —
+// STRUKTURELLE Modifikatoren (Geschwister/Ehepartner/gleiches Haus/
+// Charisma) werden jedes Jahr neu aus dem aktuellen Zustand berechnet
+// (deterministisch, kein RNG), und EREIGNIS-Modifikatoren kommen jetzt aus
+// `state.memories` statt aus früher (Phase 3) direkt auf dem Charakter
+// gespeicherten Fixwerten — SINGLE SOURCE OF TRUTH (§Phase-4-Punkt 25/27),
+// mit echtem Verfall über die Zeit (js/memory.js: computeEffectiveWeight()).
+// Die alten, in Phase 3 eingeführten `addPersistentRelationshipModifier()`/
+// `PERSISTENT_MODIFIER_SOURCES` sind damit entfallen — ersetzt durch
+// Memory-Einträge (DENIED_OFFICE/PASSED_OVER_IN_SUCCESSION/RIVALRY_BEGAN),
+// keine doppelte Zählung (§Punkt 26).
 // ============================================================
 
-const PERSISTENT_MODIFIER_SOURCES = new Set(["amt_verweigert", "erbfolge_uebergangen", "rivalitaet"]);
-
-function addPersistentRelationshipModifier(character, targetId, source, value) {
-  if (!character.relationships[targetId]) character.relationships[targetId] = { total: 0, modifiers: [] };
-  const mods = character.relationships[targetId].modifiers;
-  if (mods.some(m => m.source === source)) return; // nicht duplizieren
-  mods.push({ source, value });
-}
-
-// Berechnet, wie `fromId` über `toId` denkt — kombiniert die dauerhaft
-// gespeicherten Ereignis-Modifikatoren (siehe oben) mit frisch berechneten
-// strukturellen Modifikatoren, klammert auf -100..100. Schreibt NICHT in
-// state — reiner Leseweg, siehe refreshCharacterRelationships() für die
-// Stelle, die das Ergebnis tatsächlich zurück in relationships[] speichert.
+// Berechnet, wie `fromId` über `toId` denkt — kombiniert frisch berechnete
+// strukturelle Modifikatoren mit den aktuell noch wirksamen (verfallenen)
+// Memory-Effekten, klammert auf -100..100. Schreibt NICHT in state — reiner
+// Leseweg, siehe refreshRelationship() für die Stelle, die das Ergebnis
+// tatsächlich zurück in relationships[] speichert.
 function computeRelationshipBreakdown(state, fromId, toId) {
   if (fromId === toId) return { modifiers: [], total: 0 };
   const from = state.characters[fromId];
@@ -35,13 +29,6 @@ function computeRelationshipBreakdown(state, fromId, toId) {
   if (!from || !to) return { modifiers: [], total: 0 };
 
   const modifiers = [];
-  const stored = from.relationships[toId];
-  if (stored) {
-    for (const m of stored.modifiers) {
-      if (PERSISTENT_MODIFIER_SOURCES.has(m.source)) modifiers.push(m);
-    }
-  }
-
   if (from.parentId === toId || to.parentId === fromId) modifiers.push({ source: "eltern_kind", value: 15 });
   if (from.parentId && from.parentId === to.parentId) modifiers.push({ source: "geschwister", value: 15 });
   if (from.spouseId === toId) modifiers.push({ source: "ehepartner", value: 25 });
@@ -49,6 +36,11 @@ function computeRelationshipBreakdown(state, fromId, toId) {
   if (from.advisorRole && toId === state.rulerId) modifiers.push({ source: "amt_innehat", value: 10 });
   const charismaBonus = traitEffectSum(to, "relationshipMod");
   if (charismaBonus) modifiers.push({ source: "charisma", value: charismaBonus });
+
+  for (const memory of getMemoriesForRelationship(state, fromId, toId)) {
+    const weight = computeEffectiveWeight(state, memory, fromId);
+    if (weight !== 0) modifiers.push({ source: memory.type, value: weight, memoryId: memory.id, year: memory.year });
+  }
 
   const total = clamp(modifiers.reduce((s, m) => s + m.value, 0), -100, 100);
   return { modifiers, total };
@@ -158,11 +150,21 @@ function addRivalry(state, aId, bId) {
   if (!a || !b) return;
   if (!a.rivalIds.includes(bId)) a.rivalIds.push(bId);
   if (!b.rivalIds.includes(aId)) b.rivalIds.push(aId);
-  addPersistentRelationshipModifier(a, bId, "rivalitaet", -30);
-  addPersistentRelationshipModifier(b, aId, "rivalitaet", -30);
+  const memory = recordWorldEvent(state, {
+    type: "RIVALRY_BEGAN",
+    actorIds: [aId, bId],
+    targetIds: [aId, bId],
+    emotionalWeight: -30,
+    metadata: { characterA: aId, characterB: bId },
+    description: `${a.name} ${a.surname || ""} und ${b.name} ${b.surname || ""} gelten fortan als Rivalen.`.replace(/\s+/g, " ").trim(),
+  });
+  // §Punkt 32: Ursprung der Rivalität dauerhaft und direkt abrufbar speichern
+  // (UI muss nicht bei jedem Aufruf danach suchen).
+  a.rivalryOrigin[bId] = memory.id;
+  b.rivalryOrigin[aId] = memory.id;
   refreshRelationship(state, aId, bId);
   refreshRelationship(state, bId, aId);
-  addChronicle(state, `${a.name} ${a.surname || ""} gilt nun als Rivale von ${b.name} ${b.surname || ""}.`.replace(/\s+/g, " ").trim());
+  addChronicle(state, memory.description);
 }
 
 function updateRivalries(state) {
