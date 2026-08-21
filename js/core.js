@@ -259,6 +259,12 @@ function newGame(options) {
     rulerId: null,
     memories: { byId: {}, nextId: 1 }, // §Phase-4 World Memory: state.memories.byId["m1"...], siehe js/memory.js
     eventChains: { active: {}, resolved: {}, nextId: 1, cooldowns: {} }, // §Phase-5 Event Chains, siehe js/event-chains.js
+    storyThreads: { active: {}, resolved: {}, nextId: 1 }, // §Phase-6 Story Threads, siehe js/story-threads.js
+    drama: { // §Phase-6 Drama Director, siehe js/drama-director.js — reiner Kurator
+      tension: 0, momentum: 0, yearsSinceMajorEvent: 0, lastMajorEventYear: null,
+      recentIntensity: [], focusThreadId: null, recoveryWindowUntilYear: null, pacing: "QUIET",
+      tensionBreakdown: [],
+    },
   };
 
   for (const ext of EXTRA_REGIONS) {
@@ -297,7 +303,7 @@ function logLedger(state, label, amount) {
 
 // ---------- Landwirtschaft (§18/§19) ----------
 
-const SAVE_VERSION = 5;
+const SAVE_VERSION = 6;
 
 function serializeSave(state) {
   return JSON.stringify({
@@ -356,11 +362,12 @@ function migrateSaveV3ToV4(parsed) {
 // KEINE rückwirkend erfundene Geschichte ("nach dem Laden eines alten Saves
 // darf nicht plötzlich behauptet werden: 'Diese Krise läuft seit 1512'",
 // §Punkt 62). Neue Ketten beginnen erst nach der Migration, ganz normal
-// über updateEventChains(). `character.appointedYear` (neu, für die
-// Korruptions-Kette, §Punkt 15) bleibt bei bereits amtierenden Beratern aus
-// Altspielständen bewusst `null` statt eines erfundenen Jahres — die
-// Amtsdauer-Prüfung behandelt `null` als "unbekannt, nicht blockierend"
-// statt als "gerade erst berufen" (siehe canStartCorruptTreasurerChain()).
+// über den in finalizeYear() verdrahteten Scheduler (js/event-chains.js).
+// `character.appointedYear` (neu, für die Korruptions-Kette, §Punkt 15)
+// bleibt bei bereits amtierenden Beratern aus Altspielständen bewusst
+// `null` statt eines erfundenen Jahres — die Amtsdauer-Prüfung behandelt
+// `null` als "unbekannt, nicht blockierend" statt als "gerade erst berufen"
+// (siehe canStartCorruptTreasurerChain()).
 function migrateSaveV4ToV5(parsed) {
   if (!parsed.state.eventChains) parsed.state.eventChains = { active: {}, resolved: {}, nextId: 1, cooldowns: {} };
   for (const id in parsed.state.characters) {
@@ -370,11 +377,45 @@ function migrateSaveV4ToV5(parsed) {
   return parsed;
 }
 
+// §Phase-6-Punkt 75-78: Story Threads/Drama Director erweitern den State um
+// `state.storyThreads`/`state.drama`. Alte Saves bekommen LEERE Speicher —
+// keine rückwirkend erfundenen Threads (§Punkt 76). Threads werden erst ab
+// dem nächsten normalen Simulationsschritt aus dem AKTUELLEN Weltzustand
+// entdeckt (discoverStoryThreads(), js/story-threads.js) — ein alter Save
+// kann dabei bereits Jahrzehnte alte Memories besitzen, die als reale
+// Historie in die Signal-Erkennung einfließen (das ist keine Fiktion, siehe
+// §Punkt 77), aber `startedYear` des neu ENTDECKTEN Threads ist immer das
+// aktuelle Jahr — es wird nie behauptet, ein Thread liefe "schon seit 20
+// Jahren", nur weil seine auslösende Memory alt ist (§Punkt 78: Ursprung
+// und Erkennungszeitpunkt sind unterschiedliche Dinge, siehe
+// `thread.memoryIds` vs. `thread.startedYear`). Bereits bestehende Event
+// Chains aus Version 5 bekommen `threadId: null` (werden erst bei ihrer
+// nächsten Fortschreibung/Auflösung ggf. nachträglich verknüpft).
+function migrateSaveV5ToV6(parsed) {
+  if (!parsed.state.storyThreads) parsed.state.storyThreads = { active: {}, resolved: {}, nextId: 1 };
+  if (!parsed.state.drama) {
+    parsed.state.drama = {
+      tension: 0, momentum: 0, yearsSinceMajorEvent: 0, lastMajorEventYear: null,
+      recentIntensity: [], focusThreadId: null, recoveryWindowUntilYear: null, pacing: "QUIET",
+      tensionBreakdown: [],
+    };
+  }
+  for (const id in parsed.state.eventChains.active) {
+    if (parsed.state.eventChains.active[id].threadId === undefined) parsed.state.eventChains.active[id].threadId = null;
+  }
+  for (const id in parsed.state.eventChains.resolved) {
+    if (parsed.state.eventChains.resolved[id].threadId === undefined) parsed.state.eventChains.resolved[id].threadId = null;
+  }
+  parsed.saveVersion = 6;
+  return parsed;
+}
+
 function deserializeSave(json) {
   let parsed = JSON.parse(json);
   if (parsed.saveVersion === 2) parsed = migrateSaveV2ToV3(parsed);
   if (parsed.saveVersion === 3) parsed = migrateSaveV3ToV4(parsed);
   if (parsed.saveVersion === 4) parsed = migrateSaveV4ToV5(parsed);
+  if (parsed.saveVersion === 5) parsed = migrateSaveV5ToV6(parsed);
   if (parsed.saveVersion !== SAVE_VERSION) {
     throw new Error("Inkompatible Spielstand-Version: " + parsed.saveVersion);
   }

@@ -468,6 +468,44 @@ const CONFIG = {
     defaultCooldownYears: 15,   // §Punkt 41: eine gelöste Kette darf nicht sofort identisch neu starten
     defaultExpiryYears: 20,     // §Punkt 57: hängt eine Kette zu lange fest, läuft sie ab statt ewig zu bleiben
   },
+  // ---------- Phase 6: Story Threads (§Punkt 6/10/33) ----------
+  storyThreads: {
+    dormancyYears: 5,           // §Punkt 33: keine neue Aktivität seit so vielen Jahren -> ACTIVE fällt auf DORMANT
+    aftermathYears: 2,          // Mindestdauer AFTERMATH, bevor RESOLVED möglich ist
+  },
+  // ---------- Phase 6: Drama Director (§Punkt 22/107 — konfigurierbare
+  // Gewichte statt verstreuter Magic Numbers, jede hier vollständig
+  // aufgelistet und in computeDramaTensionBreakdown() 1:1 nachvollziehbar) ----------
+  drama: {
+    recoveryWindowYears: 5,       // §Punkt 25: nach einem Großereignis werden NUR optionale Chains zurückgestaffelt
+    focusSwitchThreshold: 15,     // §Punkt 29: Fokus wechselt nur bei klar höherer Dringlichkeit
+    majorEventImportanceThreshold: 65, // Memory-Importance ab der ein Jahr als "Großereignis" zählt
+    chainThreadTensionFactor: 0.2,   // Anteil der Thread-Tension, der in den Chain-Score einfließt (§Punkt 43)
+    chainYearsSinceActivityFactor: 2, // pro Jahr seit letzter Thread-Aktivität, gedeckelt auf 10 Jahre
+    chainFocusBonus: 25,
+    chainRecoveryPenalty: -15,
+    tensionWeights: {
+      activeRivalryPerRival: 6, activeRivalryCap: 18,
+      lowLoyaltyPowerful: 10, lowLoyaltyThreshold: 40,
+      unresolvedClaim: 8,
+      hunger: 15,
+      weakEconomy: 8,
+      war: 15,
+      badRelations: 6, badRelationsThreshold: -20,
+      rulerHealth: 12, rulerHealthThreshold: 30,
+      uncertainSuccession: 10,
+      activeChainPerChain: 5, activeChainCap: 15,
+      upcomingElection: 8,
+      religiousTension: 6,
+      peaceBonus: -8,
+      stableDynastyBonus: -6,
+      fullGranariesBonus: -5, fullGranariesThreshold: 1.1,
+      goodEconomyBonus: -5, goodEconomyThreshold: 3000,
+      highLegitimacyBonus: -7, highLegitimacyThreshold: 80,
+      highLoyaltyBonus: -5, highLoyaltyThreshold: 70,
+      recentResolutionBonus: -4, recentResolutionYears: 3,
+    },
+  },
 };
 
 // §65/§79: die reinen Datentabellen (GOODS bis TITLES weiter unten) werden ab
@@ -1785,6 +1823,10 @@ const MEMORY_TYPES = {
   DEMAND_ACCEPTED:           { importance: 45, decayRate: 0.04, direction: "target_to_actor", tags: ["politics", "gratitude"] },
   DEMAND_REFUSED:            { importance: 45, decayRate: 0.03, direction: "target_to_actor", tags: ["politics", "grievance"] },
   PUBLICLY_HUMILIATED:       { importance: 60, decayRate: 0.02, direction: "target_to_actor", tags: ["politics", "grievance", "betrayal"] },
+  // --- neu in Phase 6 (§Punkt 70): EIN generischer Typ für den Abschluss
+  // einer bedeutsamen Story-Thread-Geschichte, wiederverwendet über alle
+  // 8 Thread-Typen hinweg — keine Memory-Typ-Explosion.
+  MAJOR_STORY_RESOLVED:      { importance: 70, decayRate: 0, direction: "none", tags: ["story", "resolution"] },
 };
 
 // Event-System: TRIGGER/BEDINGUNGEN/TEXT/ENTSCHEIDUNGEN/KONSEQUENZEN (§38)

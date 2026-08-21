@@ -231,6 +231,7 @@ function handleSuccession(state) {
   // "Phase 5" für die Begründung) — hier wird nur ein nachvollziehbarer
   // History-Eintrag ergänzt, keine ID-Umschreibung nötig.
   notifyEventChainsOfSuccession(state, oldRulerId, heirId);
+  notifyStoryThreadsOfSuccession(state, oldRulerId, heirId); // §Phase-6
 
   // §Character-Core-Punkt 30: Berater können durch den Herrscherwechsel ihr
   // Amt verlieren — abhängig von ihrer (zuletzt gegenüber dem alten
