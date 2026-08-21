@@ -18,38 +18,28 @@ werden zuerst fertiggestellt/gefestigt, bevor neue Breite hinzukommt.
 - [x] Phase 1 (Master-Prompt "Next Generation"): Code-Audit
       (`CODE_AUDIT.md`), reproduzierbare Baseline (`BASELINE.md`,
       `tests/baseline_analysis.js`), `GAME_DESIGN.md`/`ROADMAP.md`
-      aktualisiert. **Noch kein Gameplay-Refactoring** — wartet auf
-      Freigabe für Phase 2.
+      aktualisiert.
+- [x] **Phase 2 — Technical Stabilization** (Ergebnisse: CODE_AUDIT.md
+      Abschnitt 14, Ablauf: DEVELOPMENT.md "Phase 2"): `advanceYear()` in
+      6 benannte Teilschritte zerlegt (reines Extract-Method, RNG-
+      Determinismus über `tests/advance_year_snapshot_test.js` — 3 feste
+      Seeds, jahrgenau byte-identisch — bewiesen), Data-Sync-Drift
+      (`baseCost`) behoben + Pflichtfeld-Validierung ergänzt, tote
+      Belagerungslogik (military.js/battle-bridge.js + UI-Pfad) entfernt,
+      `tools/build-bundle.js` als validiertes Build-Werkzeug neu
+      eingerichtet. Keine Balance-/CONFIG-/Gameplay-Werte verändert,
+      Kampf-Engine unangetastet. **Offen geblieben (bewusst außerhalb
+      des Phase-2-Scopes, siehe unten unter NEXT):** ob `TERRITORIES`/
+      `START_REGIONS` in `tools/data-sync.js` aufgenommen werden sollen.
+      **Phase 3 wurde NICHT begonnen** — wartet auf ausdrückliche
+      Freigabe.
 
 ## NEXT (nach Freigabe, in der vom Master-Prompt vorgeschlagenen Reihenfolge)
 
-- [ ] **Phase 2 — Technical Stabilization** (Detailplan: CODE_AUDIT.md
-      Abschnitt 13, noch nicht ausgeführt, wartet auf Freigabe):
-      1. `advanceYear()` in benannte Teilschritte zerlegen
-         (`applyPreProductionBonuses`, `processAllRegions`,
-         `updateEconomyAndDiplomacy`, `applyRulerAndDynastyEffects`,
-         `updatePoliticsAndWar`, `finalizeYear`).
-      2. Verhalten 1:1 erhalten — reines Extract-Method, keine
-         Logikänderung, keine Umsortierung.
-      3. Regressionstests davor und danach (`battle_test.js`,
-         `economy_test.js`, `ai_vs_ai_test.js`, `baseline_analysis.js`)
-         plus ein neuer Byte-Gleichheits-Vergleichstest (alt vs. neu,
-         gleicher Seed).
-      4. Daten-Sync zwischen `data/json/*.json` und `data/gamedata.js`
-         absichern (`tools/data-sync.js` um `TERRITORIES`/`START_REGIONS`
-         erweitern oder bewusst als veraltet kennzeichnen).
-      5. `baseCost`-Drift bei `data/json/advisor-roles.json` beheben
-         (`node tools/data-sync.js extract` erneut laufen lassen).
-      6. Doppelte tote Belagerungslogik identifizieren (bestätigt: BEIDE
-         Implementierungen in `military.js` und `battle-bridge.js` sind
-         tot, inkl. der zugehörigen UI-Verzweigung in `index.html`) und
-         konsolidieren/entfernen.
-      7. Bestehende Kampf-Engine (`battle-engine/*.js`) unangetastet
-         lassen — DO NOT TOUCH WITHOUT REGRESSION TEST, siehe
-         CODE_AUDIT.md Abschnitt 12.
-      **RNG-Determinismus darf durch dieses Refactoring nicht verändert
-      werden** — siehe CODE_AUDIT.md Abschnitt 13.6 für die exakte
-      Aufrufreihenfolge-Garantie.
+- [ ] Tech Debt (klein, aus Phase 2 zurückgestellt): Entscheiden, ob
+      `tools/data-sync.js` um `TERRITORIES`/`START_REGIONS` erweitert
+      oder die JSON-Modding-Schicht bewusst als auf 9 Tabellen begrenzt
+      dokumentiert wird (siehe CODE_AUDIT.md Abschnitt 6).
 - [ ] Phase 3 — Character Core: Berater-Kandidatenauswahl (3 Kandidaten
       statt automatischer Zuweisung — `generateAdvisorCandidate()` existiert
       bereits als Baustein), Beziehungs-Ursachen-Log statt eines einzelnen

@@ -1888,3 +1888,95 @@ aktualisiert), ein volles Jahr durchlaufen und das Kassenbuch zeigt die
 neue Bevölkerungssektion mit korrekten Werten, Regierungsstil-Regler auf
 "Gierig" (90) gezogen zeigt sofort +288 Taler/−6,4 Zufriedenheit/−2,4
 Legitimität in der Live-Vorschau — keine JavaScript-Fehler.
+
+## 2026-08-21 – Phase 2 (KAISERREICH-Next-Generation-Master-Prompt): Technical Stabilization
+
+Reines Behavior-Preserving Refactoring nach abgeschlossener Phase 1
+(Code-Audit, siehe CODE_AUDIT.md/BASELINE.md/GAME_DESIGN.md/ROADMAP.md).
+Oberste Regel dieser Phase: identisches Spielverhalten, kein einziger
+Balance-/Gameplay-Wert verändert — "besserer Code, identisches Spiel".
+
+**Priorität 1 — `advanceYear()` entzerrt.** Die ~123 Zeilen lange
+Orchestrator-Funktion (nicht fehlerhaft, aber ein Refactoring-Kandidat,
+siehe CODE_AUDIT.md Abschnitt 12) wurde per reinem Extract-Method in 6
+benannte Teilschritte zerlegt: `applyPreProductionBonuses()`,
+`processAllRegions()`, `updateEconomyAndDiplomacy()`,
+`applyRulerAndDynastyEffects()`, `updatePoliticsAndWar()`,
+`finalizeYear()` — `advanceYear()` selbst ist jetzt ein 6-zeiliger
+Aufrufer in exakt der bisherigen Reihenfolge. Keine Logik neu geschrieben,
+keine Bedingungen vereinfacht, keine RNG-Aufrufe verschoben. Die einzigen
+Nicht-1:1-Anpassungen sind ein erneutes `const r = state.regions.player`
+und eine erneute (reine, RNG-freie) `advisorEffectBonus(state,
+"handelsberater")`-Berechnung in den Funktionen, die diese Werte später
+brauchen — beides liefert exakt denselben Wert wie zuvor.
+
+Dafür neu angelegt: `tests/advance_year_snapshot_test.js` — ein
+dauerhafter Determinismus-Regressionstest mit 3 festen Seeds (101/202/303),
+der pro simuliertem Jahr Staatskasse/Bevölkerung/Preise/Dynastie/Prestige/
+Legitimität/Kriege/Beziehungen/volle Chronik/Game-Over-Zustand gegen ein
+Golden-Fixture (`tests/fixtures/advance_year_snapshot_golden.json`,
+erzeugt aus dem Code-Stand VOR dem Refactoring) vergleicht und bei der
+ersten Abweichung exakt Jahr und Feld benennt. Ergebnis nach dem
+Refactoring: alle 3 Seeds jahrgenau byte-identisch (bis zu 100 simulierte
+Jahre). `battle_test.js`- und `baseline_analysis.js`-Ausgabe ebenfalls
+byte-identisch vorher/nachher; `economy_test.js`/`ai_vs_ai_test.js`
+(unseeded) blieben im etablierten Referenzbereich.
+
+**Priorität 2 — Data-Sync abgesichert.** Der zuvor gefundene Drift
+(`data/json/advisor-roles.json` fehlte das `baseCost`-Feld seit Schritt 40)
+wurde behoben (`node tools/data-sync.js extract`, keine Kostenwerte
+verändert — nur die Moddatei an den bereits bestehenden `gamedata.js`-Stand
+angeglichen). `tools/data-sync.js` validiert jetzt vor jedem Schreiben
+Pflichtfelder für alle 9 getrackten Tabellen und bricht bei einem
+fehlenden Feld mit klarer Fehlermeldung ab, statt still zu überschreiben.
+Verifiziert: ein voller Extract→Build-Roundtrip lässt `gamedata.js`
+byte-identisch, ein absichtlich entferntes `baseCost`-Feld lässt den Build
+kontrolliert fehlschlagen (gamedata.js bleibt unverändert) — exakt der
+Fehler, der ursprünglich unbemerkt geblieben wäre, ist jetzt hart
+abgesichert.
+
+**Priorität 3 — Tote Belagerungslogik entfernt.** Vor der Entfernung
+projektweit erneut nach Aufrufstellen/String-Referenzen/dynamischem
+Dispatch gesucht (bestätigt: `startSiege()` — die einzige Stelle, die
+`state.pendingSiege` je setzte — wurde von nichts im Projekt aufgerufen).
+Entfernt: `resolveSiegeStorm/Starve/Bribe` (`js/military.js`),
+`startSiege/siegeStarve/siegeBribe` (`js/battle-bridge.js`), die
+zugehörige unerreichbare UI-Verzweigung in `index.html` (Render-Zweig +
+`doSiegeAction()`). Bewusst NICHT angefasst: zwei harmlose, dauerhaft
+falsche `state.pendingSiege`-Schutzabfragen in noch aktivem Code
+(`checkAiWarInitiative`, `applyBattleResultToGame`) sowie `CONFIG.siege`
+in `gamedata.js` (jetzt unbenutzt, aber CONFIG-Werte waren explizit außer
+Scope für diese Phase). `determineWarTerrain()` bleibt aktiv (Kriegskarten-
+Geländebonus).
+
+**Zusätzlich (Punkt 29–31 der Phase-2-Anweisung): Build-Infrastruktur.**
+Neues `tools/build-bundle.js` ersetzt das bisherige Ad-hoc-Inline-Rebuild-
+Skript durch ein committetes Werkzeug mit echter Validierung: Existenz-
+prüfung der 14 Quelldateien, Syntax-Check, und ein Laufzeit-Rauchtest (das
+Bundle wird in einer `vm`-Sandbox tatsächlich gestartet und 12× per
+`advanceMonth()` einen vollen Jahreswechsel durchlaufen lassen). Beim Bau
+dieses Prüfschritts selbst eine echte Schwäche gefunden: ein einzelner
+`advanceMonth()`-Aufruf erreicht `advanceYear()` nie (erst der 12. Aufruf
+löst den Jahreswechsel aus) — die erste Fassung des Rauchtests hätte
+Fehler innerhalb von `advanceYear()` daher nicht erkannt. Mit zwei
+bewussten Fehlereinspielungen (fehlende Datei, kaputter Funktionsaufruf)
+verifiziert, dass das korrigierte Werkzeug beide zuverlässig mit klarer
+Fehlermeldung erkennt, ohne `index.html` zu beschädigen. CODE_AUDIT.md
+Abschnitt 14 enthält zusätzlich eine kleine Modul-Abhängigkeitsübersicht
+(mit dem Hinweis, dass Funktions-Hoisting die Ladereihenfolge weniger
+strikt macht als zunächst angenommen) und eine vorbereitete, aber nicht
+umgesetzte Getter/Selector-Liste für eine mögliche spätere UI-Entkopplung.
+
+**Nicht verändert (bewusst, per Auftrag):** keine Balance-/CONFIG-Werte,
+keine Gameplay-Regeln, keine neuen Events/Systeme, keine UI-Migration, die
+Kampf-Engine (`battle-engine/*.js`) unangetastet.
+
+**Commits** (klein, nachvollziehbar, keine Feature-Commits):
+`test: add deterministic yearly simulation regression baseline` →
+`refactor: extract advanceYear phases without behavior changes` →
+`build: rebuild index.html bundle after advanceYear extraction` →
+`fix: preserve advisor baseCost during data sync` →
+`cleanup: remove unreachable siege implementation` →
+`build: add validated bundle build tool + module dependency overview` →
+diese Dokumentation. Working Tree nach jedem Schritt sauber, alle Tests
+zwischendurch grün.
