@@ -257,6 +257,7 @@ function newGame(options) {
     dynastyName: dynastyName,
     characters: {},
     rulerId: null,
+    memories: { byId: {}, nextId: 1 }, // §Phase-4 World Memory: state.memories.byId["m1"...], siehe js/memory.js
   };
 
   for (const ext of EXTRA_REGIONS) {
@@ -295,7 +296,7 @@ function logLedger(state, label, amount) {
 
 // ---------- Landwirtschaft (§18/§19) ----------
 
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 4;
 
 function serializeSave(state) {
   return JSON.stringify({
@@ -331,9 +332,28 @@ function migrateSaveV2ToV3(parsed) {
   return parsed;
 }
 
+// §Phase-4-Punkt 50/51/52: World Memory erweitert den State um
+// `state.memories`. Alte Saves bekommen einen LEEREN Speicher — KEINE
+// rückwirkend erfundenen historischen Memories ("keine retroaktive
+// Fiktion"). Alte, in Phase 3 auf `character.relationships[x].modifiers`
+// dauerhaft gespeicherte Ereignis-Modifikatoren (amt_verweigert/
+// erbfolge_uebergangen/rivalitaet) werden von der neuen, memory-basierten
+// computeRelationshipBreakdown() ohnehin nicht mehr gelesen — sie bleiben
+// als harmlose, ungenutzte Altlast im Save stehen statt sie künstlich in
+// Memories umzudeuten (dieselbe Nicht-Erfindungs-Regel).
+function migrateSaveV3ToV4(parsed) {
+  if (!parsed.state.memories) parsed.state.memories = { byId: {}, nextId: 1 };
+  for (const id in parsed.state.characters) {
+    if (!parsed.state.characters[id].rivalryOrigin) parsed.state.characters[id].rivalryOrigin = {};
+  }
+  parsed.saveVersion = 4;
+  return parsed;
+}
+
 function deserializeSave(json) {
   let parsed = JSON.parse(json);
   if (parsed.saveVersion === 2) parsed = migrateSaveV2ToV3(parsed);
+  if (parsed.saveVersion === 3) parsed = migrateSaveV3ToV4(parsed);
   if (parsed.saveVersion !== SAVE_VERSION) {
     throw new Error("Inkompatible Spielstand-Version: " + parsed.saveVersion);
   }

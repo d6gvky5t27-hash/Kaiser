@@ -1734,6 +1734,46 @@ const TITLES = [
   }
 ];
 
+// ---------- World Memory (Phase 4) ----------
+// Datengetriebene Defaults pro Memory-Typ (§Punkt 66: "klare Defaults pro
+// Memory-Typ bevorzugen" statt einer riesigen universellen Formel).
+// `direction` steuert, ob/wie eine Memory die Beziehungsberechnung
+// beeinflusst (js/characters.js, computeRelationshipBreakdown()):
+//   "target_to_actor" — wirkt nur vom Ziel Richtung Akteur (Groll/Dank)
+//   "symmetric"        — wirkt zwischen allen Teilnehmern in beide Richtungen
+//   "none"             — rein historisch, beeinflusst keine Beziehung direkt
+// `importance` (1-100) ist der Startwert, `decayRate` der Anteil des
+// emotionalWeight, der pro Jahr verblasst (0 = verblasst nie, siehe §Punkt 46).
+// ELECTION_PROMISE_BROKEN ist bewusst vorbereitet, aber noch nicht verdrahtet
+// (§Punkt 6: "falls einzelne Systeme noch nicht existieren: nur vorbereiten"
+// — es gibt noch kein Versprechenssystem bei Kaiserwahlen, das wäre
+// Kaiserwahl 2.0 und ausdrücklich nicht Teil dieser Phase, §Punkt 79).
+const MEMORY_TYPES = {
+  CHILD_BORN:                { importance: 25, decayRate: 0.04, direction: "none", tags: ["dynasty", "birth"] },
+  HEIR_BORN:                 { importance: 65, decayRate: 0.02, direction: "none", tags: ["dynasty", "birth", "succession"] },
+  MARRIAGE:                  { importance: 55, decayRate: 0,    direction: "none", tags: ["dynasty", "marriage"] },
+  RULER_DIED:                { importance: 90, decayRate: 0,    direction: "none", tags: ["dynasty", "death"] },
+  SUCCESSION:                { importance: 80, decayRate: 0,    direction: "none", tags: ["dynasty", "succession"] },
+  PASSED_OVER_IN_SUCCESSION: { importance: 60, decayRate: 0.02, direction: "target_to_actor", tags: ["dynasty", "succession", "grievance"] },
+  APPOINTED_TO_OFFICE:       { importance: 30, decayRate: 0.06, direction: "target_to_actor", tags: ["hof", "office", "gratitude"] },
+  DENIED_OFFICE:             { importance: 35, decayRate: 0.05, direction: "target_to_actor", tags: ["hof", "office", "grievance"] },
+  DISMISSED_FROM_OFFICE:     { importance: 35, decayRate: 0.05, direction: "target_to_actor", tags: ["hof", "office", "grievance"] },
+  DIED_IN_OFFICE:            { importance: 40, decayRate: 0.03, direction: "none", tags: ["hof", "death"] },
+  ALLIANCE_FORMED:           { importance: 35, decayRate: 0.05, direction: "none", tags: ["diplomacy", "alliance"] },
+  ALLIANCE_BROKEN:           { importance: 50, decayRate: 0.02, direction: "none", tags: ["diplomacy", "betrayal"] },
+  AID_GRANTED:               { importance: 30, decayRate: 0.06, direction: "none", tags: ["diplomacy", "gratitude"] },
+  AID_REFUSED:               { importance: 30, decayRate: 0.06, direction: "none", tags: ["diplomacy", "grievance"] },
+  WAR_DECLARED:              { importance: 50, decayRate: 0.03, direction: "none", tags: ["war"] },
+  MAJOR_BATTLE_WON:          { importance: 65, decayRate: 0.02, direction: "none", tags: ["war", "victory"] },
+  MAJOR_BATTLE_LOST:         { importance: 65, decayRate: 0.02, direction: "none", tags: ["war", "defeat"] },
+  PEACE_SIGNED:              { importance: 45, decayRate: 0,    direction: "none", tags: ["war", "peace"] },
+  TITLE_GAINED:              { importance: 70, decayRate: 0,    direction: "none", tags: ["politics", "title"] },
+  ELECTION_SUPPORT_GIVEN:    { importance: 40, decayRate: 0.04, direction: "none", tags: ["politics", "election", "gratitude"] },
+  ELECTION_PROMISE_BROKEN:   { importance: 55, decayRate: 0.015, direction: "none", tags: ["politics", "election", "betrayal"] },
+  RIVALRY_BEGAN:             { importance: 55, decayRate: 0.01, direction: "symmetric", tags: ["rivalry"] },
+  FAMINE:                    { importance: 55, decayRate: 0.03, direction: "none", tags: ["disaster", "famine"] },
+};
+
 // Event-System: TRIGGER/BEDINGUNGEN/TEXT/ENTSCHEIDUNGEN/KONSEQUENZEN (§38)
 // ---------- Charaktersystem (§9/§10) ----------
 const MALE_NAMES = ["Friedrich","Wilhelm","Heinrich","Konrad","Albrecht","Ludwig","Otto","Rudolf","Gottfried","Sigismund","Bernhard","Eberhard"];
@@ -1773,18 +1813,18 @@ const TRAITS = [
   { id: "fromm",         name: "fromm",         effects: { satisfactionBonus: 4 } },
   { id: "verschwenderisch", name: "verschwenderisch", effects: { treasuryDrain: 0.1 } },
   // --- neu in Phase 3 ---
-  { id: "loyal",         name: "loyal",         effects: { loyaltyMod: 15 } },
-  { id: "barmherzig",    name: "barmherzig",    effects: { loyaltyMod: 5 } },
+  { id: "loyal",         name: "loyal",         effects: { loyaltyMod: 15, memoryDecayModPositive: -0.3 } },
+  { id: "barmherzig",    name: "barmherzig",    effects: { loyaltyMod: 5, memoryDecayModNegative: 0.5 } },
   { id: "mutig",         name: "mutig",         effects: { claimAggression: 5 } },
   { id: "feige",         name: "feige",         effects: { loyaltyMod: 10, claimAggression: -10 } },
   { id: "intelligent",   name: "intelligent",   effects: { advisorEffectMod: 0.08 } },
   { id: "naiv",          name: "naiv",          effects: { advisorEffectMod: -0.05, loyaltyMod: 5 } },
   { id: "charismatisch", name: "charismatisch", effects: { relationshipMod: 5 } },
-  { id: "paranoid",      name: "paranoid",      effects: { loyaltyMod: -10 } },
+  { id: "paranoid",      name: "paranoid",      effects: { loyaltyMod: -10, memoryWeightAmplifierNegative: 0.3 } },
   { id: "arrogant",      name: "arrogant",      effects: { loyaltyMod: -8, claimAggression: 8 } },
   { id: "bescheiden",    name: "bescheiden",    effects: { loyaltyMod: 8, claimAggression: -10 } },
   { id: "korrupt",       name: "korrupt",       effects: { advisorEffectMod: -0.1 } },
-  { id: "rachsuechtig",  name: "rachsüchtig",   effects: { claimAggression: 10 } },
+  { id: "rachsuechtig",  name: "rachsüchtig",   effects: { claimAggression: 10, memoryDecayModNegative: -0.4 } },
 ];
 
 // §Punkt 75: offensichtlich widersprüchliche Kombinationen vermeiden (nicht
@@ -1859,6 +1899,7 @@ function createCharacter(gender, age, surname) {
     loyalty: 50,          // getrennt von "Beziehung" (§Punkt 16), siehe computeLoyalty()
     advisorRole: null,
     rivalIds: [],
+    rivalryOrigin: {},    // §Phase-4-Punkt 32: rivalId -> Memory-ID des auslösenden Ereignisses
   };
 }
 
