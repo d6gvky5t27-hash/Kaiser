@@ -235,11 +235,12 @@ Gedächtnis für Wetter oder einzelne Preisschwankungen.
   Ereignisse (Amt verweigert, Erbfolge übergangen, Rivalität) sind jetzt
   selbst Memories und fließen live-zerfallend statt als starrer Fixwert in
   `computeRelationshipBreakdown()` ein — keine doppelte Buchführung.
-- **World Memory ist NICHT die Chronik.** Eine vorbereitete, aber noch
-  nicht aktiv genutzte Brücke (`memoryToChronicleCandidate()`) liefert
-  Kandidaten-Text für eine spätere, bedeutungsbasierte Chronik — das
-  bestehende 95%-Wetter-Problem (siehe „Narrative Density" unten) bleibt in
-  dieser Phase bewusst unangetastet.
+- **World Memory ist NICHT die Chronik.** In Phase 4 lieferte
+  `memoryToChronicleCandidate()` nur vorbereiteten Kandidaten-Text, ohne
+  aktiv genutzt zu werden — das bestehende 95%-Wetter-Problem (siehe
+  „Narrative Density" unten) blieb in dieser Phase bewusst unangetastet.
+  Seit Phase 7 ist World Memory die tatsächliche Datengrundlage der
+  Dynasty Chronicle (siehe „Dynasty Chronicle 2.0 (Phase 7)" unten).
 - **Bewusst NICHT Teil von Phase 4**: Event Chains (folgte in Phase 5),
   Story Threads/Drama Director (folgten in Phase 6, siehe unten),
   UI-Redesign.
@@ -362,28 +363,41 @@ Waren.
 
 Keine differenzierten Herrscher-Todesursachen (nur Alter/Gesundheit —
 Berater sterben seit Phase 3 zwar auch, aber mit derselben
-undifferenzierten Formel), keine bedeutungsbasierte Chronik (Event Chains
-liefern seit Phase 5 chronikwürdige Momente, werden aber bewusst noch
-nicht automatisch in die Chronik geschrieben), Story-Thread-Resolution
-unterscheidet noch nicht zwischen friedlichem und eskalationsbedingtem
-Ende (siehe CODE_AUDIT.md).
+undifferenzierten Formel). `no_heir`-Rate (ca. 20 % unter FIRST_OPTION,
+Phase-7-Messung) bewusst nur gemessen, nicht korrigiert (§Punkt 83-85,
+spätere separate Entscheidung). Zwei frühere Lücken sind seit Phase 7
+geschlossen und hier nur noch der Vollständigkeit halber erwähnt: eine
+bedeutungsbasierte Chronik existiert jetzt (siehe „Dynasty Chronicle 2.0
+(Phase 7)" unten), und Story-Thread-Resolution unterscheidet jetzt
+strukturiert zwischen friedlichem und eskalationsbedingtem Ende
+(Resolution 2.0, ebenfalls unten).
 
 ## Narrative Density
 
-**Aktueller Zustand** (belegt durch `BASELINE.md`, Abschnitt "85-Year
-Chronicle Test"): Die Simulation erzeugt technisch viele Chronikeinträge,
-aber nur wenige erinnerungswürdige Ereignisse. In einem vollständig
-protokollierten 85-Jahre-Testlauf waren 95% aller Chronikeinträge reiner
-Wetter-Flavourtext, nur 11 Ereignisse über die gesamte Partie waren
-tatsächlich story-relevant (≈ alle 8 Jahre eines). Das aktuelle Verhältnis
-von ca. 95% Wetter-Flavour zu 5% relevanten Ereignissen ist nicht
-ausreichend, um die vom Master-Prompt geforderte "Nur noch ein Jahr"-
-Neugier zu erzeugen.
+**Historischer Ausgangszustand** (belegt durch `BASELINE.md`, Abschnitt
+"85-Year Chronicle Test"): Die Simulation erzeugte technisch viele
+Chronikeinträge, aber nur wenige erinnerungswürdige Ereignisse. In einem
+vollständig protokollierten 85-Jahre-Testlauf waren 95% aller
+Chronikeinträge reiner Wetter-Flavourtext, nur 11 Ereignisse über die
+gesamte Partie waren tatsächlich story-relevant.
 
-**Designziel**: Die Chronik soll nicht primär Ereignis**menge** messen,
-sondern Ereignis**bedeutung**. Ein gutes 50- bis 100-Jahre-Spiel soll eine
-nachvollziehbare Geschichte erzählen, die sich in wenigen Sätzen
-zusammenfassen lässt — nicht in einer Liste von 200 Wetterberichten.
+**Aktueller Zustand seit Phase 7** (belegt durch
+`tests/phase7_chronicle_metrics_test.js`, 30×100-Jahre-Messung): das
+World Log (`state.chronicle`) bleibt unverändert vollständig und weiterhin
+zu ca. 64 % Wetter-Flavourtext — das ist gewollt, das World Log ist die
+technische Vollständigkeits-Ebene. Die neu abgeleitete Dynasty Chronicle
+(`computeDynastyChronicle()`, js/chronicle.js) hat dagegen einen
+Wetteranteil von **0 %** bei Ø 30,1 strukturierten Einträgen pro Partie
+(Ø 3,0 pro Jahrzehnt) — Wetter erscheint dort nur noch indirekt, wenn es
+eine echte Hungerkrise mit Toten auslöst (als `FAMINE`-Krisen-Eintrag,
+nicht als Wetterzeile). Das oben beschriebene Designziel ("Ereignis**menge**"
+vs. "Ereignis**bedeutung**") ist damit strukturell umgesetzt.
+
+**Designziel (weiterhin gültig)**: Die Chronik soll nicht primär
+Ereignis**menge** messen, sondern Ereignis**bedeutung**. Ein gutes 50- bis
+100-Jahre-Spiel soll eine nachvollziehbare Geschichte erzählen, die sich
+in wenigen Sätzen zusammenfassen lässt — nicht in einer Liste von 200
+Wetterberichten.
 
 Beispiele für bedeutende Chronikpunkte (bereits teilweise als
 Einzelereignisse vorhanden, aber ohne Verkettung/Gewichtung, siehe
@@ -433,51 +447,64 @@ ROADMAP.md → LATER → Narrative Systems für die Reihenfolge):
 
 - Event Chains — **seit Phase 5 erledigt** (siehe Abschnitt „Event Chains
   (Phase 5)" oben)
-- World Memory — **die Datengrundlage ist seit Phase 4 vorhanden**
-  (`js/memory.js`, siehe Abschnitt „World Memory (Phase 4)" oben), aber
-  bewusst noch NICHT an die Chronik angeschlossen (`memoryToChronicleCandidate()`
-  ist nur vorbereitet) — dieser Abschnitt bleibt daher als offene Lücke
-  stehen, bis eine spätere Phase die bedeutungsbasierte Chronik tatsächlich
-  umsetzt. Event Chains erzeugen seit Phase 5 zwar chronikwürdige Momente
-  (`addChronicle()` beim Anbieten einer Entscheidung), aber das ist ein
-  Nebeneffekt der bestehenden Event-UI-Wiederverwendung, keine bewusste
-  bedeutungsbasierte Chronik-Selektion — diese Lücke bleibt also trotzdem
-  offen
+- World Memory — **seit Phase 4 vorhanden** (`js/memory.js`) und **seit
+  Phase 7 aktiv an die Chronik angeschlossen** (`js/chronicle.js`,
+  `computeDynastyChronicle()`) — die ursprünglich nur vorbereitete Brücke
+  `memoryToChronicleCandidate()` ist damit überholt/ersetzt durch die
+  tatsächliche Selektionslogik (`isChronicleWorthy()`)
 - Story Threads — **seit Phase 6 erledigt** (siehe Abschnitt „Story
   Threads & Drama Director (Phase 6)" oben)
 - Drama Director — **seit Phase 6 erledigt**, siehe oben
-- aktivere KI-Dynastien
-- bedeutungsbasierte Chronik
+- bedeutungsbasierte Chronik — **seit Phase 7 erledigt**, siehe Abschnitt
+  „Dynasty Chronicle 2.0 (Phase 7)" unten
+- aktivere KI-Dynastien — weiterhin offen, keine Phase adressiert das
+  bisher
 
-**Noch NICHT implementieren** — dieser Abschnitt ist reine Zieldefinition
-für eine spätere Phase.
+## Dynasty Chronicle 2.0 (Phase 7) — World Log / Dynasty Chronicle
 
-## Zukünftige Chronik-Architektur (Designregel, noch nicht implementiert)
+Die oben beschriebene Zwei-Ebenen-Architektur ist seit Phase 7
+**umgesetzt** (`js/chronicle.js`):
 
-Nicht jedes simulierte Ereignis gehört automatisch in die Hauptchronik.
-Zukünftig sollen mindestens zwei Ebenen existieren:
+**WORLD LOG** — vollständige technische Ereignishistorie, unverändert
+`state.chronicle` selbst. Bleibt bewusst ungefiltert und vollständig (u. a.
+zur Determinismus-Prüfung in `advance_year_snapshot_test.js` weiterhin
+nützlich) — ca. 64 % davon sind Wetter-Flavourtext, das ist normal und
+gewollt.
 
-**WORLD LOG** — vollständige technische Ereignishistorie (das ist im
-Kern bereits das heutige `state.chronicle`, nur ungefiltert).
+**DYNASTY CHRONICLE** — `computeDynastyChronicle(state)`, ON DEMAND aus
+World Memory + Story-Thread-Zusammenfassungen abgeleitet, nur bedeutende,
+erzählerisch relevante Ereignisse. Zwei Aufnahmepfade:
 
-**DYNASTY CHRONICLE** — nur bedeutende, erzählerisch relevante Ereignisse,
-gefiltert nach Wirkung statt nach Auftreten.
+- **ALWAYS CHRONICLE**: Herrschertod, Thronfolge, Thronfolgergeburt,
+  Titelaufstieg, Kriegserklärung, Frieden, Dynastie-Ende — immer
+  aufgenommen, unabhängig vom Score.
+- **SCORED CHRONICLE**: additive Punktzahl aus Memory-Bedeutsamkeit +
+  Herrscher-/Thronfolger-Beteiligungs-Bonus + Zugehörigkeit zu einem
+  bedeutenden Story Thread, Schwelle konfigurierbar über
+  `CONFIG.chronicle.scoredThreshold` (aktuell 45) — keine starre
+  50-Punkte-Regel.
 
-Beispiel: Jeder Winter kann weiterhin im World Log stehen. In die
-(zukünftige) Dynasty Chronicle kommt er aber nur, wenn er:
+Wetter erscheint in der Dynasty Chronicle nur noch INDIREKT: reines Wetter
+erzeugt strukturell nie eine Memory, nur eine echte Hungerkrise mit
+1 %+ hungerbedingter Sterblichkeit tut das (`FAMINE`, unverändert seit
+Phase 4) — dann gehört die KRISE in die Chronik, nicht der Wettertext.
+Gemessen (30×100 Jahre, `tests/phase7_chronicle_metrics_test.js`):
+Wetteranteil Dynasty Chronicle 0 %, bei Ø 30,1 Einträgen/Partie.
 
-- eine Hungersnot auslöst
-- den Handel massiv verändert
-- einen Krieg beeinflusst
-- große Verluste erzeugt
-- eine Eventkette startet
+Story Threads liefern eigene Zusammenfassungs-Einträge (Kategorie
+GESCHICHTE), templatebasiert aus der echten Thread-Historie
+(`summarizeStoryThread()`) — keine externe KI-Texterzeugung. Dedup: eine
+Memory, die bereits Teil einer solchen Zusammenfassung ist, erscheint
+nicht zusätzlich einzeln (außer sie ist selbst Always-Chronicle-würdig).
 
-Damit vermeiden wir, dass Wetter (oder andere hochfrequente Routine-
-Ereignisse) die eigentliche Geschichte verdrängt, wie es der 85-Year-
-Chronicle-Test aktuell zeigt (95% Wetter-Flavour). **Diese Zwei-Ebenen-
-Architektur ist noch nicht umgesetzt** — sie ist eine vorbereitete
-Designregel für die Event-Chains-/Drama-Director-Phase (ROADMAP.md →
-LATER), keine aktuelle Funktion.
+Ruler Eras (`getRulerEras()`) und Herrscherbiografien
+(`buildRulerBiography()`) sind aus denselben Quellen ableitbar — siehe
+DEVELOPMENT.md „Phase 7" für Details.
+
+**Bewusst NICHT Teil von Phase 7**: Kaiserwahl 2.0, Kriegssystem-
+Erweiterung, politisches Interessengruppensystem, neue Waren, große
+Weltkartenerweiterung, finales Renaissance-/Comic-UI-Redesign (geplant als
+Phase 8, siehe ROADMAP.md — erst nach expliziter Freigabe).
 
 ## Entscheidungsregel für neue Mechaniken
 

@@ -1122,3 +1122,76 @@ Phase 3, World-Memory-Kern aus Phase 4, Event-Chain-Eligibility aus Phase
 5 — der Drama Director wählt nachweislich nur unter bereits eligiblen
 Ketten, siehe `drama_director_test.js` §116/117). `battle-engine/*.js`
 und `js/battle-bridge.js` sind technisch unverändert (bestätigt per Diff).
+
+## 19. Ergänzende Audit-Ergebnisse — Phase 7 (Narrative Calibration & Chronicle 2.0)
+
+Ein neues Modul `js/chronicle.js` plus Importance-2.0-/Resolution-2.0-
+Umbau in `js/story-threads.js` (siehe DEVELOPMENT.md „Phase 7" für den
+vollständigen Funktionsumfang). Punkt 5 aus Abschnitt 18 oben ist damit
+AUFGELÖST: Thread-`resolution` ist jetzt ein strukturiertes Objekt und
+unterscheidet strukturiert zwischen friedlichem (RECONCILED/COMPROMISE/
+SUCCESS/…, Ton PEACEFUL/TRIUMPHANT) und eskalationsbedingtem Ende
+(ESCALATED/FAILED/WAR, Ton CONFLICT/TRAGIC). Vier neue, beobachtbare
+technische Punkte:
+
+1. **Dedup-Logik ist eine Mengen-Operation über die volle Memory-/
+   Thread-Liste pro Aufruf**: `computeDynastyChronicle()` baut bei jedem
+   Aufruf zuerst `summarizedMemoryIds` aus ALLEN Threads
+   (`getAllStoryThreads(state)`, aktiv + resolved) und iteriert danach
+   ALLE Memories (`allMemories(state)`) einmal durch — O(Threads +
+   Memories), keine verschachtelte O(n²)-Schleife, aber bewusst NICHT
+   inkrementell gepflegt (siehe Architekturentscheidung in
+   DEVELOPMENT.md „Phase 7"). Bei den in
+   `phase7_chronicle_metrics_test.js` gemessenen Größenordnungen (Ø 190
+   World-Log-Zeilen, Ø 30 Dynasty-Chronicle-Einträge pro 100-Jahre-Partie)
+   unkritisch — wird aber bei jedem Aufruf neu berechnet (Debug-Panel,
+   Metriken), nie bei `advanceYear()` selbst, genau um ein wiederholtes
+   O(n)-Scannen aus dem Jahres-Hot-Path herauszuhalten (§Punkt 64).
+2. **State-Wachstum um ein neues, kleines Feld**: `state.rulerEraSnapshots`
+   wächst um höchstens einen Eintrag pro tatsächlicher Thronfolge (nicht
+   pro Jahr) — deutlich kleiner als `state.memories.byId`/
+   `state.storyThreads.resolved`, dieselbe bewusste Nicht-Löschung
+   (Vorher/Nachher-Vergleich für Herrscherbiografien braucht den Start-
+   Snapshot dauerhaft). Gehört zur selben, bereits in Abschnitt 16-18
+   dokumentierten Beobachtungsreihe für sehr lange Kampagnen/viele
+   Dynastiewechsel.
+3. **Summary-Templates sind rein additive Textbausteine, keine
+   KI-Generierung** — `summarizeStoryThread()`/`formatRulerBiography()`
+   verketten ausschließlich bereits vorhandene, echte Felder
+   (`thread.history`, `resolution.type/tone/consequences`,
+   `bio.highlights/population/treasury`). Beobachteter kosmetischer
+   Nebeneffekt (siehe Beispielausgabe in `phase7_chronicle_metrics_test.js`,
+   Seed 701): eine Story-Thread-Zusammenfassung kann denselben Sachverhalt
+   knapp wiederholen, den bereits eine ALWAYS/SCORED-Chronicle-Zeile kurz
+   davor gezeigt hat (z. B. "Ludwig ... wurde ein Platz im Rat
+   zugestanden" als eigene POLITIK-Zeile UND innerhalb der späteren
+   Thread-Zusammenfassung) — das ist KEIN Verstoß gegen die getestete
+   Dedup-Regel (§87/88, dort geht es um dieselbe Memory-ID, nicht um
+   thematisch verwandte, aber unterschiedliche Memories), aber ein
+   kosmetischer Wiederholungs-Punkt, den eine spätere Phase ggf. durch
+   Ausblenden bereits einzeln gezeigter Memories aus der Thread-Recap-Zeile
+   glätten könnte.
+4. **Legacy-Chronik-Migration (v6→v7) reklassifiziert, statt zu löschen
+   oder zu erfinden**: `migrateSaveV6ToV7()` ruft `classifyThreadResolution()`
+   auf bereits abgeschlossene Phase-6-Threads erneut auf — eine reine
+   Funktion bereits gespeicherter Fakten, keine neue Fiktion (siehe
+   DEVELOPMENT.md „Phase 7", Abschnitt Savegame-Migration). Getestet in
+   `chronicle_test.js` (§Migration v6→v7). Ein noch nicht getesteter
+   Randfall: ein sehr altes Savegame, das mehrere Migrationsstufen (v2→v7)
+   in einer Kette durchläuft — `deserializeSave()` verkettet dies zwar
+   korrekt (dieselbe bereits etablierte sequentielle if-Kette wie in jeder
+   vorherigen Phase), ein Multi-Stufen-Migrationstest von v2 direkt bis v7
+   in einem einzigen Testfall existiert aber nicht (nur die jeweils
+   einzelne Stufe ist pro Testdatei abgedeckt) — ein Beobachtungspunkt für
+   eine spätere Aufräum-Phase, kein bekannter Fehler.
+
+**DO-NOT-TOUCH-Liste aus Abschnitt 12 bleibt unverändert gültig** — keines
+der geschützten Systeme wurde in Phase 7 verändert (Kampf-Engine,
+Kohorten-Bevölkerungsmodell, Preisbildung, Ledger-System, kalibrierte
+CONFIG-Werte, Regierungsstil-/Regionalhandel-Balance, Beratermechanik aus
+Phase 3, World-Memory-Kern aus Phase 4, Event-Chain-Eligibility aus Phase
+5, Drama-Director-Priorisierung aus Phase 6). Der Trade-Off-Audit
+(§Punkt 50-52) führte zu KEINER Options-/CONFIG-Änderung, da keine der 10
+Ketten eine strikt dominante Option zeigte (siehe DEVELOPMENT.md „Phase
+7"). `battle-engine/*.js` und `js/battle-bridge.js` sind technisch
+unverändert (bestätigt per Diff).

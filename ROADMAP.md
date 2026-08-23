@@ -109,6 +109,33 @@ werden zuerst fertiggestellt/gefestigt, bevor neue Breite hinzukommt.
       unterscheidet noch nicht zwischen friedlichem und eskalations-
       bedingtem Ende. **Phase 7 wurde NICHT automatisch begonnen** —
       wartet auf ausdrückliche Freigabe (§Phase-6-Punkt 113/119).
+- [x] **Phase 7 — Narrative Calibration & Chronicle 2.0** (Ergebnisse:
+      GAME_DESIGN.md → "Dynasty Chronicle 2.0 (Phase 7)", Ablauf:
+      DEVELOPMENT.md "Phase 7"): reine Kalibrierungs-Phase, keine neuen
+      Spielsysteme. Importance 2.0 (additive, nachvollziehbare
+      12-Komponenten-Formel statt einer Blackbox, behebt einen
+      Null-Varianz-Bug, der `SUCCESSION_CONFLICT`/`PERSONAL_RIVALRY`-
+      Threads pro Typ auf exakt denselben Wert eingefroren hatte — Anteil
+      `importance>=50` steigt von 2,6% auf 56% im 30×100-Jahre-Audit).
+      Resolution 2.0 (`thread.resolution` jetzt strukturiert:
+      type/tone/outcome/consequences, ausschließlich aus echten Daten
+      abgeleitet, nie gewürfelt). Neues Modul `js/chronicle.js`: World Log
+      (`state.chronicle`, unverändert vollständig, ~64% Wetteranteil) vs.
+      Dynasty Chronicle (`computeDynastyChronicle()`, ON DEMAND aus World
+      Memory + Thread-Zusammenfassungen abgeleitet, 0% Wetteranteil bei Ø
+      30 Einträgen/100-Jahre-Partie), Ruler Eras/Herrscherbiografien,
+      Dynasty Milestones/Summary, 4-Policy-Vergleich (FIRST_OPTION/
+      RANDOM_VALID_OPTION/CONCILIATORY/neu: HARDLINE) bestätigt FIRST_OPTIONs
+      frühere 64%-QUIET-Messung als Policy-Artefakt statt Balance-Problem.
+      Trade-Off-Audit aller 10 Event Chains (keine dominante Option
+      bewiesen, daher keine CONFIG-Änderung). Savegame-Migration v6→v7.
+      Entscheidender Qualitätstest bestanden (§Punkt 98): 5 vollständige
+      echte 100-Jahre-Dynastie-Chroniken lesen sich als zusammenhängende
+      Geschichte statt als Wetterprotokoll (siehe
+      `tests/phase7_chronicle_metrics_test.js`). Chronicle-Debug-Panels
+      (Kandidaten/Dynasty Chronicle/Herrscher-Biografie/Dynasty Summary).
+      **Phase 8 wurde NICHT automatisch begonnen** — wartet auf
+      ausdrückliche Freigabe (§Phase-7-Punkt 97).
 
 ## NEXT (nach Freigabe, in der vom Master-Prompt vorgeschlagenen Reihenfolge)
 
@@ -117,38 +144,42 @@ werden zuerst fertiggestellt/gefestigt, bevor neue Breite hinzukommt.
       ob `tools/data-sync.js` um `TERRITORIES`/`START_REGIONS`/`TRAITS`/
       `MEMORY_TYPES` erweitert oder die JSON-Modding-Schicht bewusst als
       begrenzt dokumentiert wird (siehe CODE_AUDIT.md Abschnitt 6).
-- [ ] Phase 7 — Kaiserwahl 2.0: Wahlkampf, Versprechen, Kurfürsten-
+- [ ] **Phase 8 — Visual Identity & UI-Redesign** (nächste angekündigte
+      Phase, siehe § "Bewusst NICHT Teil von Phase 7"/§Punkt 97 STOPP der
+      Phase-7-Vorgabe — noch NICHT begonnen): entspricht inhaltlich dem
+      seit Phase 2 als "Phase 10 — UI-Redesign" unter UI & Fun Pass unten
+      vorgeplanten Historical-Graphic-Novel-Look (Weltkarte als
+      Hauptbildschirm-Zentrum, sichtbare Weltzustände) — beide Einträge
+      meinen denselben noch ungeplanten Umbau, hier nur unter dem vom
+      aktuellen Master-Prompt verwendeten Namen zusätzlich referenziert.
+- [ ] Phase 9 — Kaiserwahl 2.0: Wahlkampf, Versprechen, Kurfürsten-
       Interessen statt reiner Bestechung/Beziehungsschwelle.
-- [ ] Phase 8 — War & Peace 2.0: Friedensverhandlung statt automatischer
-      Vasallisierung bei Vollständigkeit, Versorgungsmechanik auf der
-      Kriegskarte, echte Annexionsoption mit Konsequenzen.
-- [ ] Phase 9 — Politik: Regierungsstil-Regler um weitere Stellschrauben
-      ergänzen (Bauernabgaben/Handelszölle/Adelsprivilegien/Kirchenrechte)
-      statt eines einzelnen Reglers, politische Interessengruppen.
+- [ ] Phase 10 (Politik/Krieg-Nummerierung dieser Liste) — War & Peace 2.0:
+      Friedensverhandlung statt automatischer Vasallisierung bei
+      Vollständigkeit, Versorgungsmechanik auf der Kriegskarte, echte
+      Annexionsoption mit Konsequenzen.
+- [ ] Politik: Regierungsstil-Regler um weitere Stellschrauben ergänzen
+      (Bauernabgaben/Handelszölle/Adelsprivilegien/Kirchenrechte) statt
+      eines einzelnen Reglers, politische Interessengruppen.
 
 ## LATER
 
 ### Narrative Systems
 
-Belegt durch den 85-Year-Chronicle-Test (`BASELINE.md`): 95% der Chronik
-ist aktuell Wetter-Flavourtext, nur ~1 relevantes Ereignis alle 8 Jahre bei
-passivem Spiel (siehe `GAME_DESIGN.md` → "Narrative Density"/"Emergent
-Storytelling Gap"). Diese Gruppe war zuvor als Phase 4–6 unter NEXT
-eingeplant, wandert aber nach der Priorisierung von Phase 2 (Technical
-Stabilization) hierher — erst nach Phase 2/3 sinnvoll angehbar. **World
-Memory ist seit Phase 4 erledigt, Event Chains sind seit Phase 5 erledigt,
-Story Threads/Drama Director sind seit Phase 6 erledigt** (siehe CURRENT
-oben) — alle vier daher hier nicht mehr aufgeführt:
+Historischer Befund (85-Year-Chronicle-Test, `BASELINE.md`): 95% der
+Chronik war ursprünglich Wetter-Flavourtext, nur ~1 relevantes Ereignis
+alle 8 Jahre bei passivem Spiel (siehe `GAME_DESIGN.md` → "Narrative
+Density"/"Emergent Storytelling Gap"). **World Memory ist seit Phase 4
+erledigt, Event Chains seit Phase 5, Story Threads/Drama Director seit
+Phase 6, die bedeutungsbasierte Chronik (World Log/Dynasty Chronicle)
+seit Phase 7 erledigt** (siehe CURRENT oben, `GAME_DESIGN.md` → "Dynasty
+Chronicle 2.0 (Phase 7)") — alle vier daher hier nicht mehr aufgeführt:
 
-- [ ] Bedeutungsbasierte Chronik (WORLD LOG vs. DYNASTY CHRONICLE, siehe
-      `GAME_DESIGN.md` → "Zukünftige Chronik-Architektur"): nur Ereignisse
-      mit echter Wirkung (Hungersnot, Kriegseinfluss, große Verluste,
-      Eventketten-Start) erscheinen in der Hauptchronik statt jedes
-      Wetterberichts.
 - [ ] Aktivere KI-Dynastien (mehr eigenständig sichtbare Lebensereignisse
-      bei KI-Regionen, nicht nur beim Spieler).
+      bei KI-Regionen, nicht nur beim Spieler). Einziger noch offener
+      Punkt dieser Gruppe.
 
-**Noch NICHT implementieren** — diese Gruppe ist Zieldefinition, kein
+**Noch NICHT implementieren** — dieser Punkt ist Zieldefinition, kein
 aktueller Auftrag.
 
 ### UI & Fun Pass

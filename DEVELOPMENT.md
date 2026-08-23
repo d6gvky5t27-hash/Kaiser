@@ -2619,3 +2619,250 @@ verändert.
 UI-Redesign, Kriegssystem-Erweiterung, politische Interessengruppen, neue
 Waren. Battle Engine (`battle-engine/*.js`, `js/battle-bridge.js`)
 technisch unverändert.
+
+## 2026-08-23 – Phase 7 (KAISERREICH-Next-Generation-Master-Prompt): Narrative Calibration & Chronicle 2.0
+
+Reine Kalibrierungs-Phase (§Punkt 1: KEINE Feature-Erweiterung) — macht aus
+der bestehenden Simulation eine lesbare Dynastie-Geschichte, ohne neue
+Spielsysteme. Kernarbeit: Thread-Importance neu berechnen, Thread-
+Resolution strukturieren, und aus World Memory + Story Threads eine
+selektierte "Dynasty Chronicle" ableiten, getrennt vom vollständigen
+"World Log" (`state.chronicle`, bleibt unverändert bestehen).
+
+**Importance 2.0 — Audit zuerst, dann Fix (§Punkt 2-7).** Ein erster
+30×100-Jahre-Audit-Lauf bestätigte GENAU den in der Auftragsbeschreibung
+genannten Missstand: alle 115 gemessenen `SUCCESSION_CONFLICT`-Threads
+hatten exakt denselben Importance-Wert (43), alle 36
+`PERSONAL_RIVALRY`-Threads ebenso (20) — keine Streuung innerhalb eines
+Typs. Ursache gefunden: `computeThreadImportance()` prüfte
+`thread.actorIds.includes(state.rulerId)`, aber der Herrscher wird per
+Architekturentscheidung aus Phase 5/6 NIE in `actorIds` gespeichert
+(immer live über `state.rulerId` referenziert) — der Bonus konnte für
+genau die Thread-Typen, die strukturell IMMER den Herrscher betreffen, nie
+greifen. Ersetzt durch `threadInvolvesRuler()`/`threadInvolvesHeir()`
+(js/story-threads.js), die den Herrscher-/Erben-Bezug semantisch statt
+über reine ID-Mitgliedschaft prüfen. Die neue Importance ist eine additive
+Summe aus 12 einzeln benannten, nachvollziehbaren Komponenten (keine
+Blackbox, §Punkt 6): Basis, Herrscher beteiligt, Thronfolger betroffen,
+starker Anspruch, Rivalität, Krieg, Herrscherwechsel während der
+Geschichte, wirtschaftlicher/Versorgungsschaden, Dauer (gedeckelt),
+bedeutende Memories (gedeckelt), Kaiser-/Titelbezug, CLIMAX erreicht,
+Event-Chains (gedeckelt) — abrufbar über `explainThreadImportance()` fürs
+Debug-Panel. Zusätzlich behoben: `PERSONAL_RIVALRY`-Threads aus
+`grieved_advisor`-Ketten verblassten strukturell nach genau 1 Jahr, weil
+weder Memories noch der generische Signal-Detector eine frisch gestartete
+Chain als gültiges Signal erkannten — `advanceStoryThread()` zählt eine
+aktive angehängte Chain jetzt selbst als Signal.
+
+**Vorher/Nachher (30×100 Jahre, FIRST_OPTION, identischer Audit-Aufbau):**
+Threads mit `importance >= 50`: 11 von 415 (2,6 %, der in der
+Auftragsbeschreibung genannte Ausgangsbefund) → 234 von 415 (56 %) nach
+dem Fix, mit echter Streuung innerhalb jedes Typs (z. B.
+`SUCCESSION_CONFLICT` vorher konstant 43, nachher Min 67/Max 100;
+`DYNASTIC_ALLIANCE` Min 33/Max 63; `FOOD_CRISIS` Min 31/Max 80). Ehrlich
+mitgemessen statt verschwiegen: `SUCCESSION_CONFLICT` liegt jetzt eher am
+oberen Ende (Ø 95, 113 von 115 ≥ 75) — der Thread-Typ ist architektonisch
+fast immer herrscher-/erben-relevant UND langlebig genug, um die
+Dauer-/Memory-Komponenten auszureizen; keine künstliche Deckelung
+eingezogen, um diese realen Werte zu verstecken.
+
+**Resolution 2.0 (§Punkt 8-14).** `thread.resolution` ist jetzt ein
+strukturiertes Objekt `{type, tone, outcome, year, primaryActorId,
+consequences: [], sourceChainIds: []}` statt eines bloßen Strings.
+`classifyThreadResolution()` (js/story-threads.js) leitet Typ/Ton
+AUSSCHLIESSLICH aus bereits vorhandenen echten Daten ab, nie aus Würfeln:
+Tod eines Beteiligten übersticht alles (DIED/TRAGIC), ein
+FOREIGN_CONFLICT-Thread liest den tatsächlichen `state.warState`
+(WAR/PEACE), sonst wird der letzte abgeschlossene Event-Chain-Ausgang über
+`CHAIN_OUTCOME_RESOLUTION_MAP` (alle ~30 möglichen Chain-Ausgänge aus den
+10 Templates) auf eine von 14 Typen (RECONCILED/ESCALATED/SUPPRESSED/
+COMPROMISE/FAILED/SUCCESS/MARRIED/APPOINTED/EXILED/DIED/WAR/PEACE/
+ABANDONED/NATURAL_END) und einen von 5 rein dramaturgischen (keine
+moralische Wertung, §Punkt 10/42) Tönen (PEACEFUL/CONFLICT/TRAGIC/
+TRIUMPHANT/AMBIGUOUS) abgebildet; ohne abgeschlossene Chain entscheidet
+die aktuelle Beziehung zwischen Hauptakteur und Herrscher. Resolved
+Threads bleiben unverändert vollständig in `state.storyThreads.resolved`
+erhalten (kein Löschen).
+
+**World Log / Dynasty Chronicle — Architekturentscheidung (§Punkt 15-27).**
+Bewusst KEIN neuer, inkrementell gepflegter State-Zweig: das hätte 50+
+bestehende `addChronicle()`-Aufrufstellen in praktisch jeder Datei
+anfassen müssen — ein Umbaurisiko weit über den Rahmen dieser
+Kalibrierungs-Phase hinaus. Stattdessen `computeDynastyChronicle(state)`
+(neues `js/chronicle.js`), das die Dynasty Chronicle ON DEMAND aus bereits
+strukturierten Quellen ABLEITET: World Memory + Story-Thread-
+Zusammenfassungen. World Log = `state.chronicle` selbst, bleibt
+unverändert vollständig (Wetter, Routine, alles). Diese Architektur
+erfüllt §18 ("kein Wetter in der Dynasty Chronicle") automatisch, ohne
+Text zu parsen: reines Wetter erzeugt strukturell NIE eine Memory — nur
+Hungerkrisen mit echten Toten tun das (`FAMINE`, ab 1 % hungerbedingter
+Sterblichkeit, js/memory.js, unverändert aus Phase 4). Damit ist auch §68
+("Wetter MIT echten Folgen darf Teil der Geschichte sein") automatisch
+erfüllt: eine echte Hungerkrise erzeugt bereits eine `FAMINE`-Memory,
+unabhängig vom Wettertext selbst.
+
+Zwei Aufnahme-Pfade (§Punkt 19-22): `ALWAYS_CHRONICLE_MEMORY_TYPES`
+(RULER_DIED, SUCCESSION, HEIR_BORN, TITLE_GAINED, WAR_DECLARED,
+PEACE_SIGNED, DYNASTY_ENDED — immer aufgenommen, unabhängig vom Score) und
+SCORED CHRONICLE (`computeChronicleScoreBreakdown()`: Memory-Bedeutsamkeit
++ Herrscher-beteiligt-Bonus + Thronfolger-beteiligt-Bonus +
+Thread-Zugehörigkeits-Bonus, additiv über `CONFIG.chronicle`, Schwelle
+`scoredThreshold: 45` — keine feste 50-Punkte-only-Regel, §Punkt 22).
+Dedup (§Punkt 87/88): eine Memory, die bereits Teil einer bedeutsamen,
+abgeschlossenen Thread-Zusammenfassung ist (`importance >=
+threadSummaryThreshold: 50`), erscheint NICHT zusätzlich einzeln —
+außer sie ist selbst Always-Chronicle-würdig (ein Herrschertod bleibt
+sichtbar, auch wenn er zufällig Teil eines Threads war). Kein harter
+200er-Deckel (der alte Cap ließ Wetter echte Geschichte verdrängen) — das
+World Log wird ohnehin nie gekürzt, die Dynasty Chronicle ist durch die
+Selektion selbst schon klein genug.
+
+**Zwei neue Memory-Hooks, die vorher fehlten.** Ein Kaiserwahl-Sieg
+erzeugte bisher KEINE Memory (nur einen Chronik-String) —
+`resolveElection()` (js/politics.js) erzeugt jetzt `TITLE_GAINED`. Das
+Aussterben der Dynastie (kein Erbe) ebenso — `handleSuccession()`
+(js/population-dynasty.js) erzeugt jetzt `DYNASTY_ENDED` (neuer, einziger
+neuer Memory-Typ dieser Phase) mit einem informativeren Chronik-Text
+("Mit dem Tod X im Jahre Y erlosch das Haus Z in direkter Linie." statt
+"Die Dynastie ... stirbt ohne Erben aus."). Ohne diese beiden Hooks hätte
+Dynasty Chronicle 2.0 zwei der wichtigsten denkbaren Abschlusspunkte einer
+Dynastie-Geschichte gar nicht finden können.
+
+**Ruler Eras / Herrscherbiografie (§Punkt 28-33/72-75).**
+`getRulerEras(state)` rekonstruiert die vollständige Herrscherfolge
+AUSSCHLIESSLICH aus bereits vorhandenen `SUCCESSION`-Memories — kein neuer
+persistenter Herrscher-Historie-State nötig. `getChronicleForRuler(state,
+rulerId)` filtert die Dynasty Chronicle auf den Zeitraum einer Ära.
+`buildRulerBiography()`/`formatRulerBiography()` liefern eine
+templatebasierte Regierungszusammenfassung (Name, Regierungsjahre,
+Highlights aus der echten Chronik, Bevölkerung/Staatskasse
+vorher→nachher). Vorher/Nachher-Werte kommen aus `snapshotRulerEraStart()`
+— aufgerufen bei `newGame()` und bei jeder `handleSuccession()`. Bewusst
+NUR Start-Snapshots nötig: das Ende von Regent A ist derselbe Zeitpunkt
+wie der Start von Regent B (Nachfolge geschieht ohne Zeitversatz), also
+liefert B's Start-Snapshot bereits A's Endwerte, ohne eine zweite
+Snapshot-Quelle zu brauchen. Für Altspielstände/historische Regenten ohne
+Snapshot bleibt das Feld explizit `null` statt eines erfundenen Wertes
+(§Punkt 75 "keine falsche Exaktheit").
+
+**Dynasty Milestones & Dynasty Summary (§Punkt 34-35/76-79).**
+`computeDynastyMilestones()`: erster Titelaufstieg je Titelstufe (aus
+`TITLE_GAINED`-Memories), höchste Bevölkerung/Staatskasse/größtes
+Territorium (`state.stats.maxPopulation/maxTreasury/maxLand` — `maxLand`
+ist neu, wird analog zu den beiden bestehenden Trackern in
+`js/advance-year.js` mitgeführt), längste Regentschaft (aus
+`getRulerEras()`). `computeDynastySummary()`: Anzahl Herrscher/
+Generationen, größte Krise/bedeutendster Krieg/wichtigste Rivalität —
+ALLE drei ausschließlich über Story-Thread-`importance` ermittelt (nie
+über Flavor-Text, §Punkt 79), höchster Titel, Bevölkerungs-/
+Wohlstandsspitzen, Anzahl bedeutender Ehen, `no_heir`-Endstatus. Reine
+Analyse ohne neue Spielwirkung.
+
+**Policy-Vergleich (§Punkt 43-49).** Neue Test-Policy `HARDLINE` in
+`resolvePendingEventWithPolicy()` (js/event-chains.js) — bewusst ein
+semantischer Alias von `AGGRESSIVE` (immer die härteste/letzte Option),
+nur unter dem im Auftrag verlangten Namen, ohne die 10 Chain-Templates mit
+eigenen CONCILIATORY/PRAGMATIC/HARDLINE/RISKY-Metadaten-Tags umzubauen
+(§Punkt 46 "ohne großen Umbau", die bestehende großzügig→hart-Sortierung
+der Optionen reicht für einen klar messbaren Policy-Unterschied). 30×100
+Jahre je Policy bestätigen die Vermutung aus dem Auftrag: FIRST_OPTION und
+CONCILIATORY sind mit Index 0 identisch (64 % QUIET, 0 % HIGH_TENSION/
+CRISIS, 211 friedliche/0 konfliktorientierte Thread-Resolutions) — das
+ist ein reines POLICY-Artefakt der immer-großzügigsten Auswahl, keine
+verdeckte Balance-Schwäche. RANDOM_VALID_OPTION (13,70 Threads/Partie,
+111 friedlich/8 konfliktorientiert) und besonders HARDLINE (8,53
+Threads/Partie — Ketten enden häufiger vorzeitig eskaliert statt sich
+über mehrere Stufen zu entwickeln —, nur 2 friedlich/13
+konfliktorientiert, `no_heir`-Rate 53 % statt 20 %) zeigen deutlich mehr
+Eskalation/Anspannung. Siehe `tests/phase7_chronicle_metrics_test.js` für
+die vollständige Tabelle.
+
+**Trade-Off-Audit der 10 Event Chains (§Punkt 50-52, rein lesende
+Code-Analyse, keine automatisierte Messung nötig — die Kosten stehen
+direkt im Code).** Mit echten, dokumentierten Kosten auf der großzügigsten
+Option: `famine_crisis` (-600 Taler für "Korn kaufen"), `trade_conflict`
+(dauerhafte Zollsenkung bzw. -250 Taler Sonderprivileg), `church_conflict`
+(-200 Taler volles Zugeständnis), `dynastic_marriage` (-300 Taler höhere
+Mitgift), `corrupt_treasurer` (öffentliche Anklage ohne Beweis kostet
+Prestige — echtes Risiko, kein Freifahrtschein). Ohne jeden
+Taler-/Ressourcenpreis auf allen Optionen, aber ohne klar bewiesene
+Dominanz (die Optionen unterscheiden sich in ANDEREN Dimensionen —
+Amt vs. keine Beziehung, Prestige vs. Diplomatie): `rising_rival`,
+`imperial_ambition`, `passed_over_heir` (großzügigste Option "Amt
+anbieten" ist kostenlos). Da keine der 10 Ketten eine Option zeigt, die in
+JEDER Dimension einer anderen strikt überlegen ist, bleibt es laut
+§Punkt 51/52 bei der Dokumentation — keine CONFIG-/Wirtschaftssystem-
+Änderung.
+
+**Chronicle Debug Panel (§Punkt 56-58).** Vier neue, rein funktionale
+Debug-Ansichten (kein visuelles Redesign, §Punkt 80-82): Chronik-
+Kandidaten (Memory/Immer-chronikwürdig?/Score-Aufschlüsselung/
+Aufgenommen?/Warum — nutzt `explainChronicleCandidate()`, dieselbe Logik
+wie `computeDynastyChronicle()` selbst), Dynasty-Chronicle-Ansicht,
+Herrscher-Chronik/Biografie-Ansicht, Dynasty-Summary/Meilensteine-Ansicht.
+
+**Savegame-Migration.** `SAVE_VERSION` 6 → 7. `migrateSaveV6ToV7()`
+klassifiziert bereits abgeschlossene Phase-6-Threads (deren `resolution`
+noch ein reiner String war) NACHTRÄGLICH über dieselbe
+`classifyThreadResolution()`-Funktion neu — das ist KEINE Fiktion: die
+Funktion liest ausschließlich bereits real gespeicherte Fakten
+(abgeschlossene Chains, aktuelle Beziehungen), mit dem ursprünglichen Jahr
+aus der Thread-Historie statt dem Migrationsjahr, und bewahrt den
+ursprünglichen String zusätzlich als `resolution.legacyLabel`.
+`state.rulerEraSnapshots` wird als LEERES Objekt angelegt — kein
+erfundener Vorher-Wert für bereits vergangene Regentschaften (§Punkt 75).
+
+**Determinismus & Performance (§Punkt 62/64).** Importance 2.0, Resolution
+2.0 und die gesamte Chronicle-2.0-Ableitung verbrauchen nachweislich
+keinen `rnd()`-Aufruf (per Test bestätigt: `__rngCalls` unverändert vor/
+nach `computeDynastyChronicle()`/`computeDynastySummary()`/
+`computeDynastyMilestones()`, und wiederholte Aufrufe liefern
+byte-identische Ergebnisse). Kein `AI`-Texterzeugung — vollständig lokal,
+deterministisch, templatebasiert. Zwei neue `recordWorldEvent()`-Aufrufe
+(TITLE_GAINED bei Kaiserwahl-Sieg, DYNASTY_ENDED bei ausgestorbener
+Dynastie) verschieben den nachfolgenden RNG-Fingerprint bzw. Chronik-Text
+— Golden-Fixture daher neu erzeugt, Phase-6-Fixture archiviert unter
+`tests/fixtures/advance_year_snapshot_golden_phase6.json`. Keine neue
+O(n²)-Vollhistorienabfrage pro Jahr: `computeDynastyChronicle()` wird nur
+bei Bedarf (Debug-Panel/Metriken) aufgerufen, nicht bei jedem
+`advanceYear()`.
+
+**Neue Tests.** `tests/chronicle_test.js` (§Punkt 86-89, Regressionstests:
+Importance Breakdown, Resolution Mapping, Always/Scored Chronicle, Wetter
+ausgeschlossen, echte Wetterkrise eingeschlossen, Herrschertod in Chronik,
+Thread-Summary + Dedup, Ruler Era Query, Save Migration v6→v7,
+Determinismus, Herrscherbiografie — 33 Prüfungen, alle grün).
+`tests/phase7_chronicle_metrics_test.js` (§Punkt 65-70/97/98): 30×100
+Jahre World Log vs. Dynasty Chronicle — Ø 189,8 World-Log-Zeilen/Partie
+(64 % Wetteranteil, unverändert) vs. Ø 30,1 Dynasty-Chronicle-Einträge/
+Partie (3,01 pro Jahrzehnt, 0 % Wetteranteil), 62 Herrschertode/55
+Thronfolgen/33 Krisen/265 Thread-Zusammenfassungen über 30 Partien;
+Policy-Vergleich (s. o.); ein vollständiges Dynasty-Summary-Beispiel; und
+**§Punkt 98, der entscheidende Test**: 5 vollständige, echte
+100-Jahre-Dynastie-Chroniken direkt aus Simulationsdaten. Ergebnis lesbar
+als tatsächliche Dynastiegeschichte — Beispiel aus Seed 701: Heirat →
+Kind → vier Hungerkrisen in Folge → Herrschertod → übergangener Bruder bei
+der Nachfolge → Rivalität entsteht → Amt zugestanden → Versöhnung
+angeboten → "Der Streit mit Ludwig von Kaisersberg" schließt RECONCILED/
+PEACEFUL → weitere Ehen der nächsten Generation. Alle bestehenden
+Regressionstests weiterhin grün (bis auf die bekannte, unseeded
+`economy_test.js`-Flakiness, unverändert seit Phase 4).
+
+**Ehrlich mitgemessen, bewusst NICHT gefixt (§Punkt 83-85).** Die
+`no_heir`-Rate bleibt bei ca. 20 % unter FIRST_OPTION im 100-Jahre-Lauf
+dieser Phase (RANDOM_VALID_OPTION 33 %, HARDLINE 53 % — Ketten-Eskalation
+wirkt sich sichtbar auf die Erbfolgesicherheit aus) — wie im Auftrag
+verlangt nur gemessen, nicht korrigiert; das ist eine bewusst separate,
+spätere Entscheidung.
+
+**UI-Erweiterungen (kein Redesign, §Punkt 80-82).** Vier neue
+Chronicle-Debug-Panels (s. o.). Die bestehende Event-/Spiel-Oberfläche
+wurde NICHT verändert; einzige Korrektur an der bestehenden Story-Thread-
+Debug-Anzeige: `thread.resolution` wird jetzt als `TYPE (TONE)` statt als
+rohes Objekt dargestellt (Resolution 2.0 hat die Feldform geändert).
+
+**Bewusst NICHT umgesetzt (§Punkt 97 STOPP):** Kaiserwahl 2.0,
+Kriegssystem-Erweiterung, politisches Interessengruppensystem, neue
+Waren, große Weltkartenerweiterung, finales Renaissance-/Comic-UI-
+Redesign (folgt erst nach expliziter Freigabe als Phase 8). Battle Engine
+(`battle-engine/*.js`, `js/battle-bridge.js`) technisch unverändert.
