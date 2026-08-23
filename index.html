@@ -4,44 +4,85 @@
 <meta charset="UTF-8">
 <title>KAISERREICH – Aufstieg einer Dynastie</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Baloo+2:wght@500;600;700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap');
   :root {
-    /* ---- Comic-Mittelalter-Farbschema: warmes Pergament + kräftige,
-       verspielte Akzentfarben statt der bisherigen düsteren Retro-Palette.
-       Variablennamen bewusst unverändert (werden an vielen Stellen per
-       var(--x) auch in JS-generierten Inline-Styles referenziert). ---- */
-    --bg: #e8d9ae;
-    --panel: #fff6e2;
-    --panel-dark: #2c1f12;
-    --ink: #2c1f12;
-    --accent: #d64a3a;
-    --accent2: #3f8b5c;
-    --gold: #f0a83c;
-    --blue: #4a86c8;
-    --purple: #7a4fa3;
+    /* ---- Phase 8 "Historical Graphic Novel × Renaissance 1500": ersetzt
+       das bisherige Comic-Mittelalter-Farbschema (Luckiest-Guy-Zierschrift,
+       knallige Comic-Primärfarben, harte Sticker-Schatten) durch eine
+       gedämpfte Renaissance-Palette. Variablennamen bewusst unverändert
+       (werden an vielen Stellen per var(--x) auch in JS-generierten
+       Inline-Styles referenziert, siehe UI_REDESIGN.md Abschnitt 1.5) —
+       nur die WERTE ändern sich, keine Umbenennung. ---- */
+    --bg: #17120d;
+    --panel: #f2e6c9;
+    --panel-dark: #201811;
+    --ink: #201811;
+    --accent: #6e2226;      /* tiefes Burgunderrot */
+    --accent2: #33472e;     /* dunkles Waldgrün */
+    --gold: #b3893f;        /* gedämpftes Gold */
+    --blue: #1b2534;        /* Nachtblau */
+    --purple: #6b4f30;      /* Bronze (ersetzt den vorherigen Lila-Akzent für Zwischenüberschriften) */
 
-    /* ---- Design-System: Typografie-Skala ---- */
-    --font-display: 'Luckiest Guy', 'Arial Black', 'Segoe UI', sans-serif; /* Titel, Buttons, Tabs */
-    --font: 'Baloo 2', 'Segoe UI', system-ui, sans-serif;                 /* Fließtext */
+    /* ---- Sekundärpalette (§6) ---- */
+    --ochre: #a97e34;
+    --umber: #4a3524;
+    --red-muted: #8a3d3d;
+    --blue-muted: #3d5570;
+    --olive: #63633a;
+
+    /* ---- Bedeutungsfarben (§7) — bewusst getrennt von den Deko-Tokens
+       oben, damit ein späterer Wechsel der Deko-Palette nie versehentlich
+       die Bedeutungslogik (Grün=positiv, Rot=Gefahr, Gold=Rang, Blau=
+       Diplomatie, Ocker=Wirtschaft) mitverschiebt. ---- */
+    --c-positive: #3f6b46;
+    --c-danger: #8a2e2e;
+    --c-prestige: #b3893f;
+    --c-diplomacy: #3d5570;
+    --c-economy: #a3792f;
+
+    /* ---- Design-System: Typografie-Skala (§89: zwei Schriftwelten) ---- */
+    --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif; /* Titel, Herrschernamen, Events, Chronik */
+    --font: 'Source Sans 3', system-ui, 'Segoe UI', sans-serif;              /* Zahlen, Tabellen, Buttons, Tooltips */
     --fs-micro: 13px;  /* Badges, Fußnoten, Tags */
     --fs-body: 15px;   /* Standardtext in Panels, Tabellen, Buttons */
     --fs-md: 17px;     /* Zwischenüberschriften, betonte Werte */
-    --fs-lg: 19px;     /* Panel-Titel-Leisten */
-    --fs-xl: 21px;     /* Topbar, große Banner */
-    --fs-h1: 28px;     /* Bildschirm-Überschriften (Charaktererstellung) */
-    --fs-logo: 40px;   /* Startbildschirm-Logo */
+    --fs-lg: 20px;     /* Panel-Titel-Leisten */
+    --fs-xl: 22px;     /* Topbar, große Banner */
+    --fs-h1: 29px;     /* Bildschirm-Überschriften (Charaktererstellung) */
+    --fs-logo: 44px;   /* Startbildschirm-Logo */
 
-    /* ---- Design-System: Abstands-Skala ---- */
+    /* ---- Design-System: Abstands-Skala (unverändert, war bereits konsistent) ---- */
     --sp-1: 5px;
     --sp-2: 8px;
     --sp-3: 10px;
     --sp-4: 14px;
     --sp-5: 22px;
 
-    /* ---- Rundungen fürs Comic-Look (statt harter Pixel-Kanten) ---- */
-    --r-sm: 10px;
-    --r-md: 14px;
-    --r-lg: 20px;
+    /* ---- Rundungen: von "Comic-rund" auf gediegen reduziert ---- */
+    --r-sm: 4px;
+    --r-md: 7px;
+    --r-lg: 10px;
+
+    /* ---- Schatten: von harten Comic-Sticker-Schatten auf subtile,
+       weichgezeichnete Tiefe umgestellt (§96: keine Material-Design-
+       Kartenwolke, daher bewusst kurz und gedämpft). ---- */
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.35);
+    --shadow-md: 0 3px 9px rgba(0,0,0,0.4);
+    --shadow-lg: 0 6px 18px rgba(0,0,0,0.45);
+
+    /* ---- Z-Index-System (§157): feste, benannte Layer statt verstreuter
+       Zahlenwerte. Werte bewusst identisch zu den vorherigen literalen
+       Zahlen gewählt, um die bestehende Stapelreihenfolge exakt zu
+       erhalten (siehe UI_REDESIGN.md Abschnitt 3). ---- */
+    --z-map: 1;
+    --z-hud: 50;
+    --z-panel: 80;
+    --z-tooltip: 100;
+    --z-overlay-battle: 200;
+    --z-overlay-warmap: 210;
+    --z-modal: 400;
+    --z-notification: 500;
+    --z-debug: 600;
   }
   * { box-sizing: border-box; font-family: var(--font); }
   body {
@@ -56,7 +97,7 @@
   #frame {
     width: 960px; background: var(--blue);
     border: 5px solid var(--ink); border-radius: var(--r-lg);
-    box-shadow: 8px 8px 0 rgba(44,31,18,0.3);
+    box-shadow: var(--shadow-lg);
     padding: var(--sp-4);
   }
   #topbar {
@@ -71,7 +112,7 @@
     background: var(--panel); color: var(--ink);
     font-size: var(--fs-body); line-height: 1.6;
     border: 3px solid var(--ink); border-radius: var(--r-md); padding: var(--sp-3);
-    box-shadow: 5px 5px 0 rgba(44,31,18,0.28);
+    box-shadow: var(--shadow-md);
   }
   #left { width: 40%; }
   #right { width: 60%; }
@@ -81,7 +122,7 @@
     padding: var(--sp-2) var(--sp-3); font-size: var(--fs-lg); font-weight: normal;
     font-family: var(--font-display); letter-spacing: 0.5px;
     border-radius: calc(var(--r-md) - 3px) calc(var(--r-md) - 3px) 0 0;
-    text-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.25);
   }
   h2.title + * { margin-top: 0; }
   .panel h2.title:not(:first-child) { margin-top: var(--sp-4); border-radius: var(--r-sm); }
@@ -93,7 +134,7 @@
   .rulerAvatar {
     width: 52px; height: 52px; border-radius: 50%; background: var(--gold); border: 3px solid var(--ink);
     display: flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0;
-    box-shadow: 2px 2px 0 rgba(44,31,18,0.3);
+    box-shadow: var(--shadow-sm);
   }
   table { width: 100%; border-collapse: collapse; font-size: var(--fs-body); line-height: 1.5; border-radius: var(--r-sm); overflow: hidden; }
   td, th { padding: 5px 6px; text-align: left; }
@@ -111,7 +152,7 @@
   .pagetab {
     font-family: var(--font-display); font-size: var(--fs-body); background: var(--panel); color: var(--ink);
     border: 3px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-4); cursor: pointer;
-    box-shadow: 3px 3px 0 rgba(44,31,18,0.25); letter-spacing: 0.5px;
+    box-shadow: var(--shadow-sm); letter-spacing: 0.5px;
   }
   .pagetab.active { background: var(--gold); color: var(--ink); }
 
@@ -120,7 +161,7 @@
     padding: var(--sp-4); margin-bottom: var(--sp-3); border-radius: var(--r-md);
     background:
       repeating-linear-gradient(90deg, #6b4423 0px, #7a5230 6px, #5c3a1a 10px, #6b4423 14px);
-    border: 3px solid var(--ink); box-shadow: 5px 5px 0 rgba(44,31,18,0.28), inset 0 0 0 2px #4a2f16;
+    border: 3px solid var(--ink); box-shadow: var(--shadow-md), inset 0 0 0 2px #4a2f16;
     position: relative;
   }
   #mapFrame::before, #mapFrame::after,
@@ -151,7 +192,7 @@
     position: absolute; transform: translate(-50%,-50%);
     width: 58px; height: 62px; border: 3px solid var(--ink); border-radius: var(--r-sm);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    cursor:pointer; font-size: var(--fs-body); box-shadow: 3px 3px 0 rgba(44,31,18,0.3); transition: transform 0.1s;
+    cursor:pointer; font-size: var(--fs-body); box-shadow: var(--shadow-sm); transition: transform 0.1s;
   }
   .plot::before {
     content: ""; position: absolute; bottom: -6px; width: 70%; height: 8px; border-radius: 50%;
@@ -193,19 +234,37 @@
     position: absolute; left: 0; top: 100%; margin-top:var(--sp-1);
     background: var(--panel-dark); color: #fff6e2; border: 2px solid var(--gold); border-radius: var(--r-sm);
     padding: var(--sp-2) var(--sp-2); font-size: var(--fs-body); white-space: pre-line; width: max-content;
-    max-width: 220px; z-index: 100; box-shadow: 3px 3px 0 rgba(0,0,0,0.4);
+    max-width: 220px; z-index: var(--z-tooltip); box-shadow: var(--shadow-md);
     font-family: var(--font); line-height: 1.6;
   }
+  /* ---- Button-System (§160-163): der nackte <button>-Selektor bleibt der
+     SICHERE DEFAULT/Secondary-Stil für jede bestehende Instanz ohne
+     eigene Klasse (kein Rückbau-Risiko). .btn-primary/-danger/-ghost/
+     -imperial stehen als bewusst zusätzliche, gezielt einsetzbare
+     Varianten bereit (§161 "nicht überall Gold"). ---- */
   button {
-    font-family: var(--font-display); font-size: var(--fs-body); background: var(--gold); color: var(--ink);
-    border: 3px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); cursor: pointer; margin: 3px 3px 3px 0;
-    box-shadow: 3px 3px 0 rgba(44,31,18,0.3); min-height: 36px; letter-spacing: 0.3px;
+    font-family: var(--font-display); font-size: var(--fs-body); font-weight: 600; background: var(--panel); color: var(--ink);
+    border: 2px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); cursor: pointer; margin: 3px 3px 3px 0;
+    box-shadow: var(--shadow-sm); min-height: 36px; letter-spacing: 0.3px; transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
   }
-  button:hover { background: #f5bb60; }
-  button:active { transform: translate(2px,2px); box-shadow: none; }
+  button:hover { background: #fff8e6; }
+  button:active { transform: translateY(1px); box-shadow: none; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  /* Primary: wichtige positive Hauptaktion (z. B. Jahr/Monat voranschreiten) */
+  .btn-primary { background: var(--gold); color: var(--ink); border-color: var(--ink); }
+  .btn-primary:hover { background: #c79c4d; }
+  /* Danger: Krieg / harte, irreversible Handlungen */
+  .btn-danger { background: var(--c-danger); color: var(--panel); border-color: var(--ink); }
+  .btn-danger:hover { background: #a23a3a; }
+  /* Ghost: sekundäre/abbrechende Aktionen, sehr zurückhaltend */
+  .btn-ghost { background: transparent; color: var(--ink); border-color: var(--ink); box-shadow: none; }
+  .btn-ghost:hover { background: rgba(32,24,17,0.08); }
+  /* Imperial: nur besonders bedeutende Aktionen (Titel/Kaiserwahl) */
+  .btn-imperial { background: var(--gold); color: var(--panel-dark); border-color: var(--gold); box-shadow: 0 0 0 1px var(--ink), var(--shadow-md); }
+  .btn-imperial:hover { background: #c79c4d; }
   /* Sichtbarer Fokusring für Tastaturbedienung (nur bei Tastaturfokus, nicht bei Mausklick) */
   button:focus-visible, .pagetab:focus-visible, input:focus-visible, select:focus-visible {
-    outline: 3px solid var(--purple); outline-offset: 2px;
+    outline: 3px solid var(--gold); outline-offset: 2px;
   }
   #menubar { margin-top: var(--sp-3); display: flex; flex-wrap: wrap; gap: var(--sp-1); align-items:center; }
   #chronicle { max-height: 180px; overflow-y: auto; font-size: var(--fs-body); line-height: 1.7; }
@@ -215,22 +274,22 @@
   /* Start-/Charaktererstellungsbildschirm (§8/§89) */
   #titleScreen, #charCreation {
     width: 960px; background: var(--blue); border: 5px solid var(--ink); border-radius: var(--r-lg);
-    box-shadow: 8px 8px 0 rgba(44,31,18,0.3);
+    box-shadow: var(--shadow-lg);
     padding: var(--sp-5); text-align: center; color: #fff6e2;
   }
   #titleScreen h1 {
     font-family: var(--font-display); font-size: var(--fs-logo); color: var(--gold); letter-spacing: 2px; margin-bottom: var(--sp-1);
-    text-shadow: 3px 3px 0 rgba(44,31,18,0.5); font-weight: normal;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5); font-weight: normal;
   }
   #titleScreen h2 { font-family: var(--font-display); font-size: var(--fs-lg); color: #fff6e2; letter-spacing: 1px; margin-bottom: var(--sp-5); font-weight: normal; }
   #titleScreen .cityArt {
     display: flex; justify-content: center; margin-bottom: var(--sp-4);
-    filter: drop-shadow(3px 3px 0 rgba(44,31,18,0.4));
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.4));
   }
   .titleMenuBtn {
     display: block; width: 320px; margin: var(--sp-2) auto; padding: var(--sp-3); font-size: var(--fs-md);
     background: var(--panel); color: var(--ink); border: 3px solid var(--ink); border-radius: var(--r-md);
-    box-shadow: 4px 4px 0 rgba(44,31,18,0.3); cursor: pointer; font-family: var(--font-display); letter-spacing: 0.5px;
+    box-shadow: var(--shadow-sm); cursor: pointer; font-family: var(--font-display); letter-spacing: 0.5px;
   }
   .titleMenuBtn:hover { background: #ffe9bd; }
   .titleMenuBtn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -238,7 +297,7 @@
   /* Intro-Sequenz (§90): kurzer Text-Vorspann vor dem Titelbildschirm */
   #introScreen {
     width: 960px; background: var(--panel-dark); border: 5px solid var(--ink); border-radius: var(--r-lg);
-    box-shadow: 8px 8px 0 rgba(44,31,18,0.3);
+    box-shadow: var(--shadow-lg);
     padding: calc(var(--sp-5) * 3) var(--sp-5); text-align: center; color: #f0e6cf;
     min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center;
     cursor: pointer;
@@ -281,8 +340,8 @@
   #titleUpBanner {
     position: fixed; top: 16%; left: 50%; transform: translate(-50%, -16px);
     background: var(--gold); color: var(--ink); border: 3px solid var(--ink); border-radius: var(--r-md);
-    padding: var(--sp-4) var(--sp-5); box-shadow: 5px 5px 0 rgba(44,31,18,0.35);
-    font-family: var(--font-display); font-size: var(--fs-lg); text-align: center; z-index: 500; letter-spacing: 0.5px;
+    padding: var(--sp-4) var(--sp-5); box-shadow: var(--shadow-md);
+    font-family: var(--font-display); font-size: var(--fs-lg); text-align: center; z-index: var(--z-notification); letter-spacing: 0.5px;
     opacity: 0; pointer-events: none; transition: opacity 0.5s ease, transform 0.5s ease;
     max-width: 80%;
   }
@@ -290,11 +349,11 @@
   #titleUpBanner .sub { font-family: var(--font); font-size: var(--fs-body); margin-top: var(--sp-2); color: var(--ink); letter-spacing: 0; }
   #eventModal, #birthModal, #marriageModal, #ledgerModal, #advisorCandidatesModal, #characterDebugModal {
     position: fixed; inset: 0; background: rgba(44,31,18,0.7);
-    display: none; align-items: center; justify-content: center; z-index: 400;
+    display: none; align-items: center; justify-content: center; z-index: var(--z-modal);
   }
   #eventBox, #birthBox, #marriageBox, #ledgerBox, #advisorCandidatesBox, #characterDebugBox {
     width: 540px; max-width: 92vw; background: var(--panel); border: 4px solid var(--ink); border-radius: var(--r-lg);
-    box-shadow: 6px 6px 0 rgba(44,31,18,0.35); padding: var(--sp-4); font-size: var(--fs-md); color: var(--ink);
+    box-shadow: var(--shadow-lg); padding: var(--sp-4); font-size: var(--fs-md); color: var(--ink);
     line-height: 1.6; max-height: 88vh; overflow-y: auto;
   }
   #eventBox h3, #birthBox h3, #marriageBox h3, #ledgerBox h3, #advisorCandidatesBox h3, #characterDebugBox h3 {
@@ -320,11 +379,11 @@
   /* Kampfbildschirm-Overlay: nutzt dieselben Tokens/Panel-Bausteine wie das Hauptspiel */
   #btOverlay {
     position: fixed; inset: 0; background: rgba(44,31,18,0.8); display: none;
-    align-items: center; justify-content: center; z-index: 200;
+    align-items: center; justify-content: center; z-index: var(--z-overlay-battle);
   }
   #btFrame {
     width: 900px; max-height: 90vh; overflow-y: auto; background: var(--blue);
-    border: 5px solid var(--ink); border-radius: var(--r-lg); box-shadow: 8px 8px 0 rgba(44,31,18,0.3);
+    border: 5px solid var(--ink); border-radius: var(--r-lg); box-shadow: var(--shadow-lg);
     padding: var(--sp-3); color: #fff6e2;
   }
   #btTitleBar { text-align: center; font-family: var(--font-display); letter-spacing: 0.5px; }
@@ -342,7 +401,7 @@
   .btUnitRow.right { justify-content: flex-end; }
   .btUnitBlock {
     background: var(--panel); color: var(--ink); border: 2px solid var(--ink); border-radius: 8px; padding: var(--sp-1) var(--sp-2);
-    font-size: var(--fs-micro); text-align: center; box-shadow: 2px 2px 0 rgba(44,31,18,0.3); min-width: 58px;
+    font-size: var(--fs-micro); text-align: center; box-shadow: var(--shadow-sm); min-width: 58px;
   }
   .btUnitBlock .cnt { font-weight: bold; }
   .btMoraleBar { width: 100%; height: 5px; background: rgba(0,0,0,0.25); border: 1px solid var(--ink); border-radius: 4px; margin-top: 2px; overflow: hidden; }
@@ -360,11 +419,11 @@
   /* Kriegskarte: Risiko-artige Gebietseroberung (§Original-Vertiefung) */
   #warMapOverlay {
     position: fixed; inset: 0; background: rgba(44,31,18,0.8); display: none;
-    align-items: center; justify-content: center; z-index: 210;
+    align-items: center; justify-content: center; z-index: var(--z-overlay-warmap);
   }
   #warMapFrame {
     width: 900px; max-height: 92vh; overflow-y: auto; background: var(--blue);
-    border: 5px solid var(--ink); border-radius: var(--r-lg); box-shadow: 8px 8px 0 rgba(44,31,18,0.3);
+    border: 5px solid var(--ink); border-radius: var(--r-lg); box-shadow: var(--shadow-lg);
     padding: var(--sp-3); color: #fff6e2;
   }
   #warMapBoard {
@@ -380,7 +439,7 @@
     position: absolute; transform: translate(-50%, -50%); width: 11%; aspect-ratio: 1;
     border-radius: 50%; border: 3px solid var(--ink); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 2px 2px 0 rgba(44,31,18,0.4); transition: transform 0.1s;
+    box-shadow: var(--shadow-sm); transition: transform 0.1s;
   }
   .wmNode:hover { transform: translate(-50%, -50%) scale(1.1); z-index: 5; }
   .wmNode.selected { outline: 3px solid #fff6e2; outline-offset: 2px; z-index: 4; }
@@ -609,7 +668,7 @@
   </div>
 
   <div id="menubar">
-    <button id="btnAdvance" data-i18n="btn_advance">▶ MONAT VERGEHEN LASSEN</button>
+    <button id="btnAdvance" class="btn-primary" data-i18n="btn_advance">▶ MONAT VERGEHEN LASSEN</button>
     <button id="btnSave" data-i18n="btn_save">💾 SPEICHERN</button>
     <button id="btnLoad" data-i18n="btn_load">📂 LADEN</button>
     <input type="file" id="loadFile" accept="application/json" style="display:none;">

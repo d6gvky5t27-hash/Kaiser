@@ -2866,3 +2866,63 @@ Kriegssystem-Erweiterung, politisches Interessengruppensystem, neue
 Waren, große Weltkartenerweiterung, finales Renaissance-/Comic-UI-
 Redesign (folgt erst nach expliziter Freigabe als Phase 8). Battle Engine
 (`battle-engine/*.js`, `js/battle-bridge.js`) technisch unverändert.
+
+## 2026-08-23 – Phase 8A (KAISERREICH-Next-Generation-Master-Prompt): Visual Identity — Design System
+
+Erste, bewusst kleine Teilphase von Phase 8 ("Historical Graphic Novel ×
+Modern Grand Strategy × Renaissance 1500", §115-118 verlangt ausdrücklich
+gestufte Teilphasen statt eines Großbangs). Vollständiger Ablauf +
+Wireframes + Screen-Inventar in `UI_REDESIGN.md`.
+
+**Audit zuerst.** `index.html` hat genau einen `<style>`-Block (~385
+Zeilen) mit einem bereits vorhandenen Tokens-Ansatz (`:root { --bg;
+--panel; --ink; --accent; --gold; ... }`), der aber inhaltlich das jetzt
+ausdrücklich verbotene "Comic-Mittelalter"-Schema trug (Luckiest-Guy-
+Zierschrift, knallige Primärfarben, harte Sticker-Schatten). Entscheidender
+Befund: JS-generierte Panels referenzieren fast durchgängig `var(--x)`
+statt hartkodierter Hex-Werte (nur vereinzelte Kartendekorations-/
+Debug-Rahmenfarben ausgenommen) — ein reines Werte-Update in `:root`
+reskinnt dadurch fast die GESAMTE Oberfläche automatisch, ohne
+Render-Funktionen anzufassen.
+
+**Design System (Farben/Typografie/Abstände/Radien/Schatten/Z-Index/
+Buttons).** Variablennamen bewusst unverändert (werden aus JS-
+Template-Strings referenziert), nur Werte ersetzt: Burgunderrot/
+Waldgrün/Nachtblau/Elfenbein/Anthrazit/Bronze/gedämpftes Gold als
+Primärpalette, Ocker/Umbra/gedecktes Rot/entsättigtes Blau/Oliv als
+Sekundärpalette, plus fünf eigene Bedeutungsfarben-Tokens
+(`--c-positive/-danger/-prestige/-diplomacy/-economy`), bewusst getrennt
+von den Deko-Tokens (§7). Typografie: `Cormorant Garamond` (Display,
+Serif, historisch-seriös statt Fraktur) + `Source Sans 3` (UI), beide via
+Google Fonts mit sicherem lokalem Fallback-Stack (Georgia/System-Sans),
+falls kein Netzzugriff. Rundungen von "Comic-rund" (10–20px) auf gediegen
+(4–10px) reduziert. Harte `Npx Npx 0`-Comic-Schatten durch drei
+weichgezeichnete Schatten-Tokens ersetzt. Neues Z-Index-Tokensystem
+(`--z-map/-hud/-panel/-tooltip/-overlay-battle/-overlay-warmap/-modal/
+-notification/-debug`) ersetzt verstreute literale Werte, Werte bewusst
+identisch zu vorher gewählt (keine Stapelreihenfolgen-Änderung). Neue
+Button-Varianten `.btn-primary/-danger/-ghost/-imperial` ergänzen den
+bestehenden nackten `button`-Selektor (bleibt der sichere Secondary-
+Default für jede bestehende Instanz ohne eigene Klasse) — `.btn-primary`
+exemplarisch auf die einzige eindeutige Hauptaktion angewendet
+(`#btnAdvance`, "Monat vergehen lassen"); Debug-Panel-Buttons bewusst
+NICHT umklassifiziert (§146 "Debug bleibt Debug").
+
+**Verifiziert per Screenshot** (Playwright/Chromium, vier Bildschirme:
+Titel, Charaktererstellung, Hauptspiel/Hof, Berater sowie ein
+Event-Modal) — durchgängig kohärente Renaissance-Anmutung ohne
+Comic-Elemente, Kontraste intakt, Primary-Button klar erkennbar.
+
+**Bewusst NICHT Teil dieser Teilphase (siehe Screen Inventory in
+UI_REDESIGN.md):** die strukturellen Neubauten aus §10-58/76-82
+(Karten-Hauptbildschirm, Charakterportraits, Stammbaum-Ansicht,
+Story-Thread-Spieler-UI, Chronik-als-Buch) — das sind eigene, spätere
+Teilphasen (8B–8H), deren gleichzeitige Umsetzung genau den in §116
+verbotenen Großbang darstellen würde. Kein einziger `js/*.js`-Quelltext
+geändert — reine `index.html`-Änderung (Tokens + eine Button-Klasse),
+kein Bundle-Rebuild nötig. Bundle-Größe 589.045 → 592.280 Bytes (+0,5%,
+nur CSS-Tokens/Kommentare). Alle Tests weiterhin grün (außer der
+bekannten unseeded `economy_test.js`-Flakiness), keine neuen
+`rnd()`-Aufrufe, Battle Engine unverändert (bestätigt per Diff),
+Savegames unverändert (keine neue SAVE_VERSION nötig, da keine
+State-Struktur geändert wurde).
