@@ -94,20 +94,37 @@
     font-family: var(--font);
     font-size: var(--fs-body);
   }
+  /* §Phase-8B-Punkt 2/46-48: #frame ist jetzt responsiv statt fest 960px,
+     damit die Karte tatsächlich dominant sein kann -- getestet bei
+     1366x768/1440x900/1920x1080 (siehe UI_REDESIGN.md). */
   #frame {
-    width: 960px; background: var(--blue);
+    width: min(96vw, 1440px); background: var(--blue);
     border: 5px solid var(--ink); border-radius: var(--r-lg);
     box-shadow: var(--shadow-lg);
     padding: var(--sp-4);
   }
+  /* ---- Top Bar (§6-11): Herrscher groß und zuerst, Werte als kompakte
+     Icon+Zahl-Komponenten mit Tooltip statt großer Boxen. ---- */
   #topbar {
-    display: flex; justify-content: space-between;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--sp-3);
     background: var(--panel-dark); color: var(--gold);
-    padding: var(--sp-3) var(--sp-4); font-size: var(--fs-md); border: 3px solid var(--ink);
+    padding: var(--sp-2) var(--sp-4); font-size: var(--fs-md); border: 3px solid var(--ink);
     border-radius: var(--r-md); margin-bottom: var(--sp-3);
   }
-  #tb-title { font-family: var(--font-display); letter-spacing: 0.5px; }
-  #main { display: flex; gap: var(--sp-3); }
+  #tb-ruler { display: flex; align-items: center; gap: var(--sp-2); }
+  #tb-portrait { width: 44px; height: 44px; font-size: 22px; }
+  #tb-name { font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 600; color: var(--gold); letter-spacing: 0.3px; line-height: 1.1; }
+  #tb-subtitle { font-size: var(--fs-micro); color: #d8cba8; letter-spacing: 0.3px; }
+  #tb-stats { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); }
+  .tb-stat { font-size: var(--fs-body); color: #f0e6cf; white-space: nowrap; }
+  .tb-stat b { color: var(--gold); font-weight: 600; }
+  .tb-stat.tb-warn b { color: var(--red-muted); }
+  /* ---- Shell: schmale Navigation + Inhalt (§4/5/40-42) ---- */
+  #shell { display: flex; gap: var(--sp-3); align-items: flex-start; }
+  #sidenav {
+    display: flex; flex-direction: column; gap: var(--sp-1); flex: 0 0 100px; width: 100px;
+  }
+  #pagecontent { flex: 1 1 auto; min-width: 0; }
   .panel {
     background: var(--panel); color: var(--ink);
     font-size: var(--fs-body); line-height: 1.6;
@@ -147,14 +164,100 @@
   .diploBlock { border: 2.5px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-2); margin-bottom: var(--sp-2); background: rgba(44,31,18,0.04); }
   .treatyTag { display:inline-block; font-size: var(--fs-micro); padding:3px 8px; margin:2px 4px 2px 0; border:1px solid var(--ink); border-radius: 999px; background:#f0a83c33; }
   .dipbtn { font-size: var(--fs-micro); padding: 6px 8px; margin: 3px 3px 0 0; }
-  #pagetabs { display:flex; flex-wrap:wrap; gap: var(--sp-2); margin-bottom: var(--sp-3); }
-  .pagetab { flex: 1 1 auto; text-align: center; }
+  /* §Phase-8B-Punkt 4/22-24: schmale, kompakte Navigation -- Icon über
+     kurzem Label statt breiter horizontaler Tableiste. */
   .pagetab {
-    font-family: var(--font-display); font-size: var(--fs-body); background: var(--panel); color: var(--ink);
-    border: 3px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-4); cursor: pointer;
-    box-shadow: var(--shadow-sm); letter-spacing: 0.5px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 0;
+    font-family: var(--font); font-size: 12px; font-weight: 600; background: var(--panel); color: var(--ink);
+    border: 2px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-1) 2px; cursor: pointer;
+    box-shadow: var(--shadow-sm); letter-spacing: 0.2px; min-height: auto; width: 100%;
   }
+  .pagetab span { line-height: 1.15; }
   .pagetab.active { background: var(--gold); color: var(--ink); }
+
+  /* ============================================================
+     §Phase-8B: REICH -- Hauptbildschirm/Karte/HUD ("Die Spielwelt wird
+     zur Bühne"). Karte dominiert (~70%), Kontextpanel schmal (§3/5).
+     ============================================================ */
+  #reichPage { display: flex; flex-direction: column; gap: var(--sp-3); }
+  #reichMain { display: flex; gap: var(--sp-3); align-items: flex-start; }
+  #worldMapPanel { flex: 7 1 0; min-width: 0; padding: var(--sp-2); }
+  #regionContextPanel { flex: 3 1 280px; min-width: 260px; max-width: 370px; max-height: 560px; overflow-y: auto; }
+  /* Gelände-Untergrund wiederverwendet dieselbe gedämpfte Grün-Verlaufstechnik
+     wie #mapTerrain/#warMapBoard -- eine Quelle der Kartenästhetik statt einer
+     dritten Variante (§18/19: gezeichnete Landkarte, keine Satellitenoptik). */
+  #worldMapBoard {
+    position: relative; width: 100%; aspect-ratio: 4 / 3; max-height: 52vh; border-radius: var(--r-sm);
+    background:
+      repeating-linear-gradient(45deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 3px, transparent 3px, transparent 6px),
+      linear-gradient(to bottom, #3a5240 0%, #2d4433 50%, #223428 100%);
+    border: 3px solid var(--ink); overflow: hidden;
+  }
+  #worldMapSvg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  #worldMapNodes { position: absolute; inset: 0; width: 100%; height: 100%; }
+  /* div.reichNode (statt .reichNode) bewusst mit Element+Klasse, damit die
+     Positionierung unabhängig von der Reihenfolge in der Kaskade IMMER
+     gegenüber der generischen [data-tip]-Tooltip-Regel gewinnt (dieselben
+     Knoten tragen data-tip fürs Tooltip UND brauchen position:absolute). */
+  div.reichNode {
+    position: absolute; transform: translate(-50%, -50%); width: 9.5%; aspect-ratio: 1;
+    border-radius: 50%; border: 2.5px solid var(--ink); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+    box-shadow: var(--shadow-sm); transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+    filter: saturate(0.8);
+  }
+  .reichNode:hover { transform: translate(-50%, -50%) scale(1.12); filter: saturate(1); z-index: 5; }
+  .reichNode.selected { outline: 3px solid var(--gold); outline-offset: 2px; filter: saturate(1) brightness(1.08); z-index: 6; }
+  .reichNode.capital { width: 12%; border-width: 3px; border-color: var(--gold); }
+  .reichLabel {
+    position: absolute; transform: translate(-50%, 4px); font-family: var(--font-display); font-weight: 600;
+    font-size: 12px; color: #f0e6cf; text-shadow: 0 1px 3px rgba(0,0,0,0.7); pointer-events: none; white-space: nowrap;
+  }
+  #regionContextEmpty { color: var(--umber); font-style: italic; }
+  #regionContextHeader { font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 600; margin-bottom: 2px; }
+  #regionContextSub { font-size: var(--fs-micro); color: var(--umber); margin-bottom: var(--sp-2); }
+  /* 2x2-Raster statt 4 nebeneinander -- bei "BEVÖLKERUNG"/"WIRTSCHAFT" reicht
+     eine 4-Spalten-Reihe selbst im breiten Panel nicht komfortabel aus. */
+  #regionContextTabs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3px; margin: var(--sp-2) 0; }
+  .rcTab {
+    flex: 1 1 0; font-family: var(--font); font-size: 12px; font-weight: 600; padding: 5px 1px; margin: 0;
+    background: transparent; color: var(--ink); border: 2px solid var(--ink); box-shadow: none; min-height: auto;
+  }
+  .rcTab.active { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+  .rcStatRow { display: flex; justify-content: space-between; align-items: center; margin: 5px 0; font-size: var(--fs-body); }
+  .rcStatRow .rcStatLabel { color: var(--umber); }
+  .rcGoodsRow { display: flex; justify-content: space-between; font-size: var(--fs-body); padding: 2px 0; border-bottom: 1px dotted rgba(32,24,17,0.2); }
+
+  /* ---- Story Card (§12-15/43): natürlichsprachlich, keine Debug-Werte ---- */
+  #storyCard, .alertList {
+    background: var(--panel); border: 2.5px solid var(--ink); border-radius: var(--r-sm);
+    padding: var(--sp-2) var(--sp-3); box-shadow: var(--shadow-sm);
+  }
+  #reichFooter { display: flex; gap: var(--sp-3); align-items: stretch; flex-wrap: wrap; }
+  #storyCard { flex: 1 1 320px; }
+  #alertList { flex: 1 1 260px; }
+  .storyCardEyebrow { font-size: var(--fs-micro); color: var(--umber); letter-spacing: 0.5px; text-transform: uppercase; }
+  .storyCardTitle { font-family: var(--font-display); font-size: var(--fs-md); font-weight: 600; margin: 2px 0; }
+  .storyCardText { font-size: var(--fs-body); font-style: italic; color: var(--ink); }
+  /* ---- Warnungen (§16-17): priorisiert, kompakt, kein Wetter-Spam ---- */
+  .alertItem { display: flex; align-items: center; gap: 6px; font-size: var(--fs-body); padding: 2px 0; }
+  .alertItem .alertDot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .alertItem.crit .alertDot { background: var(--c-danger); }
+  .alertItem.important .alertDot { background: var(--gold); }
+  .alertItem.info .alertDot { background: var(--c-positive); }
+  .alertEmpty { color: var(--umber); font-style: italic; font-size: var(--fs-body); }
+
+  /* ---- Responsive (§46-48): 1366x768 ist die schmalste geprüfte Breite ---- */
+  @media (max-width: 1400px) {
+    #regionContextPanel { max-width: 300px; }
+  }
+  @media (max-width: 1180px) {
+    #sidenav { flex-basis: 68px; width: 68px; }
+    .pagetab span { display: none; }
+    #reichMain { flex-direction: column; }
+    #worldMapPanel, #regionContextPanel { flex: 1 1 auto; max-width: none; width: 100%; }
+    #tb-subtitle { display: none; }
+  }
 
   /* Landschafts-Karte im Siedler-Stil: Holzrahmen, Wege zwischen Gebäuden, Naturdeko */
   #mapFrame {
@@ -544,30 +647,79 @@
 <div id="titleUpBanner"></div>
 
 <div id="frame" style="display:none;">
+  <!-- §Phase-8B-Punkt 6-11: Herrscher wichtiger als Ressourcen -- Name/Titel
+       groß und zuerst, Werte als kompakte Icon+Zahl+Tooltip-Komponenten. -->
   <div id="topbar">
-    <span id="tb-title">–</span>
-    <span id="tb-year">Jahr –</span>
-    <span id="tb-treasury">Schatz –</span>
-    <span id="tb-prestige">Prestige –</span>
+    <div id="tb-ruler">
+      <div id="tb-portrait" class="rulerAvatar">👑</div>
+      <div id="tb-rulerinfo">
+        <div id="tb-name">–</div>
+        <div id="tb-subtitle">–</div>
+      </div>
+    </div>
+    <div id="tb-stats">
+      <span class="tb-stat" id="tb-year">📅 <b>–</b></span>
+      <span class="tb-stat" id="tb-treasury">🪙 <b>–</b></span>
+      <span class="tb-stat" id="tb-population">👥 <b>–</b></span>
+      <span class="tb-stat" id="tb-prestige">🏵 <b>–</b></span>
+      <span class="tb-stat" id="tb-legitimacy">⚖ <b>–</b></span>
+      <span class="tb-stat" id="tb-food">🌾 <b>–</b></span>
+    </div>
   </div>
 
-  <div id="pagetabs">
-    <button id="tabProvinz" class="pagetab active" data-i18n="tab_provinz">🏰 PROVINZ</button>
-    <button id="tabHof" class="pagetab" data-i18n="tab_hof">📚 BERATER &amp; FORSCHUNG</button>
-    <button id="tabWirtschaft" class="pagetab" data-i18n="tab_wirtschaft">💰 WIRTSCHAFT</button>
-    <button id="tabDiplomatie" class="pagetab" data-i18n="tab_diplomatie">🤝 DIPLOMATIE</button>
-    <button id="tabKarte" class="pagetab" data-i18n="tab_karte">🗺 KARTE &amp; GEBÄUDE</button>
-    <button id="tabMilitaer" class="pagetab" data-i18n="tab_militaer">⚔ MILITÄR</button>
-  </div>
+  <div id="shell">
+    <!-- §Phase-8B-Punkt 4/22-24: kompakte Navigation, Icons + kurze Labels. -->
+    <div id="sidenav">
+      <button id="tabReich" class="pagetab active">👑<span data-i18n="tab_reich_label">REICH</span></button>
+      <button id="tabProvinz" class="pagetab">🏰<span data-i18n="tab_provinz_label">PROVINZ</span></button>
+      <button id="tabHof" class="pagetab">📚<span data-i18n="tab_hof_label">BERATER</span></button>
+      <button id="tabWirtschaft" class="pagetab">💰<span data-i18n="tab_wirtschaft_label">WIRTSCHAFT</span></button>
+      <button id="tabDiplomatie" class="pagetab">🤝<span data-i18n="tab_diplomatie_label">DIPLOMATIE</span></button>
+      <button id="tabKarte" class="pagetab">🗺<span data-i18n="tab_karte_label">GEBÄUDE</span></button>
+      <button id="tabMilitaer" class="pagetab">⚔<span data-i18n="tab_militaer_label">MILITÄR</span></button>
+    </div>
 
-  <div id="electionBanner">
-    <b>⚜ KAISERWAHL STEHT BEVOR ⚜</b><br>
-    Die Kurfürsten werden bald über den neuen Kaiser entscheiden.<br>
-    <div id="electionBribeRow"></div>
-    <button onclick="doResolveElection()">Wahl jetzt abhalten</button>
-  </div>
+    <div id="pagecontent">
+      <div id="electionBanner">
+        <b>⚜ KAISERWAHL STEHT BEVOR ⚜</b><br>
+        Die Kurfürsten werden bald über den neuen Kaiser entscheiden.<br>
+        <div id="electionBribeRow"></div>
+        <button onclick="doResolveElection()">Wahl jetzt abhalten</button>
+      </div>
 
-  <div id="provinzPage">
+      <!-- §Phase-8B: neuer Hauptbildschirm -- Karte als Buehne (§1-3/18-42),
+           Kontextpanel (§31-38), Story Card (§12-15/43), Warnungen (§16-17). -->
+      <div id="reichPage">
+        <div id="reichMain">
+          <div id="worldMapPanel" class="panel">
+            <div id="worldMapBoard">
+              <svg id="worldMapSvg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <g id="worldMapLines"></g>
+              </svg>
+              <div id="worldMapNodes"></div>
+            </div>
+          </div>
+          <div id="regionContextPanel" class="panel">
+            <div id="regionContextEmpty"><i>Wähle ein Gebiet auf der Karte, um Details zu sehen.</i></div>
+            <div id="regionContextBody" style="display:none;">
+              <div id="regionContextHeader"></div>
+              <div id="regionContextTabs">
+                <button class="rcTab active" data-rctab="overview">ÜBERSICHT</button>
+                <button class="rcTab" data-rctab="economy">WIRTSCHAFT</button>
+                <button class="rcTab" data-rctab="population">BEVÖLKERUNG</button>
+                <button class="rcTab" data-rctab="military">MILITÄR</button>
+              </div>
+              <div id="regionContextContent"></div>
+            </div>
+          </div>
+        </div>
+        <div id="reichFooter">
+          <div id="storyCard"></div>
+          <div id="alertList"></div>
+        </div>
+      </div>
+
+  <div id="provinzPage" style="display:none;">
     <div class="panel">
       <h2 class="title">HOF</h2>
       <div id="courtInfo" style="font-size:var(--fs-body); line-height:1.6;"></div>
@@ -667,8 +819,12 @@
     <div id="warMenu"></div>
   </div>
 
+    </div>
+  </div>
+
   <div id="menubar">
     <button id="btnAdvance" class="btn-primary" data-i18n="btn_advance">▶ MONAT VERGEHEN LASSEN</button>
+    <span id="tb-pending" style="align-self:center; font-size:var(--fs-body); color:var(--panel);"></span>
     <button id="btnSave" data-i18n="btn_save">💾 SPEICHERN</button>
     <button id="btnLoad" data-i18n="btn_load">📂 LADEN</button>
     <input type="file" id="loadFile" accept="application/json" style="display:none;">
@@ -2544,6 +2700,9 @@ const STRINGS = {
     tab_diplomatie: "🤝 DIPLOMATIE",
     tab_karte: "🗺 KARTE & GEBÄUDE",
     tab_militaer: "⚔ MILITÄR",
+    tab_reich_label: "REICH", tab_provinz_label: "PROVINZ", tab_hof_label: "BERATER",
+    tab_wirtschaft_label: "WIRTSCHAFT", tab_diplomatie_label: "DIPLOMATIE",
+    tab_karte_label: "GEBÄUDE", tab_militaer_label: "MILITÄR",
     btn_advance: "▶ MONAT VERGEHEN LASSEN",
     btn_save: "💾 SPEICHERN",
     btn_load: "📂 LADEN",
@@ -2603,6 +2762,9 @@ const STRINGS = {
     tab_diplomatie: "🤝 DIPLOMACY",
     tab_karte: "🗺 MAP & BUILDINGS",
     tab_militaer: "⚔ MILITARY",
+    tab_reich_label: "REALM", tab_provinz_label: "PROVINCE", tab_hof_label: "ADVISORS",
+    tab_wirtschaft_label: "ECONOMY", tab_diplomatie_label: "DIPLOMACY",
+    tab_karte_label: "BUILDINGS", tab_militaer_label: "MILITARY",
     btn_advance: "▶ ADVANCE MONTH",
     btn_save: "💾 SAVE",
     btn_load: "📂 LOAD",
@@ -9559,13 +9721,220 @@ function applyBattleResultToGame(state, aiId, battleResult) {
   checkAlternativeVictory(state);
 }
 
+// ============================================================
+// UI VIEWMODELS — Phase 8B "Main Screen + Map + HUD" (§54/55/110-113):
+// reine Anzeige-Transformationen über bereits vorhandene state-Werte.
+// KEINE Gameplaylogik, KEIN rnd()-Aufruf (§56/120/121) — jede Funktion
+// hier liest nur bestehende, bereits simulierte Daten und formt sie in
+// eine für die Oberfläche direkt nutzbare Form um. Getestet in
+// tests/ui_viewmodel_test.js (u. a. §56: RNG-Neutralität).
+// ============================================================
+
+// ---------- HUD (Top Bar, §6-11) ----------
+function getHudViewModel(state) {
+  const r = state.regions.player;
+  const ruler = state.characters[state.rulerId];
+  const totalPop = Object.values(r.population).reduce((s, g) => s + g.count, 0);
+  const currentTitle = TITLES[state.titleIndex];
+  return {
+    rulerName: ruler ? `${ruler.name} ${ruler.surname || ""}`.trim() : "–",
+    rulerAge: ruler ? ruler.age : null,
+    titleName: currentTitle ? currentTitle.name : "–",
+    regionName: r.name,
+    year: state.year,
+    month: state.month,
+    treasury: Math.round(state.treasury),
+    population: totalPop,
+    prestige: Math.round(state.prestige),
+    legitimacy: Math.round(state.legitimacy),
+    grainRatioPct: Math.round((r.grainRatio !== undefined ? r.grainRatio : 1) * 100),
+  };
+}
+
+// ---------- Welt-/Regionskarte (§18-30) ----------
+// Nutzt ausschließlich die bereits bestehende TERRITORIES-Graph-Struktur
+// und state.territories (Besitzer/Garnison/Aufstellung, siehe
+// js/war-map.js) — dieselbe Datenquelle, die die Kriegskarte seit Phase
+// "Kriegskarte" bereits nutzt. Keine neue Kartenmechanik, nur eine
+// zweite, dauerhaft sichtbare Darstellung derselben Daten.
+function getWorldMapViewModel(state) {
+  const nodes = TERRITORIES.map(t => {
+    const terr = state.territories[t.id];
+    const owner = state.regions[terr.owner];
+    const isPlayer = terr.owner === "player";
+    const strength = isPlayer
+      ? Object.values(terr.deployment).reduce((a, b) => a + b, 0)
+      : Math.round(terr.garrison);
+    return {
+      id: t.id, name: t.name, x: t.x, y: t.y, terrain: t.terrain, capital: !!t.capital,
+      ownerId: terr.owner, ownerName: owner ? owner.name : terr.owner,
+      isPlayerOwned: isPlayer, strength, hasForces: strength > 0,
+    };
+  });
+  const lines = [];
+  const drawn = new Set();
+  for (const t of TERRITORIES) {
+    for (const adjId of t.adjacent) {
+      const key = [t.id, adjId].sort().join("|");
+      if (drawn.has(key)) continue;
+      drawn.add(key);
+      const other = territoryById(adjId);
+      lines.push({ x1: t.x, y1: t.y, x2: other.x, y2: other.y });
+    }
+  }
+  return { territories: nodes, lines };
+}
+
+// ---------- Kontextpanel (§31-38) ----------
+function foodStatusLabel(ratioPct) {
+  if (ratioPct < 50) return "KRITISCH";
+  if (ratioPct < 80) return "KNAPP";
+  return "STABIL";
+}
+function levelLabel(pct) {
+  if (pct < 35) return "SCHWACH";
+  if (pct < 65) return "MITTEL";
+  return "GUT";
+}
+
+function getRegionSummaryViewModel(state, territoryId) {
+  const t = territoryById(territoryId);
+  if (!t) return null;
+  const terr = state.territories[territoryId];
+  const ownerId = terr.owner;
+  const r = state.regions[ownerId];
+  const totalPop = Object.values(r.population).reduce((s, g) => s + g.count, 0);
+  const weightedWealth = totalPop > 0
+    ? Object.values(r.population).reduce((s, g) => s + g.wealth * g.count, 0) / totalPop
+    : 0;
+  const foodPct = Math.round((r.grainRatio !== undefined ? r.grainRatio : 1) * 100);
+  const topGoods = Object.keys(r.warehouse)
+    .map(gid => ({ id: gid, name: GOODS[gid] ? GOODS[gid].name : gid, stock: Math.round(r.warehouse[gid] || 0) }))
+    .sort((a, b) => b.stock - a.stock)
+    .slice(0, 5)
+    .filter(g => g.stock > 0);
+  const populationByGroup = Object.keys(r.population).map(gid => ({
+    id: gid, name: POP_GROUPS[gid] ? POP_GROUPS[gid].name : gid,
+    count: r.population[gid].count, satisfaction: Math.round(r.population[gid].satisfaction),
+  }));
+  const isPlayerTerritory = ownerId === "player";
+  const militaryStrength = isPlayerTerritory
+    ? Object.entries(terr.deployment).filter(([, v]) => v > 0).map(([k, v]) => ({ id: k, name: TROOP_TYPES[k] ? TROOP_TYPES[k].name : k, count: v }))
+    : [{ id: "garrison", name: "Garnison (geschätzt)", count: Math.round(terr.garrison) }];
+  const terrain = TERRAIN_TYPES[t.terrain] || TERRAIN_TYPES.ebene;
+
+  return {
+    territoryId, territoryName: t.name, terrainName: terrain.name, isCapital: !!t.capital,
+    ownerId, ownerName: r.name, isPlayerTerritory,
+    population: totalPop, satisfactionPct: Math.round(r.satisfactionAvg !== undefined ? r.satisfactionAvg : 55),
+    satisfactionLabel: levelLabel(r.satisfactionAvg !== undefined ? r.satisfactionAvg : 55),
+    foodPct, foodLabel: foodStatusLabel(foodPct),
+    wealthPct: Math.round(weightedWealth), wealthLabel: levelLabel(weightedWealth),
+    topGoods, populationByGroup, militaryStrength,
+  };
+}
+
+// ---------- Story Card (§12-15/43) ----------
+// Bewusst NUR natürlichsprachliche Stufenbeschreibungen — keine
+// Debug-Werte (Tension/Momentum/Director-Score bleiben im Debug-Panel,
+// §14/53/145).
+const THREAD_STAGE_TEXT = {
+  BUILDING: "Die Spannungen wachsen.",
+  ACTIVE: "Die Lage bleibt angespannt.",
+  CLIMAX: "Der Konflikt erreicht einen Höhepunkt.",
+  AFTERMATH: "Die Lage beruhigt sich.",
+};
+const THREAD_ICON_BY_TYPE = {
+  SUCCESSION_CONFLICT: "⚜", PERSONAL_RIVALRY: "⚔", DYNASTIC_ALLIANCE: "💍",
+  FOOD_CRISIS: "🌾", FOREIGN_CONFLICT: "🛡", IMPERIAL_AMBITION: "👑",
+  RELIGIOUS_TENSION: "✝", ECONOMIC_CRISIS: "💰",
+};
+
+function getPrimaryStoryViewModel(state) {
+  const activeNonDormant = getActiveStoryThreads(state).filter(t => t.status !== "DORMANT");
+  if (!activeNonDormant.length) {
+    return { hasFocus: false, quiet: true, message: "Das Reich befindet sich in ruhigen Jahren." };
+  }
+  const focusId = state.drama.focusThreadId;
+  const focus = focusId ? activeNonDormant.find(t => t.id === focusId) : null;
+  if (!focus) return { hasFocus: false, quiet: false };
+  return {
+    hasFocus: true, threadId: focus.id, title: focus.title,
+    icon: THREAD_ICON_BY_TYPE[focus.type] || "⚜",
+    stageText: THREAD_STAGE_TEXT[focus.status] || "Die Geschichte entwickelt sich weiter.",
+  };
+}
+
+// ---------- Warnungen (§16-17) ----------
+// Jede Warnung ist die direkte Übersetzung eines bereits real
+// vorhandenen Simulationszustands — keine neue Schwelle ohne bestehendes
+// Vorbild (Quellen sind kommentiert). Kein Wetter-Spam (§17): normales
+// Wetter erzeugt hier grundsätzlich keinen Eintrag.
+function getAlertViewModel(state) {
+  const r = state.regions.player;
+  const ruler = state.characters[state.rulerId];
+  const critical = [];
+  const important = [];
+  const info = [];
+
+  const foodRatio = r.grainRatio !== undefined ? r.grainRatio : 1;
+  if (foodRatio < 0.5) critical.push({ id: "food_critical", text: "Nahrung kritisch" }); // vgl. debug-Event-Bedingung "kritische Hungerkrise" (index.html)
+
+  for (const aiId in state.warState) {
+    if (state.warState[aiId]) critical.push({ id: "war_" + aiId, text: `Krieg mit ${state.regions[aiId].name}` });
+  }
+
+  if (ruler) {
+    const livingChildren = ruler.childrenIds.map(id => state.characters[id]).filter(c => c && c.alive);
+    if (livingChildren.length === 0) critical.push({ id: "no_heir", text: "Thronfolge ungeklärt" });
+    else if (livingChildren.some(c => c.age >= CONFIG.eventChains.adultAge && !c.spouseId)) {
+      important.push({ id: "heir_unmarried", text: "Thronfolger unverheiratet" });
+    }
+  }
+
+  if (state.treasury < 0) important.push({ id: "treasury_low", text: "Staatskasse im Minus" }); // vgl. computeDramaTensionBreakdown() "weakEconomy"
+
+  const growingRivalry = getActiveStoryThreads(state).find(t =>
+    (t.type === "PERSONAL_RIVALRY" || t.type === "SUCCESSION_CONFLICT") && t.status === "BUILDING");
+  if (growingRivalry) important.push({ id: "rivalry_" + growingRivalry.id, text: `Rivalität wächst: ${growingRivalry.title}` });
+
+  const nextTitle = TITLES[state.titleIndex + 1];
+  if (nextTitle) {
+    const totalPop = Object.values(r.population).reduce((s, g) => s + g.count, 0);
+    const popProgress = nextTitle.reqPop > 0 ? totalPop / nextTitle.reqPop : 1;
+    const wealthProgress = nextTitle.reqWealth > 0 ? state.treasury / nextTitle.reqWealth : 1;
+    const prestigeProgress = nextTitle.reqPrestige > 0 ? state.prestige / nextTitle.reqPrestige : 1;
+    if (popProgress >= 0.8 && wealthProgress >= 0.8 && prestigeProgress >= 0.8) {
+      info.push({ id: "title_close", text: `Titelaufstieg in Sicht: ${nextTitle.name}` });
+    }
+  }
+
+  return { critical, important, info };
+}
+
+// ---------- Jahreswechsel-Hinweis (§11) ----------
+function getYearTransitionViewModel(state) {
+  let pendingCount = 0;
+  if (state.pendingEvent) pendingCount++;
+  if (state.pendingElection) pendingCount++;
+  return {
+    nextYear: state.year + (state.month >= 12 ? 1 : 0),
+    pendingCount,
+    pendingLabel: pendingCount === 0 ? "Keine dringenden Angelegenheiten"
+      : pendingCount === 1 ? "1 wichtige Entscheidung offen"
+      : `${pendingCount} wichtige Entscheidungen offen`,
+  };
+}
+
 </script>
 <script>
 let state = null; // erst nach Charaktererstellung bzw. Laden gesetzt (§8/§89)
-let currentPage = 'provinz';
+let currentPage = 'reich';
 let selectedPlot = null;
 let soundEnabled = true;
 let selectedTraits = [];
+let selectedTerritoryId = null; // §Phase-8B: aktuell im Kontextpanel gewähltes Gebiet
+let selectedRegionContextTab = 'overview';
 
 // ---------- Start-/Charaktererstellungsbildschirm (§8/§89) ----------
 function showTitleScreen() {
@@ -10224,12 +10593,14 @@ function doShowAiDecision(aiId) {
 function switchPage(page) {
   currentPage = page;
   selectedPlot = null;
+  document.getElementById('reichPage').style.display = page === 'reich' ? 'flex' : 'none';
   document.getElementById('provinzPage').style.display = page === 'provinz' ? 'block' : 'none';
   document.getElementById('hofPage').style.display = page === 'hof' ? 'block' : 'none';
   document.getElementById('wirtschaftPage').style.display = page === 'wirtschaft' ? 'block' : 'none';
   document.getElementById('diplomatiePage').style.display = page === 'diplomatie' ? 'block' : 'none';
   document.getElementById('mapview').style.display = page === 'karte' ? 'block' : 'none';
   document.getElementById('militaryview').style.display = page === 'militaer' ? 'block' : 'none';
+  document.getElementById('tabReich').classList.toggle('active', page === 'reich');
   document.getElementById('tabProvinz').classList.toggle('active', page === 'provinz');
   document.getElementById('tabHof').classList.toggle('active', page === 'hof');
   document.getElementById('tabWirtschaft').classList.toggle('active', page === 'wirtschaft');
@@ -10238,6 +10609,7 @@ function switchPage(page) {
   document.getElementById('tabMilitaer').classList.toggle('active', page === 'militaer');
   render();
 }
+document.getElementById('tabReich').addEventListener('click', () => switchPage('reich'));
 document.getElementById('tabProvinz').addEventListener('click', () => switchPage('provinz'));
 document.getElementById('tabHof').addEventListener('click', () => switchPage('hof'));
 document.getElementById('tabWirtschaft').addEventListener('click', () => switchPage('wirtschaft'));
@@ -10251,12 +10623,26 @@ function render() {
   const currentTitle = TITLES[state.titleIndex];
   const nextTitle = TITLES[state.titleIndex+1];
 
-  document.getElementById('tb-title').textContent = `${currentTitle.name} von ${r.name}`;
-  document.getElementById('tb-year').textContent = `${t('tb_year')} ${state.year} (${state.month}/12)`;
-  document.getElementById('tb-treasury').textContent = `${t('tb_treasury')} ${Math.round(state.treasury)} ${t('tb_treasury_unit')}`;
+  // §Phase-8B-Punkt 6-11: Top Bar -- Herrscher groß/zuerst, Werte als
+  // kompakte Icon+Zahl-Komponenten mit Tooltip statt großer Boxen.
+  const hud = getHudViewModel(state);
+  const rulerForPortrait = state.characters[state.rulerId];
+  document.getElementById('tb-portrait').textContent = rulerForPortrait ? (rulerForPortrait.gender === 'm' ? '🤴' : '👸') : '👑';
+  document.getElementById('tb-name').textContent = hud.rulerName;
+  document.getElementById('tb-subtitle').textContent = `${hud.titleName} von ${hud.regionName}`;
+  document.getElementById('tb-year').innerHTML = `📅 <b>${hud.year}</b> (${hud.month}/12)`;
+  document.getElementById('tb-treasury').innerHTML = `🪙 <b>${hud.treasury.toLocaleString('de-DE')}</b> Taler`;
   document.getElementById('tb-treasury').setAttribute('data-tip', `Einnahmen u.a. aus Steuern (Satz ${Math.round(r.taxRate*100)}%)\nAusgaben: Armee-Unterhalt, Berater-Gehälter, Gebäude`);
-  document.getElementById('tb-prestige').textContent = `${t('tb_prestige')} ${Math.round(state.prestige)}`;
-  document.getElementById('tb-prestige').setAttribute('data-tip', `Steigt durch: Kriegssiege, Bündnisse, Ereignisse\nSinkt durch: Niederlagen, gebrochene Pakte, Erbfolgestreit\nLegitimität: ${Math.round(state.legitimacy)}/100`);
+  document.getElementById('tb-population').innerHTML = `👥 <b>${hud.population.toLocaleString('de-DE')}</b>`;
+  document.getElementById('tb-population').setAttribute('data-tip', 'Einwohner von ' + hud.regionName);
+  document.getElementById('tb-prestige').innerHTML = `🏵 <b>${hud.prestige}</b>`;
+  document.getElementById('tb-prestige').setAttribute('data-tip', `Steigt durch: Kriegssiege, Bündnisse, Ereignisse\nSinkt durch: Niederlagen, gebrochene Pakte, Erbfolgestreit`);
+  document.getElementById('tb-legitimacy').innerHTML = `⚖ <b>${hud.legitimacy}</b>`;
+  document.getElementById('tb-legitimacy').setAttribute('data-tip', 'Legitimität der Herrschaft (0-100)');
+  const foodEl = document.getElementById('tb-food');
+  foodEl.innerHTML = `🌾 <b>${hud.grainRatioPct}%</b>`;
+  foodEl.classList.toggle('tb-warn', hud.grainRatioPct < 80);
+  foodEl.setAttribute('data-tip', 'Vorhandenes Getreide im Verhältnis zum Grundbedarf');
 
   // Hof / Herrscher
   const ruler = state.characters[state.rulerId];
@@ -10349,6 +10735,11 @@ function render() {
   // Gebäude (Kartenansicht)
   if (currentPage === 'karte') renderMap();
   if (currentPage === 'militaer') renderMilitary();
+  if (currentPage === 'reich') renderReichPage();
+
+  // §Phase-8B-Punkt 11: Hinweis vor dem Jahreswechsel, immer sichtbar (Menüleiste)
+  const yt = getYearTransitionViewModel(state);
+  document.getElementById('tb-pending').textContent = yt.pendingLabel;
 
   // Berater (§Character-Core: echte Personen statt reiner Stufenzahlen —
   // Wirkung kommt primär aus Skill/Traits/Loyalität, das Ausbausystem bleibt
@@ -10529,6 +10920,144 @@ function render() {
     `;
     document.getElementById('gameover').style.display = 'flex';
   }
+}
+
+// ============================================================
+// §Phase-8B: REICH -- Hauptbildschirm (Karte/HUD/Kontextpanel/Story
+// Card/Warnungen). Nutzt ausschließlich js/ui-viewmodels.js für die
+// Datenaufbereitung -- diese Funktionen hier bauen nur noch DOM/HTML auf.
+// ============================================================
+
+// Dieselbe Grundpalette wie die Kriegskarte (WM_OWNER_COLOR), aber auf die
+// Phase-8A-Design-Tokens umgestellt (§49-51: keine neue Parallelpalette) --
+// Grün entfällt bewusst (verschwindet sonst im grünen Kartenuntergrund).
+const REICH_OWNER_COLOR = {
+  player: 'var(--gold)', ai1: 'var(--accent)', ai2: 'var(--blue-muted)', ai3: 'var(--ochre)',
+};
+
+function renderReichPage() {
+  renderWorldMap();
+  renderRegionContext();
+  renderStoryCard();
+  renderAlerts();
+}
+
+function renderWorldMap() {
+  const vm = getWorldMapViewModel(state);
+  let linesHtml = '';
+  for (const l of vm.lines) {
+    linesHtml += `<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="rgba(240,230,207,0.35)" stroke-width="0.6" />`;
+  }
+  document.getElementById('worldMapLines').innerHTML = linesHtml;
+
+  let nodesHtml = '';
+  for (const terr of vm.territories) {
+    const color = REICH_OWNER_COLOR[terr.ownerId] || '#888';
+    const icon = terr.capital ? '🏰' : '🏘';
+    nodesHtml += `<div class="reichNode${terr.capital ? ' capital' : ''}${selectedTerritoryId === terr.id ? ' selected' : ''}"
+      style="left:${terr.x}%; top:${terr.y}%; background:${color};"
+      onclick="selectMapTerritory('${terr.id}')" data-tip="${terr.name} (${terr.ownerName})${terr.hasForces ? '\\nTruppen: ' + terr.strength : ''}">${icon}</div>`;
+    // §Phase-8B-Punkt 24/30: Labels nur für Hauptstädte fest sichtbar (klar
+    // lesbar, ausreichend Abstand); kleinere Grenzgebiete zeigen ihren Namen
+    // über den ohnehin vorhandenen Tooltip, sonst überlagern sich benachbarte
+    // Grenzmarken auf der Karte ("Karte nicht überladen").
+    if (terr.capital) nodesHtml += `<div class="reichLabel" style="left:${terr.x}%; top:${terr.y}%;">${terr.name}</div>`;
+  }
+  document.getElementById('worldMapNodes').innerHTML = nodesHtml;
+}
+
+function selectMapTerritory(territoryId) {
+  selectedTerritoryId = territoryId;
+  selectedRegionContextTab = 'overview';
+  render();
+}
+
+function closeRegionContext() {
+  selectedTerritoryId = null;
+  render();
+}
+
+function switchRegionContextTab(tabId) {
+  selectedRegionContextTab = tabId;
+  renderRegionContext();
+}
+
+// §Phase-8B-Punkt 31-38: Kontextpanel -- 4-6 Hauptzahlen zuerst, Details
+// per Tab (progressive disclosure), keine 40-Werte-Wand.
+function renderRegionContext() {
+  const emptyEl = document.getElementById('regionContextEmpty');
+  const bodyEl = document.getElementById('regionContextBody');
+  if (!selectedTerritoryId) { emptyEl.style.display = 'block'; bodyEl.style.display = 'none'; return; }
+  const vm = getRegionSummaryViewModel(state, selectedTerritoryId);
+  if (!vm) { selectedTerritoryId = null; emptyEl.style.display = 'block'; bodyEl.style.display = 'none'; return; }
+  emptyEl.style.display = 'none'; bodyEl.style.display = 'block';
+
+  document.getElementById('regionContextHeader').innerHTML =
+    `${vm.territoryName.toUpperCase()} <span style="font-size:var(--fs-micro); font-weight:normal; color:var(--umber);">(${vm.ownerName})</span>`;
+
+  document.querySelectorAll('.rcTab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.rctab === selectedRegionContextTab);
+    btn.onclick = () => switchRegionContextTab(btn.dataset.rctab);
+  });
+
+  const contentEl = document.getElementById('regionContextContent');
+  if (selectedRegionContextTab === 'overview') {
+    contentEl.innerHTML = `
+      <div class="rcStatRow"><span class="rcStatLabel">Gelände</span><span>${vm.terrainName}${vm.isCapital ? ' · Hauptstadt' : ''}</span></div>
+      <div class="rcStatRow"><span class="rcStatLabel">Einwohner</span><span>${vm.population.toLocaleString('de-DE')}</span></div>
+      <div class="rcStatRow"><span class="rcStatLabel">Nahrung</span><span>${vm.foodPct}% · ${vm.foodLabel}</span></div>
+      <div class="rcStatRow"><span class="rcStatLabel">Zufriedenheit</span><span>${vm.satisfactionPct}% · ${vm.satisfactionLabel}</span></div>
+      <div class="rcStatRow"><span class="rcStatLabel">Wohlstand</span><span>${vm.wealthPct}% · ${vm.wealthLabel}</span></div>
+      <div class="subhead" style="margin-top:var(--sp-2);">Wichtigste Waren (Lager)</div>
+      ${vm.topGoods.length ? vm.topGoods.map(g => `<div class="rcGoodsRow"><span>${g.name}</span><span>${g.stock.toLocaleString('de-DE')}</span></div>`).join('') : '<i>Keine nennenswerten Vorräte.</i>'}
+    `;
+  } else if (selectedRegionContextTab === 'economy') {
+    contentEl.innerHTML = `
+      <div class="subhead">Lagerbestände</div>
+      ${vm.topGoods.length ? vm.topGoods.map(g => `<div class="rcGoodsRow"><span>${g.name}</span><span>${g.stock.toLocaleString('de-DE')}</span></div>`).join('') : '<i>Keine nennenswerten Vorräte.</i>'}
+      ${vm.isPlayerTerritory ? `<div style="margin-top:var(--sp-2);"><button onclick="switchPage('wirtschaft')">Vollständige Wirtschaft ansehen →</button></div>` : ''}
+    `;
+  } else if (selectedRegionContextTab === 'population') {
+    contentEl.innerHTML = `
+      <table><tr><th>Gruppe</th><th>Anzahl</th><th>Zufr.</th></tr>
+      ${vm.populationByGroup.map(g => `<tr><td>${g.name}</td><td>${g.count.toLocaleString('de-DE')}</td><td>${g.satisfaction}</td></tr>`).join('')}
+      </table>
+    `;
+  } else if (selectedRegionContextTab === 'military') {
+    contentEl.innerHTML = `
+      ${vm.militaryStrength.length ? vm.militaryStrength.map(m => `<div class="rcStatRow"><span class="rcStatLabel">${m.name}</span><span>${m.count.toLocaleString('de-DE')}</span></div>`).join('') : '<i>Keine Truppen bekannt.</i>'}
+      ${vm.isPlayerTerritory ? `<div style="margin-top:var(--sp-2);"><button onclick="switchPage('militaer')">Militär verwalten →</button></div>` : ''}
+    `;
+  }
+}
+
+// §Phase-8B-Punkt 12-15/43: Story Card -- nur natürlichsprachlich, keine
+// Debug-Werte (Tension/Momentum/Director-Score bleiben im Debug-Panel).
+function renderStoryCard() {
+  const vm = getPrimaryStoryViewModel(state);
+  const el = document.getElementById('storyCard');
+  if (vm.hasFocus) {
+    el.innerHTML = `
+      <div class="storyCardEyebrow">IM REICH BEWEGT SICH ETWAS</div>
+      <div class="storyCardTitle">${vm.icon} ${vm.title}</div>
+      <div class="storyCardText">${vm.stageText}</div>
+    `;
+  } else if (vm.quiet) {
+    el.innerHTML = `<div class="storyCardEyebrow">IM REICH BEWEGT SICH ETWAS</div><div class="storyCardText">${vm.message}</div>`;
+  } else {
+    el.innerHTML = `<div class="storyCardEyebrow">IM REICH BEWEGT SICH ETWAS</div><div class="storyCardText">Mehrere Entwicklungen halten den Hof in Atem.</div>`;
+  }
+}
+
+// §Phase-8B-Punkt 16/17: Warnungen priorisiert, kompakt, kein Wetter-Spam.
+function renderAlerts() {
+  const vm = getAlertViewModel(state);
+  const all = vm.critical.map(a => ({ ...a, cls: 'crit' }))
+    .concat(vm.important.map(a => ({ ...a, cls: 'important' })))
+    .concat(vm.info.map(a => ({ ...a, cls: 'info' })));
+  const el = document.getElementById('alertList');
+  if (!all.length) { el.innerHTML = '<div class="alertEmpty">Keine besonderen Vorkommnisse.</div>'; return; }
+  el.innerHTML = all.map(a => `<div class="alertItem ${a.cls}"><span class="alertDot"></span>${a.text}</div>`).join('');
 }
 
 function renderMilitary() {
