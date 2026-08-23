@@ -3100,3 +3100,95 @@ per Diff, leerer `git diff --stat` für `battle-engine/` und
 `js/battle-bridge.js`), keine neue SAVE_VERSION (keine State-Struktur
 geändert, nur ein zusätzliches, additiv gespeichertes Feld
 `r.lastProduction`).
+
+## 2026-08-23 – Phase 8C.1 (KAISERREICH-Zwischenprompt): Strategic Map Redesign
+
+Zwischenphase vor 8D — "von der Node-Grafik zur historischen Risiko-
+Brettspiel-Karte". Voller Ablauf, gefundene Probleme und Screen-Inventar
+in `UI_REDESIGN.md` Abschnitt 6/7. Ersetzt ausschließlich die visuelle
+Darstellung der REICH-Weltkarte (die Kriegskarte bleibt unangetastet,
+wie in jeder vorherigen Teilphase); TERRITORIES/state.territories/
+adjacent/Battle Engine/Savegames/RNG unverändert.
+
+**Kernproblem und Lösung:** die bisherigen 16 Kreis-Divs mit sichtbaren
+Adjazenzlinien lasen sich wie ein Netzwerkdiagramm, nicht wie eine
+Landkarte. Ersetzt durch 16 echte SVG-`<path>`-Flächen mit organischen
+Grenzen — Nachbarschaft ist jetzt an gemeinsamen Grenzen ablesbar, keine
+Linien mehr in der normalen Ansicht.
+
+**Neues Offline-Dev-Tool `tools/generate-map-geometry.js`** (kein
+Laufzeit-Code): berechnet ein vollständiges, begrenztes Voronoi-Diagramm
+(paarweise Halbebenen-Clipping) über einen eigenen Layout-Punktesatz
+(unabhängig von `TERRITORIES.x/y`, die unverändert bleiben) und schreibt
+statische Pfaddaten nach `js/map-geometry.js` (`MAP_GEOMETRY`/
+`MAP_WILD_GEOMETRY`, bundled). Organische Kantenform via deterministischer
+String-Hash-Verschiebung (kein `Math.random()`/`rnd()`), mit
+richtungsunabhängiger kanonischer Kantenidentität, damit eine GETEILTE
+Grenze in beiden angrenzenden Zellen exakt denselben Kontrollpunkt
+verwendet.
+
+**"Adjazenz ist heilig" — programmatisch erzwungen:** der Generator
+validiert nach der Berechnung automatisch, dass JEDES deklarierte
+`TERRITORIES.adjacent`-Paar eine echte gemeinsame Kante besitzt (Quelle:
+live aus `data/gamedata.js` gelesen, kein Duplikat) und bricht bei einem
+Fehlschlag ab, statt eine falsche Karte auszugeben. Ein reines 16-Punkte-
+Voronoi-Diagramm hätte mehrere ungewollte Grenzen zwischen geometrisch
+nahen, aber im Gameplay NICHT benachbarten Gebieten verschiedener
+Besitzer erzeugt (Gameplay-Graph mit nur 17 Kanten ist deutlich dünner
+als das generische Voronoi-Ergebnis von ≈21 Kanten für 16 Punkte) — gelöst
+mit vier zusätzlichen, NICHT spielbaren "Wildnis"-Stützpunkten
+(`wild_nw/ne/se/sw`), die genau diese Zwischenräume als dekoratives,
+unbesiedeltes Gelände auffüllen. Nach Einführung: null ungewollte
+Grenzen zwischen verschiedenen Besitzern (bei jedem Generator-Lauf erneut
+geprüft).
+
+**Zustände direkt auf der Fläche:** Hover/Selected (Selected bewusst
+**cremeweiß statt golden** — Gold ist gleichzeitig die Spieler-
+Besitzerfarbe und wäre auf eigenem Gebiet unsichtbar gewesen, ein
+während dieser Teilphase gefundener und behobener Kontrastfehler),
+Attackable (dezente gestrichelte Kontur + Schwertsymbol, nur bei echtem
+Krieg UND direkter Adjazenz zu Spielergebiet — dieselbe Bedingung wie
+`aiTerritoryCounterAttack()`), Ally (aus dem bereits realen
+`treaties.allianz`). Hauptstädte/Gelände/Armeen als vier neue lokale
+Inline-SVG-`<symbol>`e (Burg/Baum/Hügel/Schwert/Banner) statt Emoji.
+
+**Ein reales technisches Problem gefunden und behoben:** das bestehende
+`[data-tip]:hover::after`-CSS-Tooltip-System rendert auf SVG-
+Geometrieelementen laut `getComputedStyle` zwar einen Box-Wert, wird von
+Chromium aber tatsächlich NICHT gemalt (per dediziertem Playwright-Test
+bestätigt) — eine reine SVG-Rendering-Einschränkung. Behoben mit einem
+visuell IDENTISCHEN JS-Tooltip (`#mapTooltip`, dieselbe Optik), per
+einmalig registrierter `mousemove`-Event-Delegation positioniert statt
+CSS `::after`. Nebenbei behoben: ein vorbestehender `\\n`-statt-`\n`-
+Tippfehler (Backslash+n als Literal statt echtem Zeilenumbruch) in der
+Tooltip-Zeile, geerbt aus der alten Kreis-Karte.
+
+**Kein Bridges/Pässe/Furten-Sonderfall nötig:** da jede deklarierte
+Adjazenz bereits eine echte geometrische Grenze besitzt, war keine
+einzige visuelle Sonderverbindung erforderlich.
+
+**Playwright-Klicktests:** alle 16 Territorien einzeln geklickt (0
+Fehler), Kontextpanel-Tabs durchgeklickt, Kriegssimulation (exakt 1
+attackable Gebiet, das einzige direkt an Spielerland grenzende),
+Bündnissimulation (alle 4 Gebiete des Partners als ally markiert),
+automatisierter Overlay-Scan (0 blockierende Elemente), Hover-Tooltip
+per Zoom-Screenshot bestätigt. Responsive bei allen drei
+Pflichtauflösungen inkl. Kollisionsprüfung der Hauptstadt-Labels (0 bei
+allen drei) — Kartenformat von 4:3 auf 1:1 geändert (neue Geometrie ist
+quadratisch, `preserveAspectRatio="xMidYMid meet"` verhindert Verzerrung).
+
+**Dead Code entfernt statt liegengelassen:** die alte adjazenzbasierte
+Linienliste (`getWorldMapViewModel().lines`) wurde vollständig gestrichen
+(inkl. Test) statt als toter Code zu verbleiben, da die neue Geometrie
+jede Adjazenz bereits als echte Grenze abbildet.
+
+**Bewusst NICHT Teil dieser Teilphase:** Hof/Dynastie/Event-Fenster/
+Diplomatie/Krieg/Chronik komplett umbauen (weiterhin 8D–8H), Kriegskarte
+(bleibt unverändertes Overlay), Zoom-/Pan-Mechanik (Karte bleibt
+vollständig sichtbar). Bundle-Größe 662.919 → 677.811 Bytes (+2,25 %,
+primär `js/map-geometry.js` plus das neue SVG-Rendering in
+`renderWorldMap()`). Alle Testdateien grün (außer der bekannten unseeded
+`economy_test.js`-Flakiness), keine neuen `rnd()`-Aufrufe (getestet,
+inkl. neuer attackable/ally-Felder), Battle Engine unverändert
+(bestätigt per Diff, leerer `git diff --stat` für `battle-engine/` und
+`js/battle-bridge.js`), keine neue SAVE_VERSION.

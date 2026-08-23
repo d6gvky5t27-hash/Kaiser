@@ -478,7 +478,136 @@ Bevölkerungsbalken, Steuer-/Handelspanels.
 (1920×1080/1440×900/1366×768) — kein horizontales Scrollen, KPI-Leiste
 und Warenkarten-Raster bleiben bei 1366×768 in einer Spalte lesbar.
 
-## 6. Screen Inventory (Status nach Phase 8A + 8B + 8C)
+## 6. Phase 8C.1: Strategic Map Redesign
+
+Zwischenphase vor 8D — "von der Node-Grafik zur historischen Risiko-
+Brettspiel-Karte". Ersetzt ausschließlich die visuelle Darstellung der
+REICH-Weltkarte (die separate Kriegskarte/`js/war-map.js`-Overlay bleibt
+unangetastet, wie in jeder vorherigen Teilphase). TERRITORIES/
+state.territories/adjacent/Garnison/Truppen/Wirtschaft/Battle Engine/
+Savegames/RNG unverändert (§6) — reine Präsentation.
+
+**Von Kreisen zu echten Flächen.** Die bisherigen 16 Kreis-Divs
+(`div.reichNode`) plus Linien-SVG (Adjazenz als sichtbare Verbindungs-
+linien) wichen 16 echten SVG-`<path>`-Territorien mit organischen,
+unregelmäßigen Grenzen — Nachbarschaft wird jetzt durch gemeinsame
+Grenzen sichtbar, keine Netzwerklinien mehr in der normalen Ansicht (§8).
+
+**Geometrie ist fest, deterministisch und von Hand validiert, nicht
+prozedural zufällig (§5).** Neues Offline-Dev-Tool
+`tools/generate-map-geometry.js` (kein Laufzeit-Code, von Hand
+ausgeführt) berechnet ein vollständiges, begrenztes Voronoi-Diagramm
+(paarweise Halbebenen-Clipping) über einen eigenen, von `TERRITORIES.x/y`
+unabhängigen Layout-Punktesatz und schreibt das Ergebnis als statische
+Pfaddaten nach `js/map-geometry.js` (`MAP_GEOMETRY`/`MAP_WILD_GEOMETRY`,
+bundled über `tools/build-bundle.js`). Die organische "handgezeichnete"
+Kantenform (§49) kommt aus einer deterministischen String-Hash-
+Verschiebung der Kantenkontrollpunkte — kein `Math.random()`, kein
+`rnd()` (§41/42) — mit einer richtungsunabhängigen, kanonischen
+Kantenidentität, damit eine GETEILTE Grenze in beiden angrenzenden
+Zellen exakt denselben Kontrollpunkt verwendet (sonst klaffen die Ränder
+minimal auseinander).
+
+**"Adjazenz ist heilig" (§7) — programmatisch erzwungen, nicht nur
+behauptet.** Der Generator validiert nach der Berechnung automatisch:
+JEDES in `TERRITORIES.adjacent` deklarierte Paar muss eine echte
+gemeinsame Kante im Diagramm besitzen; schlägt das fehl, bricht das
+Skript mit Fehlermeldung ab, statt eine falsche Karte auszugeben. Die
+Adjazenzliste wird dafür live aus `data/gamedata.js` gelesen (kein
+separat gepflegtes Duplikat, §58 "Source of Truth").
+
+**Vier dekorative "Wildnis"-Stützpunkte lösen einen echten geometrischen
+Zielkonflikt.** Ein reines Voronoi-Diagramm der 16 Punkte allein hätte
+mehrere unerwünschte Grenzen zwischen geometrisch nahen, aber im
+Gameplay NICHT benachbarten Gebieten verschiedener Besitzer erzeugt
+(z. B. die eigene Hauptstadt direkt neben einer weit entfernten KI-
+Grenzprovinz) — eine mathematische Folge davon, dass das Gameplay-
+Adjazenzgraph (Grad ≤3, 17 Kanten) deutlich dünner ist als ein
+generisches Voronoi-Diagramm von 16 Punkten (≈21 Kanten). Vier
+zusätzliche, NICHT spielbare Stützpunkte (`wild_nw/ne/se/sw`) füllen
+genau die Zwischenräume, die sonst zwei unpassende Gebiete geteilt
+hätten — gerendert als dekoratives, unbesiedeltes Gelände (Wald/Hügel-
+Symbolik), nicht als Territorium (kein Besitzer, kein Klick, kein
+Label). Nach Einführung dieser vier Punkte: null ungewollte Grenzen
+zwischen verschiedenen Besitzern (vom Generator bei jedem Lauf erneut
+geprüft).
+
+**Farben/Grenzen/Zustände.** Dieselbe Renaissance-Besitzerpalette wie
+zuvor (`REICH_OWNER_COLOR`: Gold=Spieler, Burgunderrot/Steinblau/Ocker=
+KI, unverändert aus 8B). Neu: sichtbare Zustände direkt auf der
+SVG-Fläche — Hover (helligkeitsverstärkt, hellerer Rand), Selected
+(**cremeweißer** statt goldener Rahmen — Gold kollidiert sonst mit der
+Spieler-eigenen Besitzerfarbe und wäre dort unsichtbar, ein während
+dieser Teilphase gefundener und behobener Kontrastfehler), Attackable
+(dezente burgunderfarben gestrichelte Kontur + kleines Schwertsymbol,
+nur bei echtem `state.warState[...]` UND direkter Adjazenz zu
+Spielergebiet — keine neue Mechanik, dieselbe Bedingung wie
+`aiTerritoryCounterAttack()` in `js/war-map.js`), Ally (feine
+gestrichelte Kontur, aus dem bereits realen
+`state.diplomacy[...].treaties.allianz`).
+
+**Hauptstädte/Gelände/Armeen als lokale Inline-SVG-Symbole statt
+Emoji (§55/56).** Vier neue `<symbol>`-Definitionen (Burg, Baum, Hügel,
+Schwert, Banner) im `<defs>`-Block der Karte, offline, frei skalierbar.
+Burg-Symbol über dem Hauptstadt-Punkt, Name darunter (permanent
+sichtbar, §16); Wald/Hügel-Symbole nur für Nicht-Hauptstädte mit
+passendem `TERRITORIES.terrain` (nur reale Terrain-Typen der 16 Gebiete
+illustriert, keine neue Geländemechanik, §21-25); Truppenstärke als
+kleines Banner mit Zahl statt großem Kreis (§18-20, nutzt ausschließlich
+den bereits vorhandenen `strength`-Wert).
+
+**Ein reales technisches Problem gefunden und mit einer kleinen,
+konsistenten Lösung behoben: das bestehende `[data-tip]:hover::after`-
+CSS-Tooltip-System malt auf SVG-Geometrieelementen (`<g>`/`<path>`,
+kein `foreignObject`) laut `getComputedStyle` zwar einen Box-Wert, wird
+von Chromium aber tatsächlich NICHT sichtbar gerendert** — eine reine
+SVG-Rendering-Einschränkung (per dediziertem Playwright-Test bestätigt:
+0×0 sichtbare Fläche trotz `display:block`-Computed-Style). Behoben mit
+einem neuen, aber visuell IDENTISCHEN Tooltip (`#mapTooltip`, dieselbe
+dunkle Panel-Optik/Goldrand/`pre-line`), positioniert per einmalig
+registrierter `mousemove`-Event-Delegation auf `#worldMapBoard` statt
+CSS `::after` — das bestehende Tooltip-System bleibt damit im
+Erscheinungsbild vollständig erhalten (§34), nur die technische
+Umsetzung für SVG-Flächen ist neu. Nebenbei behoben: die Tooltip-Zeile
+nutzte (schon in der alten Kreis-Karte) `\\n` (zwei Zeichen: Backslash +
+n) statt eines echten Zeilenumbruchs `\n` im Template-Literal — sichtbar
+nur als Nebeneffekt der neuen Debug-Prüfung, jetzt ein echter Umbruch.
+
+**Kein Bridges/Pässe/Furten-Sonderfall nötig (§8).** Da die Validierung
+bestätigt, dass JEDE deklarierte Adjazenz bereits eine echte geometrische
+Grenze besitzt, war keine einzige visuelle Sonderverbindung (Brücke,
+Pass, Furt) erforderlich — die Karte bildet den kompletten Gameplay-
+Graphen allein durch Flächenränder ab.
+
+**Playwright-Klicktests (§39/40):** alle 16 Territorien einzeln geklickt
+(kein Fehler), Kontextpanel-Tabs nach Klick durchgeklickt, Schließen-
+Button, Kriegssimulation (`state.warState.ai1=true` → exakt 1
+attackable Gebiet, das einzige direkt an Spielerland grenzende), Bündnis-
+Simulation (`treaties.allianz=true` → alle 4 Gebiete des Bündnispartners
+als ally markiert), automatisierter Overlay-Scan über alle 16 Territory-
+Hitboxen (`elementFromPoint()`, 0 blockierende Elemente), Hover-Tooltip
+per dediziertem Zoom-Screenshot visuell bestätigt.
+
+**Responsive** bei allen drei Pflichtauflösungen prüft zusätzlich
+Kollisionen zwischen sichtbaren Hauptstadt-Labels (0 bei allen drei) und
+bestätigt `#worldMapBoard` bleibt vollständig im Viewport (kein
+Abschneiden, kein horizontales Scrollen) — Seitenverhältnis der Karte
+von 4:3 auf 1:1 geändert (die neue 1000×1000-Geometrie ist quadratisch,
+`preserveAspectRatio="xMidYMid meet"` verhindert Verzerrung).
+
+**Bundle-Größe:** 662.919 → 677.811 Bytes (+14.892 Bytes, +2,25 %) —
+primär `js/map-geometry.js` (statische Pfaddaten für 16+4 Flächen) und
+das neue SVG-Rendering in `renderWorldMap()`.
+
+**Dead Code entfernt statt liegengelassen:** die alte adjazenz-basierte
+Linienliste (`getWorldMapViewModel().lines`) wurde komplett gestrichen
+(inkl. zugehörigem Test) statt als toter Code stehen zu bleiben — da die
+neue Geometrie jede Adjazenz bereits als echte Grenze abbildet, gibt es
+für sie keinen Verwendungszweck mehr (anders als in 8C, wo die alte
+`#priceTable` bewusst als harmloser Fallback erhalten blieb, weil ihr
+Render-Code weiterhin unverändert mitläuft).
+
+## 7. Screen Inventory (Status nach Phase 8A + 8B + 8C + 8C.1)
 
 | Screen/Bereich | Status | Anmerkung |
 |---|---|---|
@@ -496,7 +625,7 @@ und Warenkarten-Raster bleiben bei 1366×768 in einer Spalte lesbar.
 | Event-/Geburt-/Heirat-/Kassenbuch-Modals | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | kein Illustrationsbereich (§56-58), das ist 8F |
 | Kampf-Overlay | **REDESIGNED** (Tokens) | Battle Engine unverändert (§61 bestätigt), Strukturaufwertung ist 8G |
 | Kriegskarte-Overlay | **REDESIGNED** (Tokens) | Kartenstil (handgezeichnete Landkarte) weiterhin nicht vertieft, bleibt als reines Kriegs-Overlay bestehen |
-| Welt-/Regionskarte als Hauptbildschirm-Zentrum | **REDESIGNED** | 8B — siehe Abschnitt 5 |
+| Welt-/Regionskarte als Hauptbildschirm-Zentrum | **REDESIGNED** | 8B (Layout/HUD/Kontextpanel) + 8C.1 (Node-Grafik → politische Flächenkarte, Abschnitt 6) |
 | Charakterportraits/Placeholder-System | **LEGACY** | noch nicht begonnen (8D) — Topbar-Portrait ist bewusst nur ein einfacher Emoji-Platzhalter |
 | Dynastie-/Stammbaum-Ansicht | **LEGACY** | noch nicht begonnen (8D) |
 | Story-Thread-Spieler-UI | **REDESIGNED** (Story Card, Kurzform) / **LEGACY** (volle Ansicht) | 8B liefert nur die kompakte Fokus-Karte auf dem Hauptbildschirm (§12-15/43), eine vollständige Story-Thread-Liste/-Historie im Spieler-UI ist 8F |
@@ -510,9 +639,12 @@ map-zentrierten Hauptbildschirm mit echter HUD/Kontextpanel/Story-Card/
 Warnungs-Funktionalität, 8C machte REICH/PROVINZ/WIRTSCHAFT aus rohen
 Tabellen zu einer lesbaren, aber weiterhin vollständig ehrlichen
 Herrschaftsübersicht (Status-Wörter, Progressive Disclosure, keine
-erfundenen Trends) — drei Teilphasen zusammen bereits ein klar sichtbarer
-Wechsel weg vom "Dashboard"-Look hin zu "das ist mein Reich". Die in
-§72-73/71/70 explizit aufgeschobenen STRUKTURELLEN Neubauten (Hof-
-Charakterkarten, Stammbaum, Event-Illustrationen, Diplomatie-Umbau,
-Chronik-Buch, Kampf-Neuinszenierung) sind weiterhin bewusst NICHT Teil
-dieser Teilphase — sie sind laut Auftrag selbst als 8D–8H vorgesehen.
+erfundenen Trends), 8C.1 ersetzte die Node-Grafik-Optik der Weltkarte
+durch eine echte politische Flächenkarte (Territorien/Grenzen/Land/
+Herrschaft statt Kreise/Linien) — vier Teilphasen zusammen bereits ein
+klar sichtbarer Wechsel weg vom "Dashboard"-Look hin zu "das ist mein
+Reich". Die in §72-73/71/70 explizit aufgeschobenen STRUKTURELLEN
+Neubauten (Hof-Charakterkarten, Stammbaum, Event-Illustrationen,
+Diplomatie-Umbau, Chronik-Buch, Kampf-Neuinszenierung) sind weiterhin
+bewusst NICHT Teil dieser Teilphase — sie sind laut Auftrag selbst als
+8D–8H vorgesehen.
