@@ -183,35 +183,75 @@
   #reichMain { display: flex; gap: var(--sp-3); align-items: flex-start; }
   #worldMapPanel { flex: 7 1 0; min-width: 0; padding: var(--sp-2); }
   #regionContextPanel { flex: 3 1 280px; min-width: 260px; max-width: 370px; max-height: 560px; overflow-y: auto; }
-  /* Gelände-Untergrund wiederverwendet dieselbe gedämpfte Grün-Verlaufstechnik
-     wie #mapTerrain/#warMapBoard -- eine Quelle der Kartenästhetik statt einer
-     dritten Variante (§18/19: gezeichnete Landkarte, keine Satellitenoptik). */
+  /* ============================================================
+     §Phase-8C.1 "Strategic Map Redesign": von der Kreis+Linien-Node-Grafik
+     zur historischen politischen Karte. Territorien sind jetzt echte
+     SVG-Flächen (js/map-geometry.js, feste Pfade, siehe dort) statt
+     Kreis-Divs -- Nachbarschaft wird durch gemeinsame Grenzen sichtbar,
+     keine Netzwerklinien mehr in der normalen Ansicht (§8). Pergament-
+     Untergrund + Messingrahmen statt der bisherigen grünen Rechteckfläche
+     (§26/27) -- ein "eingelassenes Spielbrett" statt eines UI-Panels. */
   #worldMapBoard {
-    position: relative; width: 100%; aspect-ratio: 4 / 3; max-height: 52vh; border-radius: var(--r-sm);
+    position: relative; width: 100%; aspect-ratio: 1 / 1; max-height: 62vh; border-radius: var(--r-md);
     background:
-      repeating-linear-gradient(45deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 3px, transparent 3px, transparent 6px),
-      linear-gradient(to bottom, #3a5240 0%, #2d4433 50%, #223428 100%);
-    border: 3px solid var(--ink); overflow: hidden;
+      radial-gradient(ellipse at 50% 40%, rgba(255,246,224,0.05) 0%, transparent 60%),
+      repeating-linear-gradient(60deg, rgba(0,0,0,0.035) 0px, rgba(0,0,0,0.035) 2px, transparent 2px, transparent 7px),
+      linear-gradient(155deg, #4a3a26 0%, #382c1c 45%, #2a2014 100%);
+    border: 5px solid var(--purple); box-shadow: inset 0 0 0 2px rgba(230,200,140,0.25), var(--shadow-md);
+    overflow: hidden;
   }
-  #worldMapSvg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-  #worldMapNodes { position: absolute; inset: 0; width: 100%; height: 100%; }
-  /* div.reichNode (statt .reichNode) bewusst mit Element+Klasse, damit die
-     Positionierung unabhängig von der Reihenfolge in der Kaskade IMMER
-     gegenüber der generischen [data-tip]-Tooltip-Regel gewinnt (dieselben
-     Knoten tragen data-tip fürs Tooltip UND brauchen position:absolute). */
-  div.reichNode {
-    position: absolute; transform: translate(-50%, -50%); width: 9.5%; aspect-ratio: 1;
-    border-radius: 50%; border: 2.5px solid var(--ink); cursor: pointer;
-    display: flex; align-items: center; justify-content: center; font-size: 13px;
-    box-shadow: var(--shadow-sm); transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
-    filter: saturate(0.8);
+  #worldMapSvg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .mapWild path { fill: #33422e; stroke: #23301f; stroke-width: 2.5; opacity: 0.9; }
+  .mapWild .terrainIcon { color: #4a5c3f; opacity: 0.55; }
+  /* g.territoryNode (statt .territoryNode) aus demselben Grund wie zuvor
+     div.reichNode: gewinnt zuverlässig gegen die generische [data-tip]-
+     Regel, unabhängig von der Kaskadenreihenfolge. */
+  g.territoryNode { cursor: pointer; }
+  .territoryFill {
+    stroke: rgba(32,24,17,0.55); stroke-width: 3.5; stroke-linejoin: round;
+    transition: filter 0.15s ease, stroke 0.15s ease, stroke-width 0.15s ease;
   }
-  .reichNode:hover { transform: translate(-50%, -50%) scale(1.12); filter: saturate(1); z-index: 5; }
-  .reichNode.selected { outline: 3px solid var(--gold); outline-offset: 2px; filter: saturate(1) brightness(1.08); z-index: 6; }
-  .reichNode.capital { width: 12%; border-width: 3px; border-color: var(--gold); }
-  .reichLabel {
-    position: absolute; transform: translate(-50%, 4px); font-family: var(--font-display); font-weight: 600;
-    font-size: 12px; color: #f0e6cf; text-shadow: 0 1px 3px rgba(0,0,0,0.7); pointer-events: none; white-space: nowrap;
+  .territoryNode:hover .territoryFill { filter: brightness(1.09) saturate(1.05); stroke: #f5e9c8; }
+  /* Helles Cremeweiß statt reinem --gold: Spieler-Territorien sind SELBST
+     gold eingefärbt (§11-Palette), ein goldener Auswahlrahmen würde dort
+     im eigenen Gebiet praktisch verschwinden -- Creme kontrastiert
+     zuverlässig gegen alle vier Besitzerfarben. */
+  .territoryNode.selected .territoryFill { stroke: #fff6da; stroke-width: 7; filter: brightness(1.1) saturate(1.05); }
+  .territoryNode.attackable .territoryFill { stroke: #c65b4a; stroke-dasharray: 10 6; }
+  .territoryNode.ally .territoryFill { stroke-dasharray: 3 5; }
+  .territoryIcon { color: #f0e6cf; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); pointer-events: none; }
+  .capitalRing { fill: none; stroke: var(--gold); stroke-width: 2; opacity: 0.9; pointer-events: none; }
+  .territoryNode.isPlayer .capitalRing { stroke-width: 3; }
+  .territoryLabel {
+    font-family: var(--font-display); font-weight: 600; font-size: 21px;
+    fill: #f5ecd6; text-anchor: middle; paint-order: stroke; stroke: rgba(20,14,8,0.85); stroke-width: 4;
+    pointer-events: none; opacity: 0; transition: opacity 0.15s ease;
+  }
+  .territoryLabel.capitalLabel { font-size: 24px; opacity: 1; }
+  .territoryNode:hover .territoryLabel, .territoryNode.selected .territoryLabel { opacity: 1; }
+  .attackIcon { color: #d8503f; opacity: 0; transition: opacity 0.15s ease; pointer-events: none; }
+  .territoryNode.attackable .attackIcon { opacity: 1; }
+  .armyBanner { pointer-events: none; }
+  .armyBanner .bannerIcon { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
+  .armyBanner text {
+    font-family: var(--font); font-weight: 700; font-size: 17px; fill: #fff8e8; text-anchor: middle;
+    paint-order: stroke; stroke: rgba(20,14,8,0.9); stroke-width: 3;
+  }
+  /* §Phase-8C.1-Punkt 34: dasselbe Tooltip-AUSSEHEN wie das bestehende
+     reine CSS-[data-tip]-System (§84, s.o.) -- aber als kleines,
+     JS-positioniertes HTML-Element. Grund: `[data-tip]:hover::after`
+     erzeugt für SVG-Geometrieelemente (<g>/<path>, kein foreignObject)
+     laut getComputedStyle zwar einen Box-Wert, wird von Chromium aber
+     NICHT tatsächlich gemalt -- eine reine SVG-Einschränkung, kein CSS-
+     Fehler. #mapTooltip liegt daher als normales HTML-Div über der Karte
+     und übernimmt exakt dieselbe Optik (dunkles Panel, Goldrand,
+     pre-line), siehe renderWorldMap()/showMapTooltip() weiter unten. */
+  #mapTooltip {
+    position: absolute; display: none; pointer-events: none;
+    background: var(--panel-dark); color: #fff6e2; border: 2px solid var(--gold); border-radius: var(--r-sm);
+    padding: var(--sp-2) var(--sp-2); font-size: var(--fs-body); white-space: pre-line; width: max-content;
+    max-width: 220px; z-index: var(--z-tooltip); box-shadow: var(--shadow-md);
+    font-family: var(--font); line-height: 1.6;
   }
   #regionContextEmpty { color: var(--umber); font-style: italic; }
   #regionContextHeader { font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 600; margin-bottom: 2px; }
@@ -779,10 +819,35 @@
         <div id="reichMain">
           <div id="worldMapPanel" class="panel">
             <div id="worldMapBoard">
-              <svg id="worldMapSvg" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <g id="worldMapLines"></g>
+              <!-- §Phase-8C.1-Punkt 55/56: lokale Inline-SVG-Symbole statt
+                   Emoji -- offline, einheitlich, frei skalierbar. -->
+              <svg id="worldMapSvg" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                  <symbol id="icon-burg" viewBox="0 0 24 24">
+                    <path d="M4 21 L4 11 L4 7 L7.5 7 L7.5 9.5 L10 9.5 L10 6.5 L14 6.5 L14 9.5 L16.5 9.5 L16.5 7 L20 7 L20 11 L20 21 Z" fill="currentColor" stroke="rgba(20,14,8,0.85)" stroke-width="1" stroke-linejoin="round"/>
+                    <rect x="10.8" y="13" width="2.4" height="8" fill="rgba(20,14,8,0.55)"/>
+                  </symbol>
+                  <symbol id="icon-tree" viewBox="0 0 16 20">
+                    <path d="M8 1 L12 8.5 L9.6 8.5 L13.2 14.5 L2.8 14.5 L6.4 8.5 L4 8.5 Z" fill="currentColor"/>
+                    <rect x="7.1" y="14.5" width="1.8" height="3.6" fill="currentColor"/>
+                  </symbol>
+                  <symbol id="icon-hill" viewBox="0 0 30 14">
+                    <path d="M0 14 Q7 2 14 14 Z" fill="currentColor" opacity="0.85"/>
+                    <path d="M12 14 Q19 3.5 28 14 Z" fill="currentColor" opacity="0.6"/>
+                  </symbol>
+                  <symbol id="icon-sword" viewBox="0 0 20 20">
+                    <path d="M2.5 17.5 L12 8 M8.7 4.7 L15.3 11.3 M8.9 4 L10.5 2.4 L13.4 5.3 L11.8 6.9" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  </symbol>
+                  <symbol id="icon-banner" viewBox="0 0 22 30">
+                    <rect x="9.6" y="0" width="1.8" height="30" fill="#2c2015"/>
+                    <path d="M11.4 2 L21 5.6 L11.4 11.8 Z" fill="currentColor" stroke="rgba(20,14,8,0.85)" stroke-width="0.8" stroke-linejoin="round"/>
+                  </symbol>
+                </defs>
+                <g id="worldMapWild" class="mapWild"></g>
+                <g id="worldMapTerritories"></g>
+                <g id="worldMapBanners"></g>
               </svg>
-              <div id="worldMapNodes"></div>
+              <div id="mapTooltip"></div>
             </div>
           </div>
           <div id="regionContextPanel" class="panel">
@@ -3436,6 +3501,48 @@ const EVENTS = [
     ],
   },
 ];
+
+// ============================================================
+// §Phase-8C.1 "Strategic Map Redesign": feste, statische SVG-Kartengeometrie.
+// AUTOGENERIERT von tools/generate-map-geometry.js -- NICHT von Hand
+// bearbeiten. Bei Änderungen an TERRITORIES (neue Gebiete/Adjazenzen)
+// erneut ausführen: node tools/generate-map-geometry.js
+//
+// Reine Präsentationsdaten (§5/6): TERRITORIES/state.territories/
+// adjacent bleiben unverändert die alleinige Gameplay-Wahrheit. Diese
+// Datei bestimmt nur WO und in WELCHER Form auf der Karte gezeichnet
+// wird. Jede deklarierte TERRITORIES.adjacent-Paarung besitzt eine echte
+// gemeinsame Kante im Diagramm (bei Generierung validiert, §7).
+// ============================================================
+const MAP_VIEWBOX = "0 0 1000 1000";
+const MAP_GEOMETRY = {
+  p_hauptstadt: { path: "M 404.4 580.0 Q 355.9 546.6 319.7 500.0 Q 352.6 450.0 404.4 420.0 Q 492.2 426.3 580.0 420.0 Q 586.4 500.0 580.0 580.0 Q 492.2 583.3 404.4 580.0 Z", labelX: 500, labelY: 522, capitalX: 500, capitalY: 484, centroidX: 458, centroidY: 500 },
+  p_nord: { path: "M 418.5 300.0 Q 494.1 309.3 569.7 300.0 Q 583.3 351.5 597.1 402.9 Q 588.0 410.9 580.0 420.0 Q 492.2 426.3 404.4 420.0 Q 399.2 358.6 418.5 300.0 Z", labelX: 514, labelY: 369, capitalX: 500, capitalY: 324, centroidX: 514, centroidY: 369 },
+  p_ost: { path: "M 680.0 398.8 Q 683.7 500.0 680.0 601.3 Q 638.8 593.4 597.1 597.1 Q 589.6 587.5 580.0 580.0 Q 586.4 500.0 580.0 420.0 Q 588.0 410.9 597.1 402.9 Q 638.6 402.8 680.0 398.8 Z", labelX: 619, labelY: 500, capitalX: 660, capitalY: 484, centroidX: 619, centroidY: 500 },
+  p_sued: { path: "M 569.7 700.0 Q 494.1 705.5 418.5 700.0 Q 412.0 639.9 404.4 580.0 Q 492.2 583.3 580.0 580.0 Q 589.6 587.5 597.1 597.1 Q 587.3 649.6 569.7 700.0 Z", labelX: 514, labelY: 631, capitalX: 500, capitalY: 644, centroidX: 514, centroidY: 631 },
+  m_hauptstadt: { path: "M 567.5 190.0 Q 483.8 179.9 400.0 190.0 Q 398.8 110.0 400.0 30.0 Q 503.8 23.7 607.5 30.0 Q 587.5 110.0 567.5 190.0 Z", labelX: 500, labelY: 142, capitalX: 500, capitalY: 104, centroidX: 494, centroidY: 110 },
+  m_sued: { path: "M 386.5 209.3 Q 394.8 200.7 400.0 190.0 Q 483.8 179.9 567.5 190.0 Q 574.4 210.3 589.6 225.3 Q 571.3 260.4 569.7 300.0 Q 494.1 309.3 418.5 300.0 Q 395.5 257.1 386.5 209.3 Z", labelX: 489, labelY: 236, capitalX: 500, capitalY: 244, centroidX: 489, centroidY: 236 },
+  m_ost: { path: "M 687.7 232.3 Q 637.9 238.6 589.6 225.3 Q 574.4 210.3 567.5 190.0 Q 587.5 110.0 607.5 30.0 Q 748.8 22.5 890.0 30.0 Q 788.5 130.8 687.7 232.3 Z", labelX: 668, labelY: 142, capitalX: 660, capitalY: 144, centroidX: 668, centroidY: 142 },
+  m_west: { path: "M 400.0 190.0 Q 394.8 200.7 386.5 209.3 Q 213.3 235.6 40.0 261.3 Q 34.4 145.7 40.0 30.0 Q 220.0 30.9 400.0 30.0 Q 398.8 110.0 400.0 190.0 Z", labelX: 253, labelY: 144, capitalX: 300, capitalY: 104, centroidX: 253, centroidY: 144 },
+  r_hauptstadt: { path: "M 780.0 607.5 Q 764.7 500.0 780.0 392.5 Q 873.9 364.4 960.0 317.5 Q 961.6 500.0 960.0 682.5 Q 867.5 651.0 780.0 607.5 Z", labelX: 860, labelY: 522, capitalX: 860, capitalY: 484, centroidX: 870, centroidY: 500 },
+  r_west: { path: "M 742.5 383.1 Q 760.7 390.1 780.0 392.5 Q 764.7 500.0 780.0 607.5 Q 761.6 613.7 742.5 616.9 Q 709.7 615.2 680.0 601.3 Q 683.7 500.0 680.0 398.8 Q 709.6 384.2 742.5 383.1 Z", labelX: 734, labelY: 500, capitalX: 700, capitalY: 484, centroidX: 734, centroidY: 500 },
+  r_nord: { path: "M 780.0 392.5 Q 760.7 390.1 742.5 383.1 Q 720.1 305.9 687.7 232.3 Q 788.5 130.8 890.0 30.0 Q 925.0 28.5 960.0 30.0 Q 960.9 173.8 960.0 317.5 Q 873.9 364.4 780.0 392.5 Z", labelX: 837, labelY: 231, capitalX: 760, capitalY: 244, centroidX: 837, centroidY: 231 },
+  r_sued: { path: "M 687.7 767.7 Q 727.7 696.9 742.5 616.9 Q 761.6 613.7 780.0 607.5 Q 867.5 651.0 960.0 682.5 Q 961.9 826.3 960.0 970.0 Q 925.0 975.5 890.0 970.0 Q 795.2 862.5 687.7 767.7 Z", labelX: 837, labelY: 769, capitalX: 760, capitalY: 724, centroidX: 837, centroidY: 769 },
+  b_hauptstadt: { path: "M 400.0 810.0 Q 483.8 803.0 567.5 810.0 Q 585.4 890.5 607.5 970.0 Q 503.8 961.6 400.0 970.0 Q 408.9 890.0 400.0 810.0 Z", labelX: 500, labelY: 902, capitalX: 500, capitalY: 864, centroidX: 494, centroidY: 890 },
+  b_nord: { path: "M 589.6 774.7 Q 579.0 792.7 567.5 810.0 Q 483.8 803.0 400.0 810.0 Q 394.4 799.6 386.5 790.7 Q 401.6 745.0 418.5 700.0 Q 494.1 705.5 569.7 700.0 Q 581.3 736.9 589.6 774.7 Z", labelX: 489, labelY: 764, capitalX: 500, capitalY: 724, centroidX: 489, centroidY: 764 },
+  b_ost: { path: "M 567.5 810.0 Q 579.0 792.7 589.6 774.7 Q 639.3 779.7 687.7 767.7 Q 795.2 862.5 890.0 970.0 Q 748.8 983.3 607.5 970.0 Q 585.4 890.5 567.5 810.0 Z", labelX: 668, labelY: 858, capitalX: 660, capitalY: 824, centroidX: 668, centroidY: 858 },
+  b_west: { path: "M 40.0 738.8 Q 214.3 757.9 386.5 790.7 Q 394.4 799.6 400.0 810.0 Q 408.9 890.0 400.0 970.0 Q 220.0 974.9 40.0 970.0 Q 27.3 854.4 40.0 738.8 Z", labelX: 253, labelY: 856, capitalX: 300, capitalY: 864, centroidX: 253, centroidY: 856 },
+};
+// Dekoratives, unbesiedeltes Gelände (Wald/Gebirge) -- KEIN Territorium,
+// nicht klickbar, kein Besitzer, kein Label. Füllt geometrisch den
+// Zwischenraum, den weit entfernte, im Gameplay NICHT benachbarte Gebiete
+// sonst sich teilen würden (siehe Validierung im Generator).
+const MAP_WILD_GEOMETRY = {
+  wild_nw: { path: "M 386.5 209.3 Q 395.5 257.1 418.5 300.0 Q 399.2 358.6 404.4 420.0 Q 352.6 450.0 319.7 500.0 Q 179.8 507.1 40.0 500.0 Q 49.4 380.6 40.0 261.2 Q 212.4 229.3 386.5 209.3 Z" },
+  wild_ne: { path: "M 742.5 383.1 Q 709.6 384.2 680.0 398.8 Q 638.6 402.8 597.1 402.9 Q 583.3 351.5 569.7 300.0 Q 571.3 260.4 589.6 225.3 Q 637.9 238.6 687.7 232.3 Q 720.1 305.9 742.5 383.1 Z" },
+  wild_se: { path: "M 589.6 774.7 Q 581.3 736.9 569.7 700.0 Q 587.3 649.6 597.1 597.1 Q 638.8 593.4 680.0 601.3 Q 709.7 615.2 742.5 616.9 Q 727.7 696.9 687.7 767.7 Q 639.3 779.7 589.6 774.7 Z" },
+  wild_sw: { path: "M 40.0 738.8 Q 52.6 619.4 40.0 500.0 Q 179.8 507.1 319.7 500.0 Q 355.9 546.6 404.4 580.0 Q 412.0 639.9 418.5 700.0 Q 401.6 745.0 386.5 790.7 Q 214.3 757.9 40.0 738.8 Z" },
+};
 
 // ============================================================
 // CORE — Zufallszahlen, Gebäude-Parzellen-Utilities, Regions-/Spielerzeugung,
@@ -9884,24 +9991,29 @@ function getWorldMapViewModel(state) {
     const strength = isPlayer
       ? Object.values(terr.deployment).reduce((a, b) => a + b, 0)
       : Math.round(terr.garrison);
+    // §Phase-8C.1-Punkt 31/40: "attackable" ist kein neuer Gameplay-Zustand,
+    // sondern dieselbe Bedingung, die js/war-map.js bereits für einen
+    // gültigen Angriff prüft (Krieg + direkte Adjazenz zu eigenem Gebiet,
+    // siehe aiTerritoryCounterAttack()) -- hier nur zur dezenten
+    // Hervorhebung auf der REICH-Karte, der eigentliche Angriff bleibt
+    // weiterhin über die unveränderte Kriegskarte.
+    const attackable = !isPlayer && !!state.warState[terr.owner]
+      && t.adjacent.some(adjId => state.territories[adjId].owner === "player");
+    // §Punkt 30: "ally" nutzt ausschließlich das bereits reale
+    // state.diplomacy[...].treaties.allianz (js/diplomacy.js).
+    const dip = state.diplomacy[terr.owner];
+    const ally = !isPlayer && !!(dip && dip.treaties && dip.treaties.allianz);
     return {
       id: t.id, name: t.name, x: t.x, y: t.y, terrain: t.terrain, capital: !!t.capital,
       ownerId: terr.owner, ownerName: owner ? owner.name : terr.owner,
-      isPlayerOwned: isPlayer, strength, hasForces: strength > 0,
+      isPlayerOwned: isPlayer, strength, hasForces: strength > 0, attackable, ally,
     };
   });
-  const lines = [];
-  const drawn = new Set();
-  for (const t of TERRITORIES) {
-    for (const adjId of t.adjacent) {
-      const key = [t.id, adjId].sort().join("|");
-      if (drawn.has(key)) continue;
-      drawn.add(key);
-      const other = territoryById(adjId);
-      lines.push({ x1: t.x, y1: t.y, x2: other.x, y2: other.y });
-    }
-  }
-  return { territories: nodes, lines };
+  // §Phase-8C.1-Punkt 8: die frühere Netzwerklinien-Liste entfällt --
+  // js/map-geometry.js (per Generator validiert) bildet JEDE deklarierte
+  // Adjazenz bereits als echte gemeinsame Gebietsgrenze ab, eine separate
+  // Verbindungslinien-Darstellung ist damit nicht mehr nötig.
+  return { territories: nodes };
 }
 
 // ---------- Kontextpanel (§31-38) ----------
@@ -11115,6 +11227,32 @@ document.getElementById('tabDiplomatie').addEventListener('click', () => switchP
 document.getElementById('tabKarte').addEventListener('click', () => switchPage('karte'));
 document.getElementById('tabMilitaer').addEventListener('click', () => switchPage('militaer'));
 
+// §Phase-8C.1-Punkt 34: Event-Delegation statt Pro-Render-Listener --
+// #worldMapTerritories wird bei jedem renderWorldMap() per innerHTML neu
+// aufgebaut, ein einziger, einmalig registrierter Listener auf dem
+// stabilen Elternelement bleibt trotzdem gültig (siehe showMapTooltip()-
+// Kommentar im CSS-Block für den Grund, warum das reine [data-tip]-CSS-
+// System hier nicht greift).
+(function initMapTooltip() {
+  const board = document.getElementById('worldMapBoard');
+  const tip = document.getElementById('mapTooltip');
+  board.addEventListener('mousemove', (e) => {
+    const node = e.target.closest('.territoryNode');
+    if (!node) { tip.style.display = 'none'; return; }
+    tip.textContent = node.getAttribute('data-tip');
+    tip.style.display = 'block';
+    const boardRect = board.getBoundingClientRect();
+    let left = e.clientX - boardRect.left + 14;
+    let top = e.clientY - boardRect.top + 14;
+    // grob am rechten/unteren Rand spiegeln, damit das Tooltip nicht abgeschnitten wird
+    if (left + 220 > boardRect.width) left = e.clientX - boardRect.left - 234;
+    if (top + 90 > boardRect.height) top = e.clientY - boardRect.top - 100;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  });
+  board.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+})();
+
 function render() {
   const r = state.regions.player;
   const totalPop = Object.values(r.population).reduce((s,g)=>s+g.count,0);
@@ -11458,28 +11596,68 @@ function renderRealmKpiStrip() {
   document.getElementById('realmKpiStrip').innerHTML = html;
 }
 
+// §Phase-8C.1-Punkt 21-25: nur die real vorhandenen Terrain-Typen der 16
+// Territorien (burg=Hauptstadt-Symbol, s.u.) bekommen ein dezentes Symbol
+// -- keine neue Geländemechanik, reine Illustration von TERRITORIES.terrain.
+const TERRAIN_ICON = { wald: 'icon-tree', huegel: 'icon-hill' };
+
 function renderWorldMap() {
   const vm = getWorldMapViewModel(state);
-  let linesHtml = '';
-  for (const l of vm.lines) {
-    linesHtml += `<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="rgba(240,230,207,0.35)" stroke-width="0.6" />`;
-  }
-  document.getElementById('worldMapLines').innerHTML = linesHtml;
 
-  let nodesHtml = '';
-  for (const terr of vm.territories) {
-    const color = REICH_OWNER_COLOR[terr.ownerId] || '#888';
-    const icon = terr.capital ? '🏰' : '🏘';
-    nodesHtml += `<div class="reichNode${terr.capital ? ' capital' : ''}${selectedTerritoryId === terr.id ? ' selected' : ''}"
-      style="left:${terr.x}%; top:${terr.y}%; background:${color};"
-      onclick="selectMapTerritory('${terr.id}')" data-tip="${terr.name} (${terr.ownerName})${terr.hasForces ? '\\nTruppen: ' + terr.strength : ''}">${icon}</div>`;
-    // §Phase-8B-Punkt 24/30: Labels nur für Hauptstädte fest sichtbar (klar
-    // lesbar, ausreichend Abstand); kleinere Grenzgebiete zeigen ihren Namen
-    // über den ohnehin vorhandenen Tooltip, sonst überlagern sich benachbarte
-    // Grenzmarken auf der Karte ("Karte nicht überladen").
-    if (terr.capital) nodesHtml += `<div class="reichLabel" style="left:${terr.x}%; top:${terr.y}%;">${terr.name}</div>`;
+  // dekoratives, unbesiedeltes Gelände (Wildnis-Füllflächen, siehe
+  // js/map-geometry.js) -- kein Territorium, nicht klickbar, kein Tooltip.
+  let wildHtml = '';
+  for (const id in MAP_WILD_GEOMETRY) {
+    wildHtml += `<path d="${MAP_WILD_GEOMETRY[id].path}"/>`;
   }
-  document.getElementById('worldMapNodes').innerHTML = nodesHtml;
+  document.getElementById('worldMapWild').innerHTML = wildHtml;
+
+  let territoriesHtml = '';
+  let bannersHtml = '';
+  for (const terr of vm.territories) {
+    const geo = MAP_GEOMETRY[terr.id];
+    if (!geo) continue; // Sicherheitsnetz: MAP_GEOMETRY muss zu TERRITORIES passen (siehe generate-map-geometry.js-Validierung)
+    const color = REICH_OWNER_COLOR[terr.ownerId] || '#888';
+    const isSelected = selectedTerritoryId === terr.id;
+    const cls = ['territoryNode',
+      terr.capital ? 'capital' : '', terr.isPlayerOwned ? 'isPlayer' : '',
+      isSelected ? 'selected' : '', terr.attackable ? 'attackable' : '', terr.ally ? 'ally' : ''].filter(Boolean).join(' ');
+    const tip = `${terr.name} (${terr.ownerName})
+Gelände: ${TERRAIN_TYPES[terr.terrain].name}${terr.hasForces ? '\nTruppen: ' + terr.strength : ''}`;
+
+    territoriesHtml += `<g class="${cls}" data-tip="${tip}" onclick="selectMapTerritory('${terr.id}')">
+      <path class="territoryFill" d="${geo.path}" style="fill:${color};"/>`;
+
+    // §Punkt 21-25: Terrain-Symbol nur für Nicht-Hauptstädte (Burg-Symbol
+    // deckt "burg" bereits als Hauptstadt-Icon ab, §15) und nur, wenn ein
+    // Symbol für diesen Terrain-Typ existiert (ebene bleibt bewusst ohne
+    // Icon -- "dezente Feldstruktur" liefert bereits die Kartenschraffur).
+    const terrainIcon = !terr.capital ? TERRAIN_ICON[terr.terrain] : null;
+    if (terrainIcon) {
+      territoriesHtml += `<use href="#${terrainIcon}" class="territoryIcon" x="${geo.centroidX - 9}" y="${geo.centroidY - 42}" width="18" height="18"/>`;
+    }
+    if (terr.attackable) {
+      territoriesHtml += `<use href="#icon-sword" class="territoryIcon attackIcon" x="${geo.centroidX + 24}" y="${geo.centroidY - 46}" width="16" height="16"/>`;
+    }
+    if (terr.capital) {
+      territoriesHtml += `<use href="#icon-burg" class="territoryIcon" x="${geo.capitalX - 12}" y="${geo.capitalY - 24}" width="24" height="24"/>`;
+      if (terr.isPlayerOwned) territoriesHtml += `<circle class="capitalRing" cx="${geo.capitalX}" cy="${geo.capitalY - 12}" r="17"/>`;
+    }
+    territoriesHtml += `<text class="territoryLabel${terr.capital ? ' capitalLabel' : ''}" x="${geo.labelX}" y="${geo.labelY}">${terr.name}</text>`;
+    territoriesHtml += `</g>`;
+
+    // §Punkt 18-20: Truppenstärke als kleines Banner statt großem Kreis --
+    // nutzt ausschließlich den bereits vorhandenen terr.strength-Wert.
+    if (terr.hasForces) {
+      const bx = geo.capitalX + 30, by = geo.capitalY + 6;
+      bannersHtml += `<g class="armyBanner">
+        <use href="#icon-banner" class="bannerIcon" x="${bx - 8}" y="${by - 4}" width="20" height="27" style="color:${color};"/>
+        <text x="${bx + 5}" y="${by + 11}">${terr.strength}</text>
+      </g>`;
+    }
+  }
+  document.getElementById('worldMapTerritories').innerHTML = territoriesHtml;
+  document.getElementById('worldMapBanners').innerHTML = bannersHtml;
 }
 
 function selectMapTerritory(territoryId) {
