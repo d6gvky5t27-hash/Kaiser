@@ -8,6 +8,7 @@ const path = require("path");
 
 const ROOT = path.join(__dirname, "..");
 const gamedata = fs.readFileSync(path.join(ROOT, "data/gamedata.js"), "utf8");
+const mapGeometry = fs.readFileSync(path.join(ROOT, "js/map-geometry.js"), "utf8");
 const simModules = [
   "core", "economy", "population-dynasty", "memory", "characters", "story-threads",
   "drama-director", "event-chains", "chronicle", "politics", "diplomacy", "military",
@@ -81,8 +82,26 @@ console.log('--- Weltkarte + Kontextpanel ---');
   const map = getWorldMapViewModel(state);
   check('alle 16 Territorien sind enthalten', map.territories.length === TERRITORIES.length);
   check('jedes Territorium hat einen gueltigen Besitzer', map.territories.every(t => state.regions[t.ownerId]));
-  check('Adjazenz-Linien werden erzeugt (mind. so viele wie eindeutige Kanten)', map.lines.length > 0);
   check('eigene Hauptstadt ist als Hauptstadt markiert', map.territories.find(t => t.id === 'p_hauptstadt').capital === true);
+
+  // §Phase-8C.1-Punkt 30/31/40: attackable/ally sind KEINE neuen
+  // Gameplay-Zustaende, nur die Uebersetzung bereits realer Felder
+  // (state.warState + Adjazenz zu Spielergebiet, state.diplomacy[...].treaties.allianz).
+  check('ohne Krieg: keine Region ist attackable', map.territories.every(t => t.attackable === false));
+  check('ohne Buendnis: keine Region ist ally', map.territories.every(t => t.ally === false));
+  state.warState.ai1 = true;
+  const mapAtWar = getWorldMapViewModel(state);
+  check('im Krieg mit ai1: genau m_sued (direkt an Spielergebiet angrenzend) ist attackable',
+    mapAtWar.territories.filter(t => t.attackable).map(t => t.id).join(',') === 'm_sued');
+  check('m_hauptstadt/m_ost/m_west (nicht direkt an Spielergebiet angrenzend) sind NICHT attackable',
+    !mapAtWar.territories.find(t => t.id === 'm_hauptstadt').attackable
+    && !mapAtWar.territories.find(t => t.id === 'm_ost').attackable
+    && !mapAtWar.territories.find(t => t.id === 'm_west').attackable);
+  state.diplomacy.ai2.treaties.allianz = true;
+  const mapAllied = getWorldMapViewModel(state);
+  check('Buendnis mit ai2: alle 4 Rheinfeld-Territorien sind ally',
+    mapAllied.territories.filter(t => t.ally).length === 4
+    && mapAllied.territories.filter(t => t.ally).every(t => t.ownerId === 'ai2'));
 
   const own = getRegionSummaryViewModel(state, 'p_hauptstadt');
   check('Kontextpanel fuer eigenes Gebiet: isPlayerTerritory', own.isPlayerTerritory === true);
@@ -95,6 +114,13 @@ console.log('--- Weltkarte + Kontextpanel ---');
   check('fremdes Gebiet zeigt eine Garnisonsschaetzung statt echter Truppenzahlen', enemy.militaryStrength[0].id === 'garrison');
 
   check('unbekannte Territoriums-ID liefert null (keine erfundenen Daten)', getRegionSummaryViewModel(state, 'does_not_exist') === null);
+
+  // §Phase-8C.1: statische Kartengeometrie (js/map-geometry.js) muss zu
+  // JEDEM TERRITORIES-Eintrag ein Gegenstueck besitzen -- sonst wuerde
+  // renderWorldMap() ein Gebiet stillschweigend ueberspringen.
+  check('MAP_GEOMETRY enthaelt alle 16 Territorien', TERRITORIES.every(t => !!MAP_GEOMETRY[t.id]));
+  check('jeder MAP_GEOMETRY-Eintrag hat einen nicht-leeren SVG-Pfad', Object.values(MAP_GEOMETRY).every(g => typeof g.path === 'string' && g.path.startsWith('M')));
+  check('MAP_WILD_GEOMETRY enthaelt die 4 dekorativen Fuellflaechen', ['wild_nw','wild_ne','wild_se','wild_sw'].every(id => !!MAP_WILD_GEOMETRY[id]));
 
   // frisches Spiel: noch kein Jahr vergangen -- keine erfundenen Produktions-/Wachstumsdaten
   check('frisches Spiel: topProduction ist leer (kein Jahr vergangen)', own.topProduction.length === 0);
@@ -320,4 +346,4 @@ if (failures > 0) { console.log(failures + ' Test(s) fehlgeschlagen.'); process.
 console.log('Alle UI-ViewModel-Tests bestanden.');
 `;
 
-eval(gamedata + "\n" + sim + "\n" + battle + "\n" + viewmodels + "\n" + testBody);
+eval(gamedata + "\n" + mapGeometry + "\n" + sim + "\n" + battle + "\n" + viewmodels + "\n" + testBody);
