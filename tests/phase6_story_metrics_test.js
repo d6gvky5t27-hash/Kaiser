@@ -8,7 +8,7 @@ const fs = require("fs");
 const path = require("path");
 
 const gamedata = fs.readFileSync(path.join(__dirname, "..", "data/gamedata.js"), "utf8");
-const simModules = ["core", "economy", "population-dynasty", "memory", "characters", "story-threads", "drama-director", "event-chains", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
+const simModules = ["core", "economy", "population-dynasty", "memory", "characters", "story-threads", "drama-director", "event-chains", "chronicle", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
 const sim = simModules.map(m => fs.readFileSync(path.join(__dirname, "..", "js", m + ".js"), "utf8")).join("\n");
 
 const testBody = `
@@ -61,8 +61,8 @@ for (let run = 0; run < RUNS; run++) {
       const lastYear = t.history.length ? t.history[t.history.length - 1].year : t.startedYear;
       durationSum += (lastYear - t.startedYear);
       durationCount++;
-      if (t.resolution === "RESOLVED" || t.resolution === "FADED") peacefulThreadCount++;
-      else if (t.resolution === "EXPIRED" || (t.chainIds.some(cid => { const c = state.eventChains.resolved[cid]; return c && c.status === "FAILED"; }))) escalatedThreadCount++;
+      if (t.resolution && t.resolution.outcome === "POSITIVE") peacefulThreadCount++;
+      else if (t.resolution && t.resolution.outcome === "NEGATIVE") escalatedThreadCount++;
     }
     if (t.chainIds.length) { chainsPerThreadSum += t.chainIds.length; threadsWithChains++; }
     memoriesPerThreadSum += t.memoryIds.length;
@@ -76,7 +76,7 @@ for (let run = 0; run < RUNS; run++) {
       seed: run,
       lines: sorted.map(t => {
         const endYear = (t.status === "RESOLVED" || t.status === "EXPIRED") && t.history.length ? t.history[t.history.length - 1].year : null;
-        return \`\${t.startedYear}\${endYear ? "–" + endYear : "–"}\\n\${t.title}\\n-> \${t.status}\${t.resolution ? " (" + t.resolution + ")" : ""}\`;
+        return \`\${t.startedYear}\${endYear ? "–" + endYear : "–"}\\n\${t.title}\\n-> \${t.status}\${t.resolution ? " (" + t.resolution.type + ")" : ""}\`;
       }),
     });
   }

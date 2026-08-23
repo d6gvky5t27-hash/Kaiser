@@ -52,6 +52,31 @@
 // gelöscht, sondern versioniert unter
 // `tests/fixtures/advance_year_snapshot_golden_phase5.json` archiviert.
 //
+// PHASE 7 NARRATIVE CALIBRATION & CHRONICLE 2.0 BASELINE (§Punkt 62/91):
+// Phase 7 selbst fügt der Simulation keine neue Zufallslogik hinzu (Thread
+// Importance 2.0, Resolution 2.0 und Chronicle 2.0 sind ausdrücklich
+// RNG-frei, §Punkt 62) — aber zwei neue recordWorldEvent()-Aufrufe
+// verschieben den nachfolgenden rnd()-Fingerprint bzw. den sichtbaren
+// Chronik-Text:
+//  1. Ein Kaiserwahl-Sieg erzeugt jetzt einen TITLE_GAINED-Memory-Eintrag
+//     (js/politics.js, resolveElection()) — vorher entstand dabei GAR KEINE
+//     Memory, wodurch state.memories.nextId/byId sich verschiebt und in
+//     Folge auch spätere, ID-abhängige Zufallsentscheidungen anders
+//     ausfallen können (Schmetterlingseffekt wie schon in Phase 4/5).
+//  2. Das Aussterben der Dynastie (kein Erbe) erzeugt jetzt zusätzlich
+//     einen DYNASTY_ENDED-Memory-Eintrag UND einen neuen, informativeren
+//     Chronik-Text (js/population-dynasty.js, handleSuccession()) statt
+//     des alten "Die Dynastie ... stirbt ohne Erben aus"-Textes. Das ist
+//     eine gewollte Erzähl-Verbesserung (strukturierte Governance-
+//     Zusammenfassung, §Punkt 72-75), kein RNG-Fehler.
+// Beide Effekte wurden vor der Neuerzeugung des Fixtures einzeln geprüft:
+// die Divergenz beginnt exakt an der erwarteten Stelle (rngCalls-Drift ab
+// dem ersten TITLE_GAINED-Aufruf bzw. der geänderte Chronik-Text beim
+// Dynastieende) und betrifft sonst nichts Unerwartetes. Golden-Fixture
+// daher neu erzeugt; das Phase-6-Fixture wurde NICHT gelöscht, sondern
+// versioniert unter `tests/fixtures/advance_year_snapshot_golden_phase6.json`
+// archiviert.
+//
 // Nutzung:
 //   node tests/advance_year_snapshot_test.js            vergleicht gegen
 //                                                        das gespeicherte
@@ -79,7 +104,7 @@ const SEEDS = [101, 202, 303]; // Seed A, B, C
 const MAX_YEARS = 100;
 
 const gamedata = fs.readFileSync(path.join(ROOT, "data/gamedata.js"), "utf8");
-const simModules = ["core", "economy", "population-dynasty", "memory", "characters", "story-threads", "drama-director", "event-chains", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
+const simModules = ["core", "economy", "population-dynasty", "memory", "characters", "story-threads", "drama-director", "event-chains", "chronicle", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
 const sim = simModules.map(m => fs.readFileSync(path.join(ROOT, "js", m + ".js"), "utf8")).join("\n");
 
 const testBody = `
