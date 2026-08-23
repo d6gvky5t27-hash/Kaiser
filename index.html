@@ -247,6 +247,89 @@
   .alertItem.info .alertDot { background: var(--c-positive); }
   .alertEmpty { color: var(--umber); font-style: italic; font-size: var(--fs-body); }
 
+  /* ============================================================
+     §Phase-8C: REICH + PROVINZ + WIRTSCHAFT -- "aus Tabellen wird eine
+     lesbare Herrschaftsübersicht". Progressive Disclosure: Überblick ->
+     Problem -> Detail (§55).
+     ============================================================ */
+
+  /* ---- Reichsübersicht-KPI-Streifen (§3-9) ---- */
+  #realmKpiStrip { display: flex; flex-wrap: wrap; gap: var(--sp-4); padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-3); }
+  .kpiTile { flex: 1 1 130px; min-width: 120px; }
+  .kpiLabel { font-size: var(--fs-micro); color: var(--umber); letter-spacing: 0.4px; text-transform: uppercase; }
+  .kpiValue { font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 600; color: var(--ink); }
+  .kpiTrend { font-size: var(--fs-micro); }
+  .kpiTrend.up { color: var(--c-positive); }
+  .kpiTrend.down { color: var(--c-danger); }
+  .kpiStatus { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.4px; padding: 1px 6px; border-radius: 999px; margin-left: 4px; border: 1px solid currentColor; }
+  .kpiStatus.STABIL, .kpiStatus.WACHSTUM { color: var(--c-positive); }
+  .kpiStatus.ANGESPANNT { color: var(--ochre); }
+  .kpiStatus.KRITISCH, .kpiStatus.RÜCKGANG { color: var(--c-danger); }
+
+  /* ---- Provinz-Vergleichskarten (§43-45, Default-Inhalt des Kontextpanels) ---- */
+  #provinceCompareList { display: flex; flex-direction: column; gap: var(--sp-2); }
+  .provinceCard { border: 2px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-2); cursor: pointer; background: rgba(32,24,17,0.03); }
+  .provinceCard:hover { background: rgba(32,24,17,0.08); }
+  .provinceCard.isPlayer { border-color: var(--gold); }
+  .provinceCardName { font-family: var(--font-display); font-weight: 600; font-size: var(--fs-md); }
+  .provinceCardRow { display: flex; justify-content: space-between; font-size: var(--fs-micro); color: var(--umber); margin-top: 2px; }
+  .provinceCardWarn { font-size: var(--fs-micro); color: var(--c-danger); font-weight: 600; margin-top: 3px; }
+  #provinceCompareSort { margin-bottom: var(--sp-2); }
+
+  /* ---- Bevölkerung (§11-14) ---- */
+  #popOverview { font-size: var(--fs-body); margin-bottom: var(--sp-2); }
+  #popOverview .kpiValue { font-size: var(--fs-lg); }
+  #popGroupBars { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--sp-2); }
+  .popGroupBar { display: flex; align-items: center; gap: var(--sp-2); cursor: pointer; padding: 3px 4px; border-radius: var(--r-sm); }
+  .popGroupBar:hover { background: rgba(32,24,17,0.06); }
+  .popGroupBar.active { background: rgba(179,137,63,0.18); }
+  .popGroupBarName { flex: 0 0 92px; font-size: var(--fs-body); }
+  .popGroupBarTrack { flex: 1 1 auto; height: 10px; background: rgba(32,24,17,0.1); border: 1px solid var(--ink); border-radius: 5px; overflow: hidden; }
+  .popGroupBarFill { display: block; height: 100%; background: var(--accent2); }
+  .popGroupBarPct { flex: 0 0 40px; text-align: right; font-size: var(--fs-micro); }
+  #popGroupDetail { border: 2px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-2); margin-bottom: var(--sp-3); background: rgba(32,24,17,0.03); }
+  #popGroupDetail:empty { display: none; }
+
+  /* ---- Nahrung (§15/16) ---- */
+  #foodSupplyWidget { border: 2px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); margin: var(--sp-2) 0; }
+  #foodSupplyWidget .foodCritical { color: var(--c-danger); font-weight: 600; margin-top: 4px; }
+
+  /* ---- Mini-Kassenbuch (§8-10) ---- */
+  #miniLedgerWidget { border: 2px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); margin: var(--sp-2) 0 var(--sp-3); }
+  .ledgerMiniCol { display: inline-block; vertical-align: top; width: 48%; }
+  .ledgerMiniRow { display: flex; justify-content: space-between; font-size: var(--fs-body); }
+  .ledgerMiniRow.plus { color: var(--c-positive); }
+  .ledgerMiniRow.minus { color: var(--c-danger); }
+  .ledgerMiniNet { font-weight: 700; margin-top: var(--sp-1); border-top: 1px solid var(--ink); padding-top: 4px; }
+
+  /* ---- Waren/Kategorien (§17-24) ---- */
+  #goodsCategoryTabs { display: flex; gap: 4px; margin: var(--sp-2) 0; flex-wrap: wrap; }
+  .goodsCatTab { font-family: var(--font); font-size: 12px; font-weight: 600; padding: 5px 12px; margin: 0; }
+  .goodsCatTab.active { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+  #goodsCategoryGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--sp-2); }
+  .goodCard { border: 2px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-2); cursor: pointer; background: rgba(32,24,17,0.03); font-size: var(--fs-body); }
+  .goodCard:hover { background: rgba(32,24,17,0.08); }
+  .goodCard.selected { border-color: var(--gold); background: rgba(179,137,63,0.15); }
+  .goodCardName { font-family: var(--font-display); font-weight: 600; }
+  .goodCardPrice { font-size: var(--fs-md); }
+  .goodCardRow { font-size: var(--fs-micro); color: var(--umber); display: flex; justify-content: space-between; }
+  .goodCardGap.neg { color: var(--c-danger); }
+  .goodCardGap.pos { color: var(--c-positive); }
+  #goodDetailPanel:empty { display: none; }
+  #goodDetailPanel { border: 2px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-3); margin-top: var(--sp-2); }
+  .chainRow { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin: var(--sp-1) 0; }
+  .chainCard { border: 2px solid var(--ink); border-radius: var(--r-sm); padding: 4px 10px; background: var(--panel); font-size: var(--fs-body); }
+  .chainArrow { font-size: var(--fs-md); color: var(--umber); }
+
+  /* ---- Steuern (§37-42) ---- */
+  #taxOverviewPanel table td:nth-child(n+2) { text-align: right; }
+
+  /* ---- Handel (§32-36) ---- */
+  .tradePartnerCard { border: 2px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-2); margin-bottom: var(--sp-1); }
+
+  /* ---- Wirtschaftliche Risiken (§25/26) ---- */
+  #economicRisksPanel .alertItem { padding: 3px 0; }
+
   /* ---- Responsive (§46-48): 1366x768 ist die schmalste geprüfte Breite ---- */
   @media (max-width: 1400px) {
     #regionContextPanel { max-width: 300px; }
@@ -690,6 +773,9 @@
       <!-- §Phase-8B: neuer Hauptbildschirm -- Karte als Buehne (§1-3/18-42),
            Kontextpanel (§31-38), Story Card (§12-15/43), Warnungen (§16-17). -->
       <div id="reichPage">
+        <!-- §Phase-8C-Punkt 3-9: Reichsübersicht -- max. 6-8 Hauptkennzahlen
+             mit Trend/Status statt reiner Zahlen, kompakt über der Karte. -->
+        <div id="realmKpiStrip" class="panel"></div>
         <div id="reichMain">
           <div id="worldMapPanel" class="panel">
             <div id="worldMapBoard">
@@ -700,7 +786,10 @@
             </div>
           </div>
           <div id="regionContextPanel" class="panel">
-            <div id="regionContextEmpty"><i>Wähle ein Gebiet auf der Karte, um Details zu sehen.</i></div>
+            <!-- §Phase-8C-Punkt 43-45: ohne Auswahl zeigt das Panel die
+                 Provinzübersicht als Vergleichskarten statt einer leeren
+                 Platzhalterzeile -- Klick wählt die Region auch auf der Karte. -->
+            <div id="regionContextEmpty"></div>
             <div id="regionContextBody" style="display:none;">
               <div id="regionContextHeader"></div>
               <div id="regionContextTabs">
@@ -745,9 +834,19 @@
 
       <h2 class="title">DEINE PROVINZ</h2>
       <div id="settlementInfo" style="font-size:var(--fs-body); margin-bottom:var(--sp-2);"></div>
-      <table id="popTable"></table>
-      <div class="subhead">Zufriedenheit gesamt</div>
-      <div class="bar"><div id="satBar" style="width:50%"></div></div>
+
+      <!-- §Phase-8C-Punkt 11-14: erst Gesamtübersicht, Gruppen als
+           kompakte Balken, Details per Klick statt sofort einer 10-Zeilen-
+           Tabelle (Progressive Disclosure, §2). -->
+      <div id="popOverview"></div>
+      <div id="popGroupBars"></div>
+      <div id="popGroupDetail"></div>
+
+      <!-- §Phase-8C-Punkt 15/16: Nahrung leicht verständlich. -->
+      <div id="foodSupplyWidget"></div>
+
+      <!-- §Phase-8C-Punkt 8-10: Mini-Kassenbuch statt sofort dem vollen Ledger. -->
+      <div id="miniLedgerWidget"></div>
 
       <h2 class="title">REICHSCHRONIK</h2>
       <div id="chronicle"></div>
@@ -766,10 +865,24 @@
 
   <div id="wirtschaftPage" style="display:none;">
     <div class="panel">
-      <h2 class="title">MARKTPREISE &amp; LAGER</h2>
-      <table id="priceTable"></table>
+      <h2 class="title">WORAUF SOLLTEST DU ACHTEN?</h2>
+      <div id="economicRisksPanel"></div>
 
-      <h2 class="title">REGIONALHANDEL (ARBITRAGE)</h2>
+      <!-- §Phase-8C-Punkt 17-24: Waren nach Kategorie statt einer 24-Zeilen-
+           Tabelle; Klick auf eine Ware öffnet Detail + Preiserklärung + Kette
+           (§27-31), ohne die bestehende Markt-Kauf/Verkauf-Funktion zu ändern. -->
+      <h2 class="title">WAREN &amp; MARKT</h2>
+      <div id="goodsCategoryTabs"></div>
+      <div id="goodsCategoryGrid"></div>
+      <table id="priceTable" style="display:none;"></table>
+      <div id="goodDetailPanel"></div>
+
+      <h2 class="title">STEUERN</h2>
+      <div id="taxOverviewPanel"></div>
+
+      <h2 class="title">HANDEL</h2>
+      <div id="tradeOverviewPanel"></div>
+      <h2 class="title" style="margin-top:var(--sp-4);">REGIONALHANDEL (ARBITRAGE)</h2>
       <div id="interregionalTradePanel" style="font-size:var(--fs-body);"></div>
 
       <div class="subhead">Land</div>
@@ -8458,7 +8571,13 @@ function processAllRegions(state) {
     if (weather.factor < 0.8 || weather.factor > 1.2) {
       addChronicle(state, `In ${r.name} herrschte ${weather.name} (Ernteeinfluss ${(weather.factor*100).toFixed(0)}%).`);
     }
-    computeProduction(r);
+    // §Phase-8C: computeProduction() gab ihr Ergebnis bisher nur transient
+    // zurück (sofort verworfen) -- für eine ehrliche "Produktion/Jahr"-Anzeige
+    // (statt sie im UI ein zweites Mal zu berechnen, was computeProduction()s
+    // Warenverbrauch versehentlich verdoppeln würde) wird der bereits
+    // berechnete echte Wert hier nur zusätzlich gespeichert, siehe r.lastHarvestFactor/
+    // r.lastPopBreakdown für dasselbe etablierte Muster.
+    r.lastProduction = computeProduction(r);
     computeGrainBalance(r); // vor der Verteilung erfassen: verfügbares Getreide vs. Grundbedarf
     updatePriceNoise(r); // Marktspekulation: Preise schwanken auch ohne Angebots-/Nachfrageänderung
     const prices = computeRegionalPrices(r);
@@ -9797,6 +9916,34 @@ function levelLabel(pct) {
   return "GUT";
 }
 
+// §Phase-8C-Korrektur: `population[gid].wealth` wird von der Simulation seit
+// Erzeugung nie mehr aktualisiert (bleibt für immer beim Startwert 50) —
+// als "Wohlstand" dargestellt wäre das eine Konstante, keine echte
+// Wirtschaftskennzahl. Der Lagerwert (Bestand × aktueller Marktpreis) ist
+// dagegen echt, dynamisch und für jede Region verfügbar (auch KI-Regionen
+// ohne eigene Staatskasse) — wird deshalb ab hier als "Wohlstand"-Ersatz
+// verwendet (siehe §Phase-8C-Punkt 4/44).
+// §Phase-8C-Korrektur: `region.prices` wird erst nach dem ERSTEN
+// abgeschlossenen Monat gesetzt (siehe processAllRegions() in
+// js/advance-year.js) -- vorher bleibt es undefined, obwohl
+// `region.priceBreakdown` durch andere Aufrufer (z. B. die bestehende
+// Marktpreis-Tabelle) trotzdem schon frisch berechnet sein kann. Damit
+// Preis-Anzeige und Preiserklärung nie auseinanderlaufen, gilt
+// `priceBreakdown[gid].gesamt` als vorrangige, stets konsistente Quelle.
+function resolveGoodPrice(region, gid) {
+  if (region.priceBreakdown && region.priceBreakdown[gid]) return region.priceBreakdown[gid].gesamt;
+  if (region.prices && region.prices[gid] !== undefined) return region.prices[gid];
+  return GOODS[gid] ? GOODS[gid].base : 0;
+}
+
+function computeWarehouseValue(region) {
+  let total = 0;
+  for (const gid in region.warehouse) {
+    total += (region.warehouse[gid] || 0) * resolveGoodPrice(region, gid);
+  }
+  return Math.round(total);
+}
+
 function getRegionSummaryViewModel(state, territoryId) {
   const t = territoryById(territoryId);
   if (!t) return null;
@@ -9804,9 +9951,6 @@ function getRegionSummaryViewModel(state, territoryId) {
   const ownerId = terr.owner;
   const r = state.regions[ownerId];
   const totalPop = Object.values(r.population).reduce((s, g) => s + g.count, 0);
-  const weightedWealth = totalPop > 0
-    ? Object.values(r.population).reduce((s, g) => s + g.wealth * g.count, 0) / totalPop
-    : 0;
   const foodPct = Math.round((r.grainRatio !== undefined ? r.grainRatio : 1) * 100);
   const topGoods = Object.keys(r.warehouse)
     .map(gid => ({ id: gid, name: GOODS[gid] ? GOODS[gid].name : gid, stock: Math.round(r.warehouse[gid] || 0) }))
@@ -9822,6 +9966,46 @@ function getRegionSummaryViewModel(state, territoryId) {
     ? Object.entries(terr.deployment).filter(([, v]) => v > 0).map(([k, v]) => ({ id: k, name: TROOP_TYPES[k] ? TROOP_TYPES[k].name : k, count: v }))
     : [{ id: "garrison", name: "Garnison (geschätzt)", count: Math.round(terr.garrison) }];
   const terrain = TERRAIN_TYPES[t.terrain] || TERRAIN_TYPES.ebene;
+  const warehouseValue = computeWarehouseValue(r);
+
+  // §Phase-8C-Punkt 48: WIRTSCHAFT-Tab des Kontextpanels -- Top-Produktion
+  // und Engpässe aus denselben echten Feldern wie getEconomicRisksViewModel(),
+  // hier aber für JEDE Region (r.lastProduction/r.priceBreakdown werden für
+  // Spieler- und KI-Regionen identisch in processAllRegions() befüllt).
+  let topProduction = [];
+  let shortages = [];
+  if (r.lastProduction) {
+    topProduction = Object.keys(r.lastProduction)
+      .map(gid => ({ id: gid, name: GOODS[gid] ? GOODS[gid].name : gid, amount: Math.round(r.lastProduction[gid]) }))
+      .filter(g => g.amount > 0)
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+    if (r.priceBreakdown) {
+      for (const gid in r.lastProduction) {
+        const production = r.lastProduction[gid] || 0;
+        const consumption = r.priceBreakdown[gid] ? r.priceBreakdown[gid].nachfrage : 0;
+        if (consumption > 0 && production < consumption * 0.85) {
+          shortages.push({ id: gid, name: GOODS[gid] ? GOODS[gid].name : gid, shortfallPct: Math.round((1 - production / consumption) * 100) });
+        }
+      }
+      shortages.sort((a, b) => b.shortfallPct - a.shortfallPct);
+      shortages = shortages.slice(0, 5);
+    }
+  }
+  // §Phase-8C-Punkt 49: BEVÖLKERUNG-Tab -- echtes Jahreswachstum (dieselbe
+  // Quelle wie getPopulationOverviewViewModel(), nur regionsunabhängig).
+  let populationGrowth = null;
+  if (r.lastPopSummary) {
+    const migration = r.lastNetMigration || 0;
+    const yearlyDelta = Math.round((r.lastPopSummary.geburten || 0) - (r.lastPopSummary.todesfaelle || 0) + migration);
+    const before = totalPop - yearlyDelta;
+    populationGrowth = {
+      yearlyDelta,
+      yearlyPct: before > 0 ? Math.round((yearlyDelta / before) * 1000) / 10 : null,
+      births: Math.round(r.lastPopSummary.geburten || 0),
+      deaths: Math.round(r.lastPopSummary.todesfaelle || 0),
+    };
+  }
 
   return {
     territoryId, territoryName: t.name, terrainName: terrain.name, isCapital: !!t.capital,
@@ -9829,8 +10013,9 @@ function getRegionSummaryViewModel(state, territoryId) {
     population: totalPop, satisfactionPct: Math.round(r.satisfactionAvg !== undefined ? r.satisfactionAvg : 55),
     satisfactionLabel: levelLabel(r.satisfactionAvg !== undefined ? r.satisfactionAvg : 55),
     foodPct, foodLabel: foodStatusLabel(foodPct),
-    wealthPct: Math.round(weightedWealth), wealthLabel: levelLabel(weightedWealth),
+    warehouseValue,
     topGoods, populationByGroup, militaryStrength,
+    topProduction, shortages, populationGrowth,
   };
 }
 
@@ -9924,6 +10109,319 @@ function getYearTransitionViewModel(state) {
       : pendingCount === 1 ? "1 wichtige Entscheidung offen"
       : `${pendingCount} wichtige Entscheidungen offen`,
   };
+}
+
+// ============================================================
+// §Phase-8C "Reich + Provinz + Wirtschaft": weitere reine ViewModels.
+// Dieselben Regeln wie oben — nur Aggregation/Formatierung existierender
+// state-Werte (§66), kein rnd(), keine neue Gameplaylogik (§72/31).
+// Trends werden AUSSCHLIESSLICH aus tatsächlich vorhandenen Vorjahres-/
+// Vormonatsdaten gebildet (state.lastMonthlyReport, r.lastPopBreakdown/
+// lastPopSummary/lastNetMigration, r.lastProduction) — es gibt KEINE
+// mehrjährige Zeitreihe im Spielstand; wo keine echte Vergleichsbasis
+// existiert, bleibt das Feld `null` statt einer erfundenen Zahl (§5/§21/§42).
+// ============================================================
+
+function statusLabelForPct(pct, thresholds) {
+  if (pct < thresholds.critical) return "KRITISCH";
+  if (pct < thresholds.tense) return "ANGESPANNT";
+  return "STABIL";
+}
+
+// ---------- Reichsübersicht (§3-9) ----------
+function getRealmEconomyViewModel(state) {
+  const r = state.regions.player;
+  const report = state.lastMonthlyReport;
+  const totalPop = Object.values(r.population).reduce((s, g) => s + g.count, 0);
+  const foodPct = Math.round((r.grainRatio !== undefined ? r.grainRatio : 1) * 100);
+  const satisfactionPct = Math.round(r.satisfactionAvg !== undefined ? r.satisfactionAvg : 55);
+  const warehouseValue = computeWarehouseValue(r);
+
+  // §5: Treasury-Trend nur als "letzter Monat" -- das ist die einzige echte,
+  // bereits gespeicherte Vergleichsbasis (kein mehrjähriges Zeitreihen-
+  // Tracking im Spielstand, siehe Kommentar oben). Explizit korrekt
+  // benannt statt fälschlich als Jahrestrend ausgegeben.
+  const treasuryMonthlyNet = report ? Math.round(report.net) : null;
+
+  // Bevölkerungstrend IST ein echter Jahreswert (Geburten - Todesfälle +
+  // Wanderungssaldo aus dem zuletzt abgeschlossenen Jahr).
+  let populationYearlyDelta = null, populationYearlyPct = null;
+  if (r.lastPopSummary) {
+    const migration = r.lastNetMigration || 0;
+    populationYearlyDelta = Math.round((r.lastPopSummary.geburten || 0) - (r.lastPopSummary.todesfaelle || 0) + migration);
+    const before = totalPop - populationYearlyDelta;
+    populationYearlyPct = before > 0 ? Math.round((populationYearlyDelta / before) * 1000) / 10 : null;
+  }
+
+  return {
+    treasury: Math.round(state.treasury),
+    treasuryMonthlyNet,
+    treasuryStatus: state.treasury < 0 ? "KRITISCH" : (state.treasury < 300 ? "ANGESPANNT" : "STABIL"), // vgl. weakEconomy-Schwelle (state.treasury<0) aus drama-director.js
+    debt: Math.round(state.debt || 0),
+    population: totalPop,
+    populationYearlyDelta, populationYearlyPct,
+    populationStatus: populationYearlyDelta === null ? null : (populationYearlyDelta > 0 ? "WACHSTUM" : (populationYearlyDelta < 0 ? "RÜCKGANG" : "STABIL")),
+    foodPct, foodStatus: foodStatusLabel(foodPct),
+    satisfactionPct, satisfactionStatus: statusLabelForPct(satisfactionPct, { critical: 35, tense: 55 }),
+    warehouseValue,
+  };
+}
+
+// ---------- Mini-Kassenbuch (§8-10) ----------
+// Nutzt ausschließlich state.lastMonthlyReport (js/advance-year.js
+// applyMonthlyFinances()) -- das bestehende Ledger bleibt unverändert,
+// dies ist nur eine kompakte Voransicht derselben Felder (§10).
+function getMiniLedgerViewModel(state) {
+  const report = state.lastMonthlyReport;
+  if (!report) return { available: false };
+  const income = [];
+  const expenses = [];
+  if (report.taxIncome) income.push({ label: "Steuern", amount: Math.round(report.taxIncome) });
+  if (report.vassalTribute) income.push({ label: "Vasallentribut", amount: Math.round(report.vassalTribute) });
+  if (report.upkeep) expenses.push({ label: "Armee", amount: -Math.round(report.upkeep) });
+  if (report.salaries) expenses.push({ label: "Hof (Berater)", amount: -Math.round(report.salaries) });
+  if (report.debtInterest) expenses.push({ label: "Schuldzinsen", amount: -Math.round(report.debtInterest) });
+  for (const entry of (report.otherEntries || [])) {
+    const amount = Math.round(entry.amount);
+    if (amount >= 0) income.push({ label: entry.label, amount });
+    else expenses.push({ label: entry.label, amount });
+  }
+  return {
+    available: true, year: report.year, month: report.month,
+    income, expenses, net: Math.round(report.net),
+  };
+}
+
+// ---------- Bevölkerung (§11-14) ----------
+function getPopulationOverviewViewModel(state) {
+  const r = state.regions.player;
+  const totalPop = Object.values(r.population).reduce((s, g) => s + g.count, 0);
+  const groups = Object.keys(r.population)
+    .map(gid => ({
+      id: gid, name: POP_GROUPS[gid] ? POP_GROUPS[gid].name : gid,
+      count: r.population[gid].count,
+      sharePct: totalPop > 0 ? Math.round((r.population[gid].count / totalPop) * 1000) / 10 : 0,
+      satisfaction: Math.round(r.population[gid].satisfaction),
+    }))
+    .sort((a, b) => b.count - a.count);
+  let yearlyDelta = null, yearlyPct = null;
+  if (r.lastPopSummary) {
+    const migration = r.lastNetMigration || 0;
+    yearlyDelta = Math.round((r.lastPopSummary.geburten || 0) - (r.lastPopSummary.todesfaelle || 0) + migration);
+    const before = totalPop - yearlyDelta;
+    yearlyPct = before > 0 ? Math.round((yearlyDelta / before) * 1000) / 10 : null;
+  }
+  return { totalPop, yearlyDelta, yearlyPct, groups };
+}
+
+function getPopulationGroupDetailViewModel(state, groupId) {
+  const r = state.regions.player;
+  const g = r.population[groupId];
+  const def = POP_GROUPS[groupId];
+  if (!g || !def) return null;
+  const needs = Object.keys(def.needs).map(gid => ({ id: gid, name: GOODS[gid] ? GOODS[gid].name : gid, amountPerCapita: def.needs[gid] }));
+  const report = state.lastMonthlyReport;
+  const monthlyTaxIncome = report && report.taxBreakdown ? Math.round(report.taxBreakdown[groupId] || 0) : null;
+  const bd = r.lastPopBreakdown && r.lastPopBreakdown[groupId] ? r.lastPopBreakdown[groupId] : null;
+  return {
+    id: groupId, name: def.name, count: g.count, satisfaction: Math.round(g.satisfaction),
+    taxWeight: def.weight, needs, monthlyTaxIncome,
+    yearlyBirths: bd ? Math.round(bd.geburten || 0) : null,
+    yearlyDeaths: bd ? Math.round((bd.alterstod || 0) + (bd.hungertote || 0) + (bd.seuchentote || 0)) : null,
+  };
+}
+
+// ---------- Nahrung (§15/16) ----------
+function getFoodSupplyViewModel(state) {
+  const r = state.regions.player;
+  const need = r.grainNeed || 0;
+  const available = r.grainAvailable !== undefined ? r.grainAvailable : (r.warehouse.getreide || 0);
+  const ratio = r.grainRatio !== undefined ? r.grainRatio : 1;
+  const pct = Math.round(ratio * 100);
+  let forecast;
+  if (pct >= 100) forecast = "ausreichend";
+  else if (pct >= 80) forecast = "knapp ausreichend";
+  else if (pct >= 50) forecast = "angespannt";
+  else forecast = "kritisch";
+  return {
+    pct, status: foodStatusLabel(pct),
+    stock: Math.round(available), yearlyNeed: Math.round(need),
+    forecast,
+    criticalWarning: pct < 50
+      ? "Bei unveränderter Lage reichen die Vorräte weniger als ein Jahr."
+      : null,
+  };
+}
+
+// ---------- Waren nach Kategorie (§17-24) ----------
+// GOODS[gid].category ist bereits echte Daten (grundnahrung/rohstoff/
+// verarbeitet/luxus) -- wird hier nur auf die im Auftrag vorgeschlagenen
+// deutschen Anzeigenamen abgebildet, keine neue Datenstruktur.
+const GOODS_CATEGORY_LABEL = {
+  grundnahrung: "NAHRUNG", rohstoff: "ROHSTOFFE", verarbeitet: "HANDWERK", luxus: "LUXUS",
+};
+
+function getGoodsCategoryViewModel(state) {
+  const r = state.regions.player;
+  const categories = {};
+  for (const gid in GOODS) {
+    const cat = GOODS[gid].category || "sonstiges";
+    const label = GOODS_CATEGORY_LABEL[cat] || cat.toUpperCase();
+    if (!categories[label]) categories[label] = [];
+    const production = r.lastProduction && r.lastProduction[gid] !== undefined ? Math.round(r.lastProduction[gid]) : null;
+    const consumption = r.priceBreakdown && r.priceBreakdown[gid] ? Math.round(r.priceBreakdown[gid].nachfrage) : null;
+    categories[label].push({
+      id: gid, name: GOODS[gid].name, price: resolveGoodPrice(r, gid),
+      stock: Math.round(r.warehouse[gid] || 0), production, consumption,
+      gap: (production !== null && consumption !== null) ? Math.round(production - consumption) : null,
+    });
+  }
+  for (const label in categories) categories[label].sort((a, b) => b.stock - a.stock);
+  return { categories, order: ["NAHRUNG", "ROHSTOFFE", "HANDWERK", "LUXUS"].filter(c => categories[c]) };
+}
+
+// ---------- Waren-Detail + Preiserklärung (§19-23) ----------
+function getGoodDetailViewModel(state, goodId) {
+  const good = GOODS[goodId];
+  const r = state.regions.player;
+  if (!good) return null;
+  const pb = r.priceBreakdown && r.priceBreakdown[goodId] ? r.priceBreakdown[goodId] : null;
+  const production = r.lastProduction && r.lastProduction[goodId] !== undefined ? Math.round(r.lastProduction[goodId]) : null;
+  return {
+    id: goodId, name: good.name, category: GOODS_CATEGORY_LABEL[good.category] || good.category,
+    price: resolveGoodPrice(r, goodId),
+    stock: Math.round(r.warehouse[goodId] || 0),
+    production, consumption: pb ? Math.round(pb.nachfrage) : null,
+    priceBreakdown: pb ? {
+      basis: pb.basis, knappheit: pb.nachfrage - pb.angebot, nachfrage: pb.nachfrage,
+      angebot: pb.angebot, marktstimmung: pb.marktstimmung, multiplikator: pb.multiplikator, gesamt: pb.gesamt,
+    } : null,
+    chain: getProductionChainViewModel(state, goodId),
+  };
+}
+
+// ---------- Produktionskette (§27-31) ----------
+// Reine Auswertung der bestehenden PRODUCTION_CHAINS-Rezeptliste -- keine
+// neue Produktionslogik, nur Darstellung (§31).
+function getProductionChainViewModel(state, goodId) {
+  const producedBy = PRODUCTION_CHAINS.filter(c => c.output === goodId);
+  const consumedBy = PRODUCTION_CHAINS.filter(c => c.input === goodId);
+  return {
+    inputs: producedBy.map(c => ({
+      inputGoodId: c.input, inputGoodName: c.input && GOODS[c.input] ? GOODS[c.input].name : null,
+      buildingId: c.building, buildingName: c.building && BUILDINGS[c.building] ? BUILDINGS[c.building].name : null,
+      workerGroup: c.workerGroup, workerGroupName: POP_GROUPS[c.workerGroup] ? POP_GROUPS[c.workerGroup].name : c.workerGroup,
+    })),
+    outputs: consumedBy.map(c => ({
+      outputGoodId: c.output, outputGoodName: GOODS[c.output] ? GOODS[c.output].name : c.output,
+      buildingId: c.building, buildingName: c.building && BUILDINGS[c.building] ? BUILDINGS[c.building].name : null,
+    })),
+  };
+}
+
+// ---------- Handel (§32-36) ----------
+function getTradeViewModel(state) {
+  const cfg = CONFIG.interregionalTrade;
+  const partners = [];
+  for (const aiId in state.diplomacy) {
+    const dip = state.diplomacy[aiId];
+    if (!dip.treaties.handel) continue;
+    const transitDiscount = dip.treaties.durchmarsch ? CONFIG.diplomacyExtra.transitRightsBanditRiskDiscount : 1;
+    const riskPct = Math.round(cfg.banditRiskChance * transitDiscount * 100);
+    partners.push({
+      id: aiId, name: state.regions[aiId].name, relation: Math.round(dip.relation),
+      hasTransitRights: !!dip.treaties.durchmarsch, riskPct,
+      riskLabel: riskPct >= 12 ? "MITTEL" : (riskPct >= 6 ? "GERING" : "SEHR GERING"),
+    });
+  }
+  return {
+    partners,
+    transportCostPct: Math.round(cfg.transportCostShare * 100),
+    baseBanditRiskPct: Math.round(cfg.banditRiskChance * 100),
+    banditLossSharePct: Math.round(cfg.banditLossShare * 100),
+  };
+}
+
+// ---------- Steuern (§37-42) ----------
+// Nur EIN Steuersatz existiert (regionsweit, kein Satz pro Gruppe) —
+// wird hier ehrlich als gemeinsamer Satz je Gruppe dargestellt, nicht als
+// erfundene Differenzierung. Der Zufriedenheitseffekt ist in der
+// Simulation ebenfalls ein einziger, für alle Gruppen gleicher Term
+// (js/economy.js consumeAndUpdateSatisfaction(), §Punkt 7 Forschungsbericht).
+function getTaxViewModel(state) {
+  const r = state.regions.player;
+  const report = state.lastMonthlyReport;
+  const sharedRatePct = Math.round(r.taxRate * 1000) / 10;
+  const sharedYearlySatisfactionEffect = -Math.round(r.taxRate * CONFIG.population.taxSatisfactionPenalty * 10) / 10;
+  const groups = Object.keys(r.population).map(gid => ({
+    id: gid, name: POP_GROUPS[gid] ? POP_GROUPS[gid].name : gid,
+    ratePct: sharedRatePct,
+    monthlyIncome: (report && report.taxBreakdown) ? Math.round(report.taxBreakdown[gid] || 0) : null,
+    satisfactionEffect: sharedYearlySatisfactionEffect,
+  }));
+  return {
+    sharedRatePct, sharedYearlySatisfactionEffect,
+    totalMonthlyIncome: report ? Math.round(report.taxIncome) : null,
+    groups,
+  };
+}
+
+// ---------- Provinzübersicht (§43-45) ----------
+function getProvinceListViewModel(state) {
+  const ids = ["player", "ai1", "ai2", "ai3"];
+  const list = ids.map(id => {
+    const r = state.regions[id];
+    const totalPop = Object.values(r.population).reduce((s, g) => s + g.count, 0);
+    const foodPct = Math.round((r.grainRatio !== undefined ? r.grainRatio : 1) * 100);
+    const satisfactionPct = Math.round(r.satisfactionAvg !== undefined ? r.satisfactionAvg : 55);
+    const topGood = Object.keys(r.warehouse)
+      .map(gid => ({ id: gid, name: GOODS[gid] ? GOODS[gid].name : gid, stock: r.warehouse[gid] || 0 }))
+      .sort((a, b) => b.stock - a.stock)[0];
+    let warning = null;
+    if (foodPct < 50) warning = "Nahrung kritisch";
+    else if (satisfactionPct < 35) warning = "Unzufriedenheit hoch";
+    return {
+      id, name: r.name, isPlayer: id === "player",
+      population: totalPop, foodPct, satisfactionPct,
+      warehouseValue: computeWarehouseValue(r),
+      topGoodName: topGood ? topGood.name : null,
+      warning,
+    };
+  });
+  return list;
+}
+
+// ---------- Wirtschaftliche Risiken (§25/26) ----------
+// Nur bereits berechenbare Probleme (Produktions-/Verbrauchslücke aus
+// r.lastProduction, hohe Preise aus dem Multiplikator, Handelsrisiko aus
+// CONFIG.interregionalTrade) -- keine neuen Schwellen ohne Vorbild (§26).
+function getEconomicRisksViewModel(state) {
+  const r = state.regions.player;
+  const risks = [];
+  if (r.lastProduction && r.priceBreakdown) {
+    for (const gid in GOODS) {
+      const production = r.lastProduction[gid] || 0;
+      const consumption = r.priceBreakdown[gid] ? r.priceBreakdown[gid].nachfrage : 0;
+      if (consumption > 0 && production < consumption * 0.85) {
+        const shortfallPct = Math.round((1 - production / consumption) * 100);
+        risks.push({ id: "shortfall_" + gid, goodId: gid, goodName: GOODS[gid].name, kind: "shortfall",
+          text: `${GOODS[gid].name}: Produktion liegt ${shortfallPct}% unter Verbrauch.` });
+      }
+    }
+  }
+  if (r.priceBreakdown) {
+    for (const gid in r.priceBreakdown) {
+      if (r.priceBreakdown[gid].multiplikator >= 2.0) {
+        risks.push({ id: "price_" + gid, goodId: gid, goodName: GOODS[gid].name, kind: "price",
+          text: `${GOODS[gid].name}: Preis sehr hoch (${Math.round(r.priceBreakdown[gid].multiplikator * 100)}% des Grundpreises).` });
+      }
+    }
+  }
+  const trade = getTradeViewModel(state);
+  const riskyPartner = trade.partners.find(p => p.riskLabel === "MITTEL");
+  if (riskyPartner) risks.push({ id: "trade_risk_" + riskyPartner.id, kind: "trade",
+    text: `Handel mit ${riskyPartner.name}: erhöhtes Räuberrisiko (${riskyPartner.riskPct}%).` });
+  return risks.slice(0, 8);
 }
 
 </script>
@@ -10661,20 +11159,9 @@ function render() {
     document.getElementById('courtInfo').innerHTML = courtHtml;
   }
 
-  // Bevölkerungstabelle (mit Ursachen-Tooltip gemäß §83)
-  let popHtml = '<tr><th>Gruppe</th><th>Anzahl</th><th>Zufriedenheit</th></tr>';
-  for (const pid in r.population) {
-    const g = r.population[pid];
-    const satClass = g.satisfaction > 55 ? 'goodgood' : (g.satisfaction < 35 ? 'goodbad' : '');
-    const bd = r.lastPopBreakdown && r.lastPopBreakdown[pid];
-    const tip = bd
-      ? `Veränderung dieses Jahr:\nGeburten ${bd.geburten >= 0 ? '+' : ''}${bd.geburten}\nAlterstod ${bd.alterstod}\nHungertote ${bd.hungertote}\nSeuchentote ${bd.seuchentote}\nGesamt ${bd.gesamt >= 0 ? '+' : ''}${bd.gesamt}`
-      : 'Noch keine Daten (erstes Jahr).';
-    popHtml += `<tr><td data-tip="${tip}">${POP_GROUPS[pid].name}</td><td>${Math.round(g.count).toLocaleString('de-DE')}</td><td class="${satClass}">${Math.round(g.satisfaction)}</td></tr>`;
-  }
-  popHtml += `<tr><th>Gesamt</th><th>${totalPop.toLocaleString('de-DE')}</th><th></th></tr>`;
-  document.getElementById('popTable').innerHTML = popHtml;
-  document.getElementById('satBar').style.width = Math.round(r.satisfactionAvg) + '%';
+  // §Phase-8C-Punkt 11-14: Bevölkerungsübersicht + Gruppen-Balken statt
+  // sofort einer vollen Tabelle -- Detail per Klick (renderPopulationSection()).
+  if (currentPage === 'provinz') renderPopulationSection();
 
   updateGovernanceInfo();
 
@@ -10699,6 +11186,7 @@ function render() {
       `</span>` +
       famineNote;
   }
+  if (currentPage === 'provinz') { renderFoodSupplyWidget(); renderMiniLedger(); }
 
   // Stadtentwicklung (§25) & Infrastruktur (§27)
   const tierInfo = CONFIG.settlement.tiers[r.settlementTier || 0];
@@ -10841,6 +11329,7 @@ function render() {
     <button onclick="doInterregionalTrade('import')">Importieren (dort kaufen)</button>
     <div style="font-size:var(--fs-body); margin-top:var(--sp-1);">Transportkosten ${Math.round(CONFIG.interregionalTrade.transportCostShare*100)}% · Räuberrisiko ${Math.round(CONFIG.interregionalTrade.banditRiskChance*100)}% (bei Überfall <span class="goodbad">−${Math.round(CONFIG.interregionalTrade.banditLossShare*100)}% der Ladung</span>) — höheres Risiko als der lokale Markt, dafür mehr vom Preisunterschied als Gewinn</div>
   `;
+  if (currentPage === 'wirtschaft') { renderGoodsCategoryGrid(); renderTaxOverview(); renderTradeOverview(); renderEconomicRisks(); }
 
   // Diplomatie
   let dipHtml = '';
@@ -10936,10 +11425,37 @@ const REICH_OWNER_COLOR = {
 };
 
 function renderReichPage() {
+  renderRealmKpiStrip();
   renderWorldMap();
   renderRegionContext();
   renderStoryCard();
   renderAlerts();
+}
+
+// §Phase-8C-Punkt 3-9: Reichsübersicht -- 6 Hauptkennzahlen mit Trend/
+// Status statt reiner Zahlen. Trends nur, wo echte Vergleichsdaten
+// existieren (getRealmEconomyViewModel() lässt sie sonst bewusst `null`).
+function renderRealmKpiStrip() {
+  const vm = getRealmEconomyViewModel(state);
+  const tile = (label, valueHtml, trendHtml, status, tip) =>
+    `<div class="kpiTile"${tip ? ` data-tip="${tip}"` : ''}>
+      <div class="kpiLabel">${label}</div>
+      <div class="kpiValue">${valueHtml}${status ? `<span class="kpiStatus ${status}">${status}</span>` : ''}</div>
+      ${trendHtml ? `<div class="kpiTrend ${trendHtml.cls}">${trendHtml.text}</div>` : ''}
+    </div>`;
+  const treasuryTrend = vm.treasuryMonthlyNet === null ? null :
+    { cls: vm.treasuryMonthlyNet >= 0 ? 'up' : 'down', text: `${vm.treasuryMonthlyNet >= 0 ? '↑' : '↓'} ${vm.treasuryMonthlyNet >= 0 ? '+' : ''}${vm.treasuryMonthlyNet.toLocaleString('de-DE')} im letzten Monat` };
+  const popTrend = vm.populationYearlyPct === null ? null :
+    { cls: vm.populationYearlyDelta >= 0 ? 'up' : 'down', text: `${vm.populationYearlyDelta >= 0 ? '↑' : '↓'} ${vm.populationYearlyPct >= 0 ? '+' : ''}${vm.populationYearlyPct}% im letzten Jahr` };
+
+  let html = '';
+  html += tile('Staatskasse', `${vm.treasury.toLocaleString('de-DE')} Taler`, treasuryTrend, vm.treasuryStatus);
+  html += tile('Bevölkerung', vm.population.toLocaleString('de-DE'), popTrend, vm.populationStatus);
+  html += tile('Nahrungslage', `${vm.foodPct}%`, null, vm.foodStatus);
+  html += tile('Zufriedenheit', `${vm.satisfactionPct}%`, null, vm.satisfactionStatus);
+  html += tile('Wohlstand', `${vm.warehouseValue.toLocaleString('de-DE')} Taler`, null, null, 'Lagerwert: Bestand aller Waren × aktueller Marktpreis');
+  if (vm.debt > 0) html += tile('Schulden', `${vm.debt.toLocaleString('de-DE')} Taler`, null, 'ANGESPANNT');
+  document.getElementById('realmKpiStrip').innerHTML = html;
 }
 
 function renderWorldMap() {
@@ -10977,6 +11493,42 @@ function closeRegionContext() {
   render();
 }
 
+let provinceCompareSort = 'population';
+function setProvinceCompareSort(sortKey) {
+  provinceCompareSort = sortKey;
+  renderProvinceCompareList();
+}
+
+// §Phase-8C-Punkt 43-45: Provinzübersicht als Vergleichskarten -- Default-
+// Inhalt des Kontextpanels, solange kein Gebiet ausgewählt ist. Klick auf
+// eine Karte wählt die Hauptstadt dieser Region auch auf der Karte aus.
+function renderProvinceCompareList() {
+  const list = getProvinceListViewModel(state).slice();
+  const sortKeyMap = { population: 'population', food: 'foodPct', satisfaction: 'satisfactionPct', wealth: 'warehouseValue' };
+  const key = sortKeyMap[provinceCompareSort] || 'population';
+  list.sort((a, b) => b[key] - a[key]);
+
+  const sortOptions = [['population','Bevölkerung'],['food','Nahrung'],['satisfaction','Zufriedenheit'],['wealth','Wohlstand']]
+    .map(([k, label]) => `<option value="${k}" ${k===provinceCompareSort?'selected':''}>${label}</option>`).join('');
+
+  let html = `<div id="provinceCompareSort">Sortieren nach: <select onchange="setProvinceCompareSort(this.value)">${sortOptions}</select></div>`;
+  html += `<div id="provinceCompareList">`;
+  for (const p of list) {
+    const capitalTerr = TERRITORIES.find(t => t.region === p.id && t.capital);
+    html += `<div class="provinceCard${p.isPlayer ? ' isPlayer' : ''}" onclick="selectMapTerritory('${capitalTerr ? capitalTerr.id : ''}')">
+      <div class="provinceCardName">${p.name}${p.isPlayer ? ' (Du)' : ''}</div>
+      <div class="provinceCardRow"><span>Einwohner</span><span>${p.population.toLocaleString('de-DE')}</span></div>
+      <div class="provinceCardRow"><span>Nahrung</span><span>${p.foodPct}%</span></div>
+      <div class="provinceCardRow"><span>Zufriedenheit</span><span>${p.satisfactionPct}%</span></div>
+      <div class="provinceCardRow"><span>Wohlstand</span><span>${p.warehouseValue.toLocaleString('de-DE')} Taler</span></div>
+      ${p.topGoodName ? `<div class="provinceCardRow"><span>Wichtigste Ware</span><span>${p.topGoodName}</span></div>` : ''}
+      ${p.warning ? `<div class="provinceCardWarn">⚠ ${p.warning}</div>` : ''}
+    </div>`;
+  }
+  html += `</div>`;
+  document.getElementById('regionContextEmpty').innerHTML = html;
+}
+
 function switchRegionContextTab(tabId) {
   selectedRegionContextTab = tabId;
   renderRegionContext();
@@ -10987,13 +11539,18 @@ function switchRegionContextTab(tabId) {
 function renderRegionContext() {
   const emptyEl = document.getElementById('regionContextEmpty');
   const bodyEl = document.getElementById('regionContextBody');
-  if (!selectedTerritoryId) { emptyEl.style.display = 'block'; bodyEl.style.display = 'none'; return; }
+  if (!selectedTerritoryId) {
+    emptyEl.style.display = 'block'; bodyEl.style.display = 'none';
+    renderProvinceCompareList();
+    return;
+  }
   const vm = getRegionSummaryViewModel(state, selectedTerritoryId);
-  if (!vm) { selectedTerritoryId = null; emptyEl.style.display = 'block'; bodyEl.style.display = 'none'; return; }
+  if (!vm) { selectedTerritoryId = null; emptyEl.style.display = 'block'; bodyEl.style.display = 'none'; renderProvinceCompareList(); return; }
   emptyEl.style.display = 'none'; bodyEl.style.display = 'block';
 
   document.getElementById('regionContextHeader').innerHTML =
-    `${vm.territoryName.toUpperCase()} <span style="font-size:var(--fs-micro); font-weight:normal; color:var(--umber);">(${vm.ownerName})</span>`;
+    `${vm.territoryName.toUpperCase()} <span style="font-size:var(--fs-micro); font-weight:normal; color:var(--umber);">(${vm.ownerName})</span>` +
+    ` <button class="btn-ghost" style="float:right; margin:0; padding:2px 8px; font-size:11px;" onclick="closeRegionContext()">✕ Provinzen</button>`;
 
   document.querySelectorAll('.rcTab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.rctab === selectedRegionContextTab);
@@ -11007,18 +11564,29 @@ function renderRegionContext() {
       <div class="rcStatRow"><span class="rcStatLabel">Einwohner</span><span>${vm.population.toLocaleString('de-DE')}</span></div>
       <div class="rcStatRow"><span class="rcStatLabel">Nahrung</span><span>${vm.foodPct}% · ${vm.foodLabel}</span></div>
       <div class="rcStatRow"><span class="rcStatLabel">Zufriedenheit</span><span>${vm.satisfactionPct}% · ${vm.satisfactionLabel}</span></div>
-      <div class="rcStatRow"><span class="rcStatLabel">Wohlstand</span><span>${vm.wealthPct}% · ${vm.wealthLabel}</span></div>
+      <div class="rcStatRow"><span class="rcStatLabel">Wohlstand</span><span data-tip="Lagerwert: Bestand aller Waren × aktueller Marktpreis">${vm.warehouseValue.toLocaleString('de-DE')} Taler</span></div>
       <div class="subhead" style="margin-top:var(--sp-2);">Wichtigste Waren (Lager)</div>
       ${vm.topGoods.length ? vm.topGoods.map(g => `<div class="rcGoodsRow"><span>${g.name}</span><span>${g.stock.toLocaleString('de-DE')}</span></div>`).join('') : '<i>Keine nennenswerten Vorräte.</i>'}
     `;
   } else if (selectedRegionContextTab === 'economy') {
     contentEl.innerHTML = `
+      <div class="subhead" style="margin-top:0;">Top-Produktion (dieses Jahr)</div>
+      ${vm.topProduction.length ? vm.topProduction.map(g => `<div class="rcGoodsRow"><span>${g.name}</span><span>+${g.amount.toLocaleString('de-DE')}</span></div>`).join('') : '<i>Noch keine Jahresdaten.</i>'}
+      ${vm.shortages.length ? `<div class="subhead">Engpässe</div>${vm.shortages.map(s => `<div class="rcGoodsRow"><span>${s.name}</span><span class="goodbad">−${s.shortfallPct}% unter Verbrauch</span></div>`).join('')}` : ''}
       <div class="subhead">Lagerbestände</div>
       ${vm.topGoods.length ? vm.topGoods.map(g => `<div class="rcGoodsRow"><span>${g.name}</span><span>${g.stock.toLocaleString('de-DE')}</span></div>`).join('') : '<i>Keine nennenswerten Vorräte.</i>'}
+      <div class="rcStatRow"><span class="rcStatLabel">Wohlstand</span><span data-tip="Lagerwert: Bestand aller Waren × aktueller Marktpreis">${vm.warehouseValue.toLocaleString('de-DE')} Taler</span></div>
       ${vm.isPlayerTerritory ? `<div style="margin-top:var(--sp-2);"><button onclick="switchPage('wirtschaft')">Vollständige Wirtschaft ansehen →</button></div>` : ''}
     `;
   } else if (selectedRegionContextTab === 'population') {
+    const g = vm.populationGrowth;
     contentEl.innerHTML = `
+      ${g ? `<div class="subhead" style="margin-top:0;">Wachstum (dieses Jahr)</div>
+        <div class="rcStatRow"><span class="rcStatLabel">Geburten</span><span>${g.births.toLocaleString('de-DE')}</span></div>
+        <div class="rcStatRow"><span class="rcStatLabel">Todesfälle</span><span>${g.deaths.toLocaleString('de-DE')}</span></div>
+        <div class="rcStatRow"><span class="rcStatLabel">Saldo</span><span>${g.yearlyDelta >= 0 ? '+' : ''}${g.yearlyDelta.toLocaleString('de-DE')}${g.yearlyPct !== null ? ` (${g.yearlyPct >= 0 ? '+' : ''}${g.yearlyPct}%)` : ''}</span></div>`
+        : '<i>Noch keine Jahresdaten.</i>'}
+      <div class="subhead">Gruppen</div>
       <table><tr><th>Gruppe</th><th>Anzahl</th><th>Zufr.</th></tr>
       ${vm.populationByGroup.map(g => `<tr><td>${g.name}</td><td>${g.count.toLocaleString('de-DE')}</td><td>${g.satisfaction}</td></tr>`).join('')}
       </table>
@@ -11058,6 +11626,177 @@ function renderAlerts() {
   const el = document.getElementById('alertList');
   if (!all.length) { el.innerHTML = '<div class="alertEmpty">Keine besonderen Vorkommnisse.</div>'; return; }
   el.innerHTML = all.map(a => `<div class="alertItem ${a.cls}"><span class="alertDot"></span>${a.text}</div>`).join('');
+}
+
+// ============================================================
+// §Phase-8C "Reich + Provinz + Wirtschaft" -- Bevölkerung, Nahrung,
+// Mini-Kassenbuch, Waren/Kategorien, Steuern, Handel, Risiken.
+// ============================================================
+
+let selectedPopGroupId = null;
+function togglePopGroupDetail(groupId) {
+  selectedPopGroupId = (selectedPopGroupId === groupId) ? null : groupId;
+  renderPopulationSection();
+}
+
+// §Phase-8C-Punkt 11-14: Gesamtübersicht zuerst, Gruppen als kompakte
+// Balken, Detail (Bedarf/Steuer/Geburten/Todesfälle) nur per Klick.
+function renderPopulationSection() {
+  const vm = getPopulationOverviewViewModel(state);
+  const trendHtml = vm.yearlyPct === null ? '' :
+    ` <span class="kpiTrend ${vm.yearlyDelta >= 0 ? 'up' : 'down'}">${vm.yearlyDelta >= 0 ? '↑ +' : '↓ '}${vm.yearlyPct}% im letzten Jahr</span>`;
+  document.getElementById('popOverview').innerHTML =
+    `<span class="kpiValue">${vm.totalPop.toLocaleString('de-DE')} Einwohner</span>${trendHtml}`;
+
+  document.getElementById('popGroupBars').innerHTML = vm.groups.map(g => `
+    <div class="popGroupBar${selectedPopGroupId === g.id ? ' active' : ''}" onclick="togglePopGroupDetail('${g.id}')">
+      <span class="popGroupBarName">${g.name}</span>
+      <span class="popGroupBarTrack"><span class="popGroupBarFill" style="width:${g.sharePct}%;"></span></span>
+      <span class="popGroupBarPct">${g.sharePct}%</span>
+    </div>`).join('');
+
+  const detailEl = document.getElementById('popGroupDetail');
+  if (!selectedPopGroupId) { detailEl.innerHTML = ''; return; }
+  const d = getPopulationGroupDetailViewModel(state, selectedPopGroupId);
+  if (!d) { detailEl.innerHTML = ''; return; }
+  detailEl.innerHTML = `
+    <b>${d.name}</b> — ${d.count.toLocaleString('de-DE')} Einwohner, Zufriedenheit ${d.satisfaction}<br>
+    Warenbedarf pro Kopf: ${d.needs.map(n => `${n.name} ${n.amountPerCapita}`).join(', ')}<br>
+    ${d.monthlyTaxIncome !== null ? `Steueraufkommen (letzter Monat): <b>${Math.round(d.monthlyTaxIncome).toLocaleString('de-DE')}</b> Taler<br>` : ''}
+    ${d.yearlyBirths !== null ? `Geburten dieses Jahr: <b>${d.yearlyBirths}</b> · Todesfälle: <b>${d.yearlyDeaths}</b>` : '<i>Noch keine Jahresdaten.</i>'}
+  `;
+}
+
+// §Phase-8C-Punkt 15/16: kompakter Status über der bestehenden, technisch
+// vollständigen Kornbilanz (#grainInfo, unverändert) -- Progressive Disclosure.
+function renderFoodSupplyWidget() {
+  const vm = getFoodSupplyViewModel(state);
+  document.getElementById('foodSupplyWidget').innerHTML = `
+    <span class="kpiValue">${vm.pct}%<span class="kpiStatus ${vm.status}">${vm.status}</span></span>
+    · Vorrat ${vm.stock.toLocaleString('de-DE')} · Jahresbedarf ${vm.yearlyNeed.toLocaleString('de-DE')} · Prognose: ${vm.forecast}
+    ${vm.criticalWarning ? `<div class="foodCritical">⚠ ${vm.criticalWarning}</div>` : ''}
+  `;
+}
+
+// §Phase-8C-Punkt 8-10: Mini-Kassenbuch -- nur eine kompakte Voransicht,
+// das vollständige Ledger (#ledgerModal) bleibt unverändert erreichbar.
+function renderMiniLedger() {
+  const vm = getMiniLedgerViewModel(state);
+  const el = document.getElementById('miniLedgerWidget');
+  if (!vm.available) { el.innerHTML = '<i>Noch kein Monat vergangen — das Kassenbuch füllt sich mit dem ersten Monatswechsel.</i>'; return; }
+  const rowsHtml = (entries, cls) => entries.map(e => `<div class="ledgerMiniRow ${cls}">${e.label}<span>${e.amount >= 0 ? '+' : ''}${Math.round(e.amount).toLocaleString('de-DE')}</span></div>`).join('') || '<i style="font-size:var(--fs-micro);">–</i>';
+  el.innerHTML = `
+    <div class="subhead" style="margin-top:0;">Mini-Kassenbuch (letzter Monat)</div>
+    <div class="ledgerMiniCol"><b>Einnahmen</b>${rowsHtml(vm.income, 'plus')}</div>
+    <div class="ledgerMiniCol"><b>Ausgaben</b>${rowsHtml(vm.expenses, 'minus')}</div>
+    <div class="ledgerMiniNet">Saldo: ${vm.net >= 0 ? '+' : ''}${vm.net.toLocaleString('de-DE')} Taler</div>
+    <button onclick="doShowFullLedger()">Kassenbuch öffnen</button>
+  `;
+}
+function doShowFullLedger() {
+  showLedger(state.lastMonthlyReport, false, state.titleIndex);
+}
+
+// §Phase-8C-Punkt 17-24: Waren nach Kategorie (grundnahrung/rohstoff/
+// verarbeitet/luxus, echte GOODS[gid].category) statt einer 24-Zeilen-
+// Tabelle. Kauf/Verkauf bleibt die bestehende doMarketTrade()-Funktion --
+// hier nur Darstellung + Navigation zum Detail.
+let selectedGoodsCategory = null;
+let selectedGoodId = null;
+function switchGoodsCategory(cat) {
+  selectedGoodsCategory = cat;
+  renderGoodsCategoryGrid();
+}
+function selectGood(goodId) {
+  selectedGoodId = (selectedGoodId === goodId) ? null : goodId;
+  renderGoodsCategoryGrid();
+  renderGoodDetail();
+}
+function renderGoodsCategoryGrid() {
+  const vm = getGoodsCategoryViewModel(state);
+  if (!selectedGoodsCategory || !vm.categories[selectedGoodsCategory]) selectedGoodsCategory = vm.order[0];
+  document.getElementById('goodsCategoryTabs').innerHTML = vm.order.map(cat =>
+    `<button class="goodsCatTab${cat === selectedGoodsCategory ? ' active' : ''}" onclick="switchGoodsCategory('${cat}')">${cat}</button>`).join('');
+
+  const goods = vm.categories[selectedGoodsCategory] || [];
+  document.getElementById('goodsCategoryGrid').innerHTML = goods.map(g => `
+    <div class="goodCard${selectedGoodId === g.id ? ' selected' : ''}" onclick="selectGood('${g.id}')">
+      <div class="goodCardName">${g.name}</div>
+      <div class="goodCardPrice">${g.price} Taler</div>
+      <div class="goodCardRow"><span>Lager</span><span>${g.stock.toLocaleString('de-DE')}</span></div>
+      ${g.gap !== null ? `<div class="goodCardRow goodCardGap ${g.gap >= 0 ? 'pos' : 'neg'}"><span>Produktion−Verbrauch</span><span>${g.gap >= 0 ? '+' : ''}${g.gap}</span></div>` : ''}
+    </div>`).join('');
+}
+
+// §Phase-8C-Punkt 22/23/27-31: echte Preiserklärung (computeRegionalPrices())
+// + Produktionskette aus der echten PRODUCTION_CHAINS-Rezeptliste, keine
+// Sci-Fi-Node-Grafik, nur Karten + Pfeile (§28/29).
+function renderGoodDetail() {
+  const el = document.getElementById('goodDetailPanel');
+  if (!selectedGoodId) { el.innerHTML = ''; return; }
+  const d = getGoodDetailViewModel(state, selectedGoodId);
+  if (!d) { el.innerHTML = ''; return; }
+  let html = `<b>${d.name}</b> (${d.category}) — ${d.price} Taler<br>`;
+  if (d.priceBreakdown) {
+    const pb = d.priceBreakdown;
+    html += `<div class="subhead">Warum ${pb.gesamt} Taler?</div>
+      Grundpreis ${pb.basis} · Nachfrage ${pb.nachfrage} · Angebot ${pb.angebot} · Marktstimmung ×${pb.marktstimmung} · Multiplikator ×${pb.multiplikator} = <b>${pb.gesamt}</b><br>`;
+  }
+  html += `Lager: ${d.stock.toLocaleString('de-DE')}`
+    + (d.production !== null ? ` · Produktion: <span class="goodgood">+${d.production}/Jahr</span>` : '')
+    + (d.consumption !== null ? ` · Verbrauch: <span class="goodbad">−${d.consumption}/Jahr</span>` : '')
+    + `<br><button class="dipbtn" onclick="doMarketTrade('${d.id}','buy')">Kaufen</button> <button class="dipbtn" onclick="doMarketTrade('${d.id}','sell')">Verkaufen</button>`;
+
+  if (d.chain && (d.chain.inputs.length || d.chain.outputs.length)) {
+    html += `<div class="subhead">Produktionskette</div>`;
+    for (const inp of d.chain.inputs) {
+      html += `<div class="chainRow">`;
+      if (inp.inputGoodId) html += `<span class="chainCard">${inp.inputGoodName}</span><span class="chainArrow">→</span>`;
+      html += `<span class="chainCard">${inp.buildingName || inp.workerGroupName}</span><span class="chainArrow">→</span><span class="chainCard">${d.name}</span></div>`;
+    }
+    for (const out of d.chain.outputs) {
+      html += `<div class="chainRow"><span class="chainCard">${d.name}</span><span class="chainArrow">→</span>`
+        + (out.buildingName ? `<span class="chainCard">${out.buildingName}</span><span class="chainArrow">→</span>` : '')
+        + `<span class="chainCard">${out.outputGoodName}</span></div>`;
+    }
+  }
+  el.innerHTML = html;
+}
+
+// §Phase-8C-Punkt 37-42: Steuern -- nur EIN regionsweiter Satz existiert,
+// wird ehrlich als gemeinsamer Satz je Gruppe dargestellt (keine erfundene
+// Differenzierung). Regler bleiben unverändert auf der PROVINZ-Seite.
+function renderTaxOverview() {
+  const vm = getTaxViewModel(state);
+  let html = `<table><tr><th>Gruppe</th><th>Satz</th><th>Einnahmen (Monat)</th><th>Zufriedenheitseffekt</th></tr>`;
+  for (const g of vm.groups) {
+    html += `<tr><td>${g.name}</td><td>${g.ratePct}%</td><td>${g.monthlyIncome !== null ? Math.round(g.monthlyIncome).toLocaleString('de-DE') : '–'}</td><td>${g.satisfactionEffect}/Jahr</td></tr>`;
+  }
+  html += `</table><div style="font-size:var(--fs-micro); color:var(--umber); margin-top:4px;">Ein einziger, regionsweiter Steuersatz gilt für alle Gruppen gleich (Regler auf der PROVINZ-Seite) — nur die Einnahmen unterscheiden sich nach Bevölkerungsgewicht.</div>`;
+  document.getElementById('taxOverviewPanel').innerHTML = html;
+}
+
+// §Phase-8C-Punkt 32-36: Handelsübersicht -- echtes Räuberrisiko aus
+// CONFIG.interregionalTrade, ergänzt die bestehende Arbitrage-Werkzeugzeile
+// darunter (unverändert).
+function renderTradeOverview() {
+  const vm = getTradeViewModel(state);
+  const el = document.getElementById('tradeOverviewPanel');
+  if (!vm.partners.length) { el.innerHTML = '<i>Noch keine Handelsverträge geschlossen (siehe Diplomatie).</i>'; return; }
+  el.innerHTML = vm.partners.map(p => `
+    <div class="tradePartnerCard">
+      <b>${p.name}</b> — Beziehung ${p.relation}<br>
+      Räuberrisiko: <span data-tip="Bei einem Überfall geht ${vm.banditLossSharePct}% der Ladung verloren.">${p.riskLabel} (${p.riskPct}%)</span>${p.hasTransitRights ? ' · Durchmarschrecht senkt das Risiko' : ''} · Transportkosten ${vm.transportCostPct}%
+    </div>`).join('');
+}
+
+// §Phase-8C-Punkt 25/26: nur bereits berechenbare Probleme, keine neuen
+// Schwellen ohne Vorbild (siehe js/ui-viewmodels.js für die Quellen).
+function renderEconomicRisks() {
+  const risks = getEconomicRisksViewModel(state);
+  const el = document.getElementById('economicRisksPanel');
+  if (!risks.length) { el.innerHTML = '<div class="alertEmpty">Keine erkennbaren wirtschaftlichen Risiken.</div>'; return; }
+  el.innerHTML = risks.map(r => `<div class="alertItem ${r.kind === 'shortfall' ? 'crit' : 'important'}"><span class="alertDot"></span>${r.text}</div>`).join('');
 }
 
 function renderMilitary() {
