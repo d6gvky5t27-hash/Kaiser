@@ -60,6 +60,7 @@ const FILES = [
   "battle-engine/battle-engine.js",
   "battle-engine/battle-state-machine.js",
   "js/battle-bridge.js",
+  "js/ui-viewmodels.js",
 ];
 
 function fail(msg) {
