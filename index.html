@@ -689,6 +689,28 @@
       <button onclick="doShowDramaDebug()">Anzeigen</button>
       <div id="dramaDebugOutput" style="margin-top:var(--sp-2); white-space:pre-line; max-height:300px; overflow-y:auto; border:2px solid #0a0c11; padding:6px; background:rgba(0,0,0,0.05);"></div>
     </div>
+    <div style="margin-top:var(--sp-2);">
+      <b>Chronik-Kandidaten (§Phase-7-Punkt 56-58 — Memory/Importance/Always?/Score/Aufgenommen?/Warum):</b><br>
+      <select id="chronicleDebugSelect"></select>
+      <button onclick="doShowChronicleDebug()">Prüfen</button>
+      <div id="chronicleDebugOutput" style="margin-top:var(--sp-2); white-space:pre-line; max-height:300px; overflow-y:auto; border:2px solid #0a0c11; padding:6px; background:rgba(0,0,0,0.05);"></div>
+    </div>
+    <div style="margin-top:var(--sp-2);">
+      <b>Dynasty Chronicle (§Phase-7-Punkt 15-27 — nur bedeutsame Ereignisse, abgeleitet):</b><br>
+      <button onclick="doShowDynastyChronicle()">Anzeigen</button>
+      <div id="dynastyChronicleOutput" style="margin-top:var(--sp-2); white-space:pre-line; max-height:300px; overflow-y:auto; border:2px solid #0a0c11; padding:6px; background:rgba(0,0,0,0.05);"></div>
+    </div>
+    <div style="margin-top:var(--sp-2);">
+      <b>Herrscher-Chronik / Biografie (§Phase-7-Punkt 28-33/72-75):</b><br>
+      <select id="rulerEraDebugSelect"></select>
+      <button onclick="doShowRulerEraDebug()">Anzeigen</button>
+      <div id="rulerEraDebugOutput" style="margin-top:var(--sp-2); white-space:pre-line; max-height:300px; overflow-y:auto; border:2px solid #0a0c11; padding:6px; background:rgba(0,0,0,0.05);"></div>
+    </div>
+    <div style="margin-top:var(--sp-2);">
+      <b>Dynasty Summary / Meilensteine (§Phase-7-Punkt 34-35/76-79):</b><br>
+      <button onclick="doShowDynastySummaryDebug()">Anzeigen</button>
+      <div id="dynastySummaryDebugOutput" style="margin-top:var(--sp-2); white-space:pre-line; max-height:300px; overflow-y:auto; border:2px solid #0a0c11; padding:6px; background:rgba(0,0,0,0.05);"></div>
+    </div>
   </div>
 </div>
 
@@ -1334,6 +1356,14 @@ const CONFIG = {
       highLoyaltyBonus: -5, highLoyaltyThreshold: 70,
       recentResolutionBonus: -4, recentResolutionYears: 3,
     },
+  },
+  // ---------- Phase 7: Narrative Calibration & Chronicle 2.0 (§Punkt 19/20/36) ----------
+  chronicle: {
+    scoredThreshold: 45,        // §Punkt 19/20: SCORED CHRONICLE — ab diesem Score chronikwürdig
+    threadSummaryThreshold: 50, // deckt sich bewusst mit dem MAJOR_STORY_RESOLVED-Schwellenwert aus Phase 6
+    rulerInvolvedBonus: 10,
+    heirInvolvedBonus: 8,
+    threadLinkBonusFactor: 0.2, // Anteil der Thread-Importance, der den Score einer verknüpften Memory anhebt
   },
 };
 
@@ -2656,6 +2686,10 @@ const MEMORY_TYPES = {
   // einer bedeutsamen Story-Thread-Geschichte, wiederverwendet über alle
   // 8 Thread-Typen hinweg — keine Memory-Typ-Explosion.
   MAJOR_STORY_RESOLVED:      { importance: 70, decayRate: 0, direction: "none", tags: ["story", "resolution"] },
+  // --- neu in Phase 7 (§Punkt 84): das Ende einer Dynastie war bisher NUR
+  // ein Chronik-String, keine Memory — ohne Memory hätte Dynasty
+  // Chronicle 2.0 dieses zentrale Schlussereignis nicht finden können.
+  DYNASTY_ENDED:             { importance: 100, decayRate: 0, direction: "none", tags: ["dynasty", "ending"] },
 };
 
 // Event-System: TRIGGER/BEDINGUNGEN/TEXT/ENTSCHEIDUNGEN/KONSEQUENZEN (§38)
@@ -3320,7 +3354,7 @@ function newGame(options) {
     vassals: {}, // §29 Vasallisierung: { aiId: true }
     stats: { // §87 Spielende-Auswertung
       maxPopulation: 0, maxTreasury: 0, warsWon: 0, warsLost: 0,
-      generations: 1, disastersCount: 0, highestTitleIndex: 0,
+      generations: 1, disastersCount: 0, highestTitleIndex: 0, maxLand: 0,
     },
     log: [],
     pendingEvent: null,
@@ -3336,6 +3370,7 @@ function newGame(options) {
       recentIntensity: [], focusThreadId: null, recoveryWindowUntilYear: null, pacing: "QUIET",
       tensionBreakdown: [],
     },
+    rulerEraSnapshots: {}, // §Phase-7 Chronik 2.0: rulerId -> {year, population, treasury, prestige, titleIndex}, siehe js/chronicle.js
   };
 
   for (const ext of EXTRA_REGIONS) {
@@ -3352,6 +3387,7 @@ function newGame(options) {
   const id = nextCharId();
   state.characters[id] = ruler;
   state.rulerId = id;
+  snapshotRulerEraStart(state, id); // §Phase-7-Punkt 74: Ausgangswerte für die spätere Regentschaftszusammenfassung
 
   addChronicle(state, `Im Jahre 1500 übernahm ${ruler.name} ${dynastyName} die Herrschaft über ${state.regions.player.name}.`);
   initTerritories(state); // Kriegskarte (§Original-Vertiefung): Gebietsbesitz/Garnisonen initialisieren
@@ -3374,7 +3410,7 @@ function logLedger(state, label, amount) {
 
 // ---------- Landwirtschaft (§18/§19) ----------
 
-const SAVE_VERSION = 6;
+const SAVE_VERSION = 7;
 
 function serializeSave(state) {
   return JSON.stringify({
@@ -3481,12 +3517,41 @@ function migrateSaveV5ToV6(parsed) {
   return parsed;
 }
 
+// §Phase-7-Punkt 59-61: Resolution 2.0 ändert `thread.resolution` von einem
+// bloßen String zu einem strukturierten Objekt (§Punkt 8) — bereits
+// abgeschlossene Phase-6-Threads bekommen ihre Klassifikation NACHTRÄGLICH
+// über dieselbe classifyThreadResolution()-Funktion neu berechnet. Das ist
+// KEINE Fiktion (§Punkt 60): die Funktion liest ausschließlich bereits
+// real gespeicherte Fakten (abgeschlossene Chains, aktuelle Beziehungen) —
+// dasselbe echte Ergebnis, nur endlich korrekt kategorisiert, mit dem
+// ursprünglichen Jahr aus der History statt dem Migrationsjahr.
+// `state.rulerEraSnapshots` bleibt bewusst LEER (§Punkt 75: kein
+// erfundener Vorher-Wert für bereits vergangene Regentschaften).
+function migrateSaveV6ToV7(parsed) {
+  const s = parsed.state;
+  const allThreads = Object.assign({}, s.storyThreads.active, s.storyThreads.resolved);
+  for (const id in allThreads) {
+    const thread = allThreads[id];
+    if (thread.resolution && typeof thread.resolution === "string") {
+      const originalYear = thread.history && thread.history.length ? thread.history[thread.history.length - 1].year : thread.startedYear;
+      const reclassified = classifyThreadResolution(s, thread, "NATURAL_END");
+      reclassified.year = originalYear;
+      reclassified.legacyLabel = thread.resolution; // ursprünglicher String bleibt nachvollziehbar erhalten
+      thread.resolution = reclassified;
+    }
+  }
+  if (!s.rulerEraSnapshots) s.rulerEraSnapshots = {};
+  parsed.saveVersion = 7;
+  return parsed;
+}
+
 function deserializeSave(json) {
   let parsed = JSON.parse(json);
   if (parsed.saveVersion === 2) parsed = migrateSaveV2ToV3(parsed);
   if (parsed.saveVersion === 3) parsed = migrateSaveV3ToV4(parsed);
   if (parsed.saveVersion === 4) parsed = migrateSaveV4ToV5(parsed);
   if (parsed.saveVersion === 5) parsed = migrateSaveV5ToV6(parsed);
+  if (parsed.saveVersion === 6) parsed = migrateSaveV6ToV7(parsed);
   if (parsed.saveVersion !== SAVE_VERSION) {
     throw new Error("Inkompatible Spielstand-Version: " + parsed.saveVersion);
   }
@@ -4166,7 +4231,18 @@ function handleSuccession(state) {
 
   if (heirs.length === 0) {
     state.gameOver = "no_heir";
-    addChronicle(state, `Die Dynastie ${oldRuler.surname} stirbt ohne Erben aus. Deine Herrschaft endet.`);
+    const desc = `Mit dem Tod ${oldRuler.name} ${oldRuler.surname || ""}s im Jahre ${state.year} erlosch das Haus ${oldRuler.surname || ""} in direkter Linie.`.replace(/\s+/g, " ");
+    addChronicle(state, desc);
+    // §Phase-7-Punkt 83/84: das Aussterben der Dynastie ist der größtmögliche
+    // Schlusspunkt der gesamten Geschichte — bisher gab es dafür KEINE
+    // Memory (nur den Chronik-String), wodurch Dynasty Chronicle 2.0 dieses
+    // zentrale Ereignis nicht hätte finden können. Einziger neuer
+    // Memory-Typ dieser Phase (§Punkt 19-Analogon: nur wirklich nötig).
+    recordWorldEvent(state, {
+      type: "DYNASTY_ENDED", actorIds: [state.rulerId], targetIds: [],
+      emotionalWeight: -70, metadata: { surname: oldRuler.surname || "" },
+      description: desc,
+    });
     return;
   }
   const heir = heirs[0];
@@ -4213,6 +4289,7 @@ function handleSuccession(state) {
   }
 
   state.rulerId = heirId;
+  snapshotRulerEraStart(state, heirId); // §Phase-7-Punkt 74: Vorher/Nachher-Grundlage für die Regentschaftszusammenfassung
   addChronicle(state, `${heir.name} ${heir.surname} tritt im Alter von ${heir.age} Jahren die Nachfolge an.`);
   recordWorldEvent(state, {
     type: "SUCCESSION", actorIds: [oldRulerId], targetIds: [heirId],
@@ -4908,19 +4985,91 @@ function recordThreadHistory(thread, year, note) {
   thread.history.push({ year, status: thread.status, note });
 }
 
-// ---------- Importance/Momentum (§Punkt 30/32) ----------
-function computeThreadImportance(state, thread) {
-  let imp = 20;
+// ---------- Importance 2.0 (§Phase-7-Punkt 3-7) ----------
+// Wichtigster Audit-Fund vor dieser Überarbeitung (§Punkt 2/3): Importance
+// variierte für SUCCESSION_CONFLICT/PERSONAL_RIVALRY praktisch GAR NICHT
+// (jede der 115 SUCCESSION_CONFLICT-Threads in den Phase-6-Metriken hatte
+// exakt Importance 43) — Ursache war, dass `thread.actorIds` für diese
+// Typen bewusst nur die GEGENSPIELER-ID enthält, nie die des Herrschers
+// (der wird absichtlich LIVE über state.rulerId referenziert, §Phase-6-
+// Punkt 59-Analogon) — der alte `actorIds.includes(state.rulerId)`-Check
+// konnte dadurch strukturell NIE zutreffen. Behoben durch eine explizite
+// `threadInvolvesRuler()`-Prüfung statt einer reinen ID-Mitgliedschaft.
+// Wichtig (§Punkt 7): Importance ist NICHT Tension — ein friedlich
+// gelöster Thronfolgestreit kann Tension 0, aber Importance 80+ behalten
+// (Tension wird oben nie in die Importance-Formel einbezogen).
+function threadInvolvesRuler(state, thread) {
+  if (thread.actorIds.includes(state.rulerId)) return true;
+  if (thread.regionIds.includes("player")) return true;
+  // Diese drei Typen sind per Definition IMMER auf den Herrscher bezogen
+  // (Rivalität/Anspruch gegen ihn, eigene kaiserliche Ambition) — das ist
+  // keine erfundene Pauschale, sondern folgt direkt aus den jeweiligen
+  // detect()-Funktionen oben, die genau das voraussetzen.
+  return thread.type === "SUCCESSION_CONFLICT" || thread.type === "PERSONAL_RIVALRY" || thread.type === "IMPERIAL_AMBITION";
+}
+
+function threadInvolvesHeir(state, thread) {
   const ruler = state.characters[state.rulerId];
-  if (thread.actorIds.includes(state.rulerId)) imp += 20;
-  if (ruler && thread.actorIds.some(id => ruler.childrenIds.includes(id))) imp += 15; // Erbe beteiligt
-  if (thread.regionIds.includes("player")) imp += 10;
-  if (thread.type === "FOOD_CRISIS" || thread.type === "ECONOMIC_CRISIS") imp += 10; // betrifft die Bevölkerung
-  if (thread.type === "IMPERIAL_AMBITION") imp += 25; // Kaiserwahl, §Punkt 56 "sehr groß"
-  if (thread.type === "SUCCESSION_CONFLICT") imp += 20; // Thronfolge, §Punkt 56 "groß"
-  if (thread.type === "FOREIGN_CONFLICT" && thread.regionIds.some(id => state.warState && state.warState[id])) imp += 15; // echter Krieg
-  imp += Math.min(thread.memoryIds.length * 3, 15); // historischer Einfluss
-  return clamp(Math.round(imp), 0, 100);
+  if (ruler && thread.actorIds.some(id => ruler.childrenIds.includes(id))) return true;
+  // Ein Thronfolgestreit handelt per Definition davon, wer die Nachfolge
+  // antritt/angetreten hat — der (unbeteiligte) Thronfolger ist die
+  // implizite Gegenseite jedes SUCCESSION_CONFLICT-Threads.
+  return thread.type === "SUCCESSION_CONFLICT";
+}
+
+// §Punkt 6: vollständig aufgeschlüsselte, debuggbare Komponenten statt
+// einer Blackbox — dieselbe Struktur dient sowohl der internen Berechnung
+// als auch explainThreadImportance() fürs Debug-Panel (eine Quelle der
+// Wahrheit).
+function computeThreadImportanceBreakdown(state, thread) {
+  const components = [{ label: "Basis", value: 15 }];
+  let total = 15;
+  const add = (label, value) => { if (value) { components.push({ label, value }); total += value; } };
+
+  add("Herrscher beteiligt", threadInvolvesRuler(state, thread) ? 15 : 0);
+  add("Thronfolger betroffen", threadInvolvesHeir(state, thread) ? 15 : 0);
+
+  const strongClaim = thread.actorIds.some(id => {
+    const c = state.characters[id];
+    return c && c.claims.some(cl => cl.titleId === "player" && (cl.strength === "strong" || cl.strength === "primary"));
+  });
+  add("Starker Anspruch beteiligt", strongClaim ? 10 : 0);
+
+  const ruler = state.characters[state.rulerId];
+  const rivalryInvolved = thread.type === "PERSONAL_RIVALRY" || thread.type === "SUCCESSION_CONFLICT" ||
+    (ruler && thread.actorIds.some(id => ruler.rivalIds.includes(id)));
+  add("Rivalität", rivalryInvolved ? 8 : 0);
+
+  const atWar = thread.type === "FOREIGN_CONFLICT" && thread.regionIds.some(id => state.warState && state.warState[id]);
+  add("Krieg", atWar ? 20 : 0);
+
+  const rulerChangedDuring = thread.history.some(h => h.note && h.note.includes("Herrscher wechselte"));
+  add("Herrscherwechsel während der Geschichte", rulerChangedDuring ? 10 : 0);
+
+  add("Wirtschaftlicher/Versorgungsschaden", (thread.type === "ECONOMIC_CRISIS" || thread.type === "FOOD_CRISIS") ? 12 : 0);
+
+  const endYear = thread.history.length ? thread.history[thread.history.length - 1].year : state.year;
+  const duration = Math.max(0, endYear - thread.startedYear);
+  add(`Dauer ${duration} Jahre`, Math.min(Math.round(duration / 2), 15));
+
+  add(`${thread.memoryIds.length} bedeutende Erinnerung(en)`, Math.min(thread.memoryIds.length * 4, 16));
+
+  add("Kaiser-/Titelbezug", thread.type === "IMPERIAL_AMBITION" ? 20 : 0);
+
+  const reachedClimax = thread.history.some(h => h.status === "CLIMAX");
+  add("CLIMAX erreicht", reachedClimax ? 15 : 0);
+
+  add(`${thread.chainIds.length} Event Chain(s)`, Math.min(thread.chainIds.length * 5, 15));
+
+  return { components, total: clamp(Math.round(total), 0, 100) };
+}
+
+function computeThreadImportance(state, thread) {
+  return computeThreadImportanceBreakdown(state, thread).total;
+}
+
+function explainThreadImportance(state, thread) {
+  return computeThreadImportanceBreakdown(state, thread);
 }
 
 function updateThreadMomentum(thread, gainedNewSignal) {
@@ -4953,18 +5102,101 @@ function threadParticipantsAlive(state, thread) {
   return thread.actorIds.every(id => { const c = state.characters[id]; return c ? c.alive : true; });
 }
 
-function resolveStoryThread(state, thread, resolution) {
+// ---------- Resolution 2.0 (§Phase-7-Punkt 8-13) ----------
+// Bildet einen abgeschlossenen Chain-Ausgang (Phase 5, bereits vorhanden)
+// auf eine der 14 vereinheitlichten Thread-Resolution-Kategorien ab.
+// AUSSCHLIESSLICH echte, bereits vorhandene Daten (§Punkt 11) — kein
+// rnd()-Aufruf. `tone` beschreibt den dramaturgischen Ausgang, keine
+// moralische Bewertung (§Punkt 10/42).
+const CHAIN_OUTCOME_RESOLUTION_MAP = {
+  APPOINTED: { type: "APPOINTED", tone: "PEACEFUL", outcome: "POSITIVE" },
+  RECONCILED: { type: "RECONCILED", tone: "PEACEFUL", outcome: "POSITIVE" },
+  COMPENSATED: { type: "COMPROMISE", tone: "PEACEFUL", outcome: "POSITIVE" },
+  PROMISED: { type: "COMPROMISE", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  MARRIED: { type: "MARRIED", tone: "TRIUMPHANT", outcome: "POSITIVE" },
+  MARRIED_WITH_DOWRY: { type: "MARRIED", tone: "TRIUMPHANT", outcome: "POSITIVE" },
+  ESCALATED: { type: "ESCALATED", tone: "CONFLICT", outcome: "NEGATIVE" },
+  SIDE_CHANGED: { type: "ESCALATED", tone: "CONFLICT", outcome: "NEGATIVE" },
+  RESIGNED: { type: "ESCALATED", tone: "CONFLICT", outcome: "NEGATIVE" },
+  PUBLICLY_EXPOSED: { type: "SUCCESS", tone: "TRIUMPHANT", outcome: "POSITIVE" },
+  FAILED_ACCUSATION: { type: "FAILED", tone: "TRAGIC", outcome: "NEGATIVE" },
+  DISMISSED: { type: "SUCCESS", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  QUIET_AUDIT: { type: "SUCCESS", tone: "AMBIGUOUS", outcome: "POSITIVE" },
+  NOT_PROVEN: { type: "SUPPRESSED", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  IGNORED: { type: "SUPPRESSED", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  RECOVERED: { type: "SUCCESS", tone: "PEACEFUL", outcome: "POSITIVE" },
+  PROLONGED: { type: "FAILED", tone: "TRAGIC", outcome: "NEGATIVE" },
+  TAX_LOWERED: { type: "COMPROMISE", tone: "PEACEFUL", outcome: "POSITIVE" },
+  PRIVILEGE_GRANTED: { type: "COMPROMISE", tone: "PEACEFUL", outcome: "POSITIVE" },
+  DEESCALATED: { type: "RECONCILED", tone: "PEACEFUL", outcome: "POSITIVE" },
+  APOLOGY: { type: "RECONCILED", tone: "PEACEFUL", outcome: "POSITIVE" },
+  COMPENSATION: { type: "COMPROMISE", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  MOBILIZED: { type: "ESCALATED", tone: "CONFLICT", outcome: "NEGATIVE" },
+  DECLINED: { type: "ABANDONED", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  CONCESSION: { type: "COMPROMISE", tone: "PEACEFUL", outcome: "POSITIVE" },
+  NEGOTIATED: { type: "COMPROMISE", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  REFUSED: { type: "ESCALATED", tone: "CONFLICT", outcome: "NEGATIVE" },
+  ISOLATED: { type: "SUPPRESSED", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  MONITORED: { type: "NATURAL_END", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  CAMPAIGNING: { type: "SUCCESS", tone: "TRIUMPHANT", outcome: "POSITIVE" },
+  DISCREET_SUPPORT: { type: "SUCCESS", tone: "AMBIGUOUS", outcome: "POSITIVE" },
+  DEFERRED: { type: "ABANDONED", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  PARTIAL_RECONCILIATION: { type: "COMPROMISE", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+};
+
+function classifyThreadResolution(state, thread, fallbackType) {
+  const primaryActorId = thread.actorIds[0] || null;
+  const sourceChainIds = thread.chainIds.slice();
+  const consequences = [];
+
+  // 1. Tod eines Beteiligten übersticht alles andere.
+  if (primaryActorId && state.characters[primaryActorId] && !state.characters[primaryActorId].alive) {
+    return { type: "DIED", tone: "TRAGIC", outcome: "NEGATIVE", primaryActorId, consequences: ["Ein zentraler Beteiligter ist verstorben."], sourceChainIds };
+  }
+  // 2. Auswärtiger Konflikt: Krieg oder Frieden ist bereits eindeutig im Weltzustand sichtbar.
+  if (thread.type === "FOREIGN_CONFLICT") {
+    const atWar = thread.regionIds.some(id => state.warState && state.warState[id]);
+    return atWar
+      ? { type: "WAR", tone: "CONFLICT", outcome: "NEGATIVE", primaryActorId, consequences, sourceChainIds }
+      : { type: "PEACE", tone: "PEACEFUL", outcome: "POSITIVE", primaryActorId, consequences, sourceChainIds };
+  }
+  // 3. Letzter abgeschlossener Chain-Ausgang (Phase 5) ist die genaueste Quelle.
+  const lastResolvedChainId = sourceChainIds.slice().reverse().find(cid => state.eventChains.resolved[cid]);
+  const lastChain = lastResolvedChainId ? state.eventChains.resolved[lastResolvedChainId] : null;
+  if (lastChain) {
+    const mapped = CHAIN_OUTCOME_RESOLUTION_MAP[lastChain.resolution];
+    if (mapped) {
+      if (primaryActorId) {
+        const rel = computeRelationshipBreakdown(state, primaryActorId, state.rulerId).total;
+        if (rel > 10) consequences.push("Die Beziehung hat sich deutlich verbessert.");
+        else if (rel < -10) consequences.push("Die Beziehung bleibt angespannt.");
+      }
+      return Object.assign({ primaryActorId, consequences, sourceChainIds }, mapped);
+    }
+  }
+  // 4. Fallback für Threads ohne (noch) abgeschlossene Chain: aktuelle Beziehung.
+  if (primaryActorId) {
+    const rel = computeRelationshipBreakdown(state, primaryActorId, state.rulerId).total;
+    if (rel >= 20) return { type: "RECONCILED", tone: "PEACEFUL", outcome: "POSITIVE", primaryActorId, consequences: ["Die Beziehung hat sich deutlich erholt."], sourceChainIds };
+    if (rel <= -20) return { type: "SUPPRESSED", tone: "AMBIGUOUS", outcome: "NEUTRAL", primaryActorId, consequences: [], sourceChainIds };
+  }
+  return { type: fallbackType || "NATURAL_END", tone: "AMBIGUOUS", outcome: "NEUTRAL", primaryActorId, consequences: [], sourceChainIds };
+}
+
+function resolveStoryThread(state, thread, fallbackType) {
+  const resolution = classifyThreadResolution(state, thread, fallbackType);
+  resolution.year = state.year;
   thread.status = "RESOLVED";
   thread.stage = STAGE_FOR_STATUS.RESOLVED;
   thread.resolution = resolution;
-  recordThreadHistory(thread, state.year, `${thread.title}: ${resolution}.`);
+  recordThreadHistory(thread, state.year, `${thread.title}: ${resolution.type} (${resolution.tone}).`);
   // §Punkt 70: nur wirklich bedeutsame Geschichten hinterlassen eine
   // strukturierte Abschluss-Memory — keine Memory-Typ-/Mengen-Explosion.
   if (thread.importance >= 50) {
     const memory = recordWorldEvent(state, {
       type: "MAJOR_STORY_RESOLVED", actorIds: thread.actorIds.slice(), regionIds: thread.regionIds.slice(),
-      importance: thread.importance, emotionalWeight: 0,
-      metadata: { threadId: thread.id, threadType: thread.type },
+      importance: thread.importance, emotionalWeight: resolution.outcome === "POSITIVE" ? 20 : (resolution.outcome === "NEGATIVE" ? -20 : 0),
+      metadata: { threadId: thread.id, threadType: thread.type, resolutionType: resolution.type },
       description: `${thread.title} findet ihren Abschluss.`,
     });
     thread.memoryIds.push(memory.id);
@@ -4974,10 +5206,12 @@ function resolveStoryThread(state, thread, resolution) {
 }
 
 function expireStoryThread(state, thread, reason) {
+  const resolution = classifyThreadResolution(state, thread, "NATURAL_END");
+  resolution.year = state.year;
   thread.status = "EXPIRED";
   thread.stage = STAGE_FOR_STATUS.EXPIRED;
-  thread.resolution = reason;
-  recordThreadHistory(thread, state.year, `${thread.title}: ${reason}.`);
+  thread.resolution = resolution;
+  recordThreadHistory(thread, state.year, `${thread.title}: ${reason} (${resolution.type}).`);
   delete state.storyThreads.active[thread.id];
   state.storyThreads.resolved[thread.id] = thread;
 }
@@ -4988,7 +5222,19 @@ function advanceStoryThread(state, thread) {
 
   const typeDef = STORY_THREAD_TYPES[thread.type];
   const signals = typeDef ? typeDef.detect(state) : [];
-  const matching = signals.find(s => candidateMatchesThread(thread, s));
+  let matching = signals.find(s => candidateMatchesThread(thread, s));
+  // §Phase-7-Audit-Fund: eine gerade laufende, an diesen Thread angehängte
+  // Event Chain IST selbst ein echtes, objektiv vorhandenes Signal — der
+  // generische Typ-Detektor (oben) ist auf DISCOVERY zugeschnitten und
+  // erkennt eine reine Chain-Situation (z. B. "Berater wurde übergangen",
+  // ohne dass daraus schon eine Rivalität geworden ist) nicht immer als
+  // "Rivalität". Ohne diesen Fallback fielen chain-getriebene Threads nach
+  // nur einem Jahr fälschlich auf FADED zurück, sobald der generische
+  // Detektor (der etwas anderes prüft) nicht zufällig mitbestätigte.
+  if (!matching) {
+    const hasActiveChain = thread.chainIds.some(cid => state.eventChains.active[cid]);
+    if (hasActiveChain) matching = { strength: Math.max(thread.tension, 45), memoryIds: [] };
+  }
 
   let gainedNewSignal = false;
   if (matching) {
@@ -5012,9 +5258,9 @@ function advanceStoryThread(state, thread) {
     if (thread.status === "CLIMAX" || thread.status === "ACTIVE") {
       thread.status = "AFTERMATH";
     } else if (thread.status === "AFTERMATH") {
-      if (yearsSinceActivity >= CONFIG.storyThreads.aftermathYears) { resolveStoryThread(state, thread, "RESOLVED"); return; }
+      if (yearsSinceActivity >= CONFIG.storyThreads.aftermathYears) { resolveStoryThread(state, thread, "NATURAL_END"); return; }
     } else if (thread.status === "BUILDING" || thread.status === "DORMANT") {
-      resolveStoryThread(state, thread, "FADED"); // wurde nie zu einer richtigen Geschichte
+      resolveStoryThread(state, thread, "ABANDONED"); // wurde nie zu einer richtigen Geschichte
       return;
     }
   } else {
@@ -5111,8 +5357,14 @@ function summarizeStoryThread(thread) {
     ? `${thread.startedYear}–${thread.history[thread.history.length - 1].year}`
     : `${thread.startedYear}–`;
   const lines = thread.history.map(h => `${h.year}:\n${h.note}`);
-  return `${thread.title.toUpperCase()}\n${years}\n` + lines.join("\n") +
-    (thread.resolution ? `\nERGEBNIS:\n${thread.resolution}` : "");
+  let result = `${thread.title.toUpperCase()}\n${years}\n` + lines.join("\n");
+  if (thread.resolution) {
+    result += `\nERGEBNIS:\n${thread.resolution.type} (${thread.resolution.tone})`;
+    if (thread.resolution.consequences && thread.resolution.consequences.length) {
+      result += "\n" + thread.resolution.consequences.join(" ");
+    }
+  }
+  return result;
 }
 
 // §Punkt 45/46-Analogon: "warum (nicht) als Thread erkannt?"
@@ -5546,14 +5798,17 @@ function notifyEventChainsOfSuccession(state, oldRulerId, newRulerId) {
 // Templates ist bewusst von großzügig/entgegenkommend zu hart/ablehnend
 // sortiert (siehe die jeweiligen queueChainDecision()-Aufrufe oben) — daher
 // ist "erste Option" eine sinnvolle CONCILIATORY- und "letzte Option" eine
-// sinnvolle AGGRESSIVE-Näherung, ohne dass Optionen einen eigenen
-// Metadaten-Tag brauchen.
+// sinnvolle AGGRESSIVE/HARDLINE-Näherung, ohne dass Optionen einen eigenen
+// Metadaten-Tag brauchen (§Phase-7-Punkt 43-49: HARDLINE ist bewusst ein
+// semantischer Alias von AGGRESSIVE — dieselbe "immer die härteste Option"-
+// Auswahl, nur unter dem im Phase-7-Auftrag verlangten Namen, damit die
+// Policy-Vergleichsmetriken vier klar benannte Policies zeigen).
 function resolvePendingEventWithPolicy(state, policy) {
   const ev = state.pendingEvent;
   if (!ev || !ev.options || !ev.options.length) return false;
   let idx = 0;
   if (policy === "RANDOM_VALID_OPTION") idx = Math.floor(rnd() * ev.options.length);
-  else if (policy === "AGGRESSIVE") idx = ev.options.length - 1;
+  else if (policy === "AGGRESSIVE" || policy === "HARDLINE") idx = ev.options.length - 1;
   else if (policy === "CONCILIATORY") idx = 0;
   else idx = 0; // FIRST_OPTION (Default)
   ev.options[idx].apply(state.regions.player, state);
@@ -6306,6 +6561,281 @@ const CHAIN_TEMPLATES = {
 };
 
 // ============================================================
+// CHRONICLE 2.0 — Phase 7 "Narrative Calibration & Chronicle 2.0": trennt
+// den bestehenden, vollständigen Chronik-String (`state.chronicle`, bleibt
+// UNVERÄNDERT bestehen) konzeptionell in zwei Ebenen (§Punkt 15-17):
+//
+//   WORLD LOG        = `state.chronicle` selbst (Wetter, Routine, alles).
+//   DYNASTY CHRONICLE = computeDynastyChronicle() — eine streng selektierte,
+//                        strukturierte Sicht NUR auf tatsächlich bedeutende
+//                        Ereignisse.
+//
+// Bewusste Architekturentscheidung: die Dynasty Chronicle wird NICHT als
+// eigener, inkrementell gepflegter State-Zweig aufgebaut (das hätte 50+
+// bestehende addChronicle()-Aufrufstellen in praktisch jeder Datei
+// angefasst — ein Umbau-Risiko weit über den Rahmen dieser Kalibrierungs-
+// Phase hinaus). Stattdessen wird sie ON DEMAND aus bereits vorhandenen,
+// strukturierten Quellen ABGELEITET: World Memory (state.memories.byId)
+// + Story Thread Resolutions (Phase 6). Praktisch jedes bedeutende
+// Ereignis erzeugt bereits eine Memory (Geburt, Tod, Heirat, Titel, Krieg,
+// Frieden, Wahl, …) — reines Wetter/Routine erzeugt dagegen NIE eine
+// Memory, wodurch Regel §18 ("normales Wetter gehört nicht in die Dynasty
+// Chronicle") automatisch aus der bestehenden Architektur folgt, ohne
+// Text parsen zu müssen. §68 (Wetter MIT echten Folgen darf Teil der
+// Geschichte sein) ist ebenso automatisch erfüllt: eine echte Hungerkrise
+// erzeugt bereits eine FAMINE-Memory, unabhängig vom Wettertext selbst.
+// ============================================================
+
+// §Punkt 20/21: unabhängig vom berechneten Score IMMER chronikwürdig.
+const ALWAYS_CHRONICLE_MEMORY_TYPES = new Set([
+  "RULER_DIED", "SUCCESSION", "HEIR_BORN", "TITLE_GAINED",
+  "WAR_DECLARED", "PEACE_SIGNED", "DYNASTY_ENDED",
+]);
+
+function chronicleCategoryForMemoryType(type) {
+  const cfg = MEMORY_TYPES[type];
+  if (!cfg) return "SONSTIGES";
+  if (cfg.tags.includes("dynasty")) return "DYNASTIE";
+  if (cfg.tags.includes("war")) return "KRIEG";
+  if (cfg.tags.includes("famine") || cfg.tags.includes("disaster")) return "KRISE";
+  if (cfg.tags.includes("politics")) return "POLITIK";
+  if (cfg.tags.includes("diplomacy")) return "DIPLOMATIE";
+  if (cfg.tags.includes("office") || cfg.tags.includes("hof")) return "HOF";
+  if (cfg.tags.includes("story")) return "GESCHICHTE";
+  return "SONSTIGES";
+}
+
+// §Punkt 19: SCORED CHRONICLE — additiv, nachvollziehbar (§Punkt 22 "keine
+// Blackbox"), nutzt CONFIG.chronicle statt verstreuter Magic Numbers.
+function computeChronicleScoreBreakdown(state, memory) {
+  const cfg = CONFIG.chronicle;
+  const components = [{ label: "Memory-Bedeutsamkeit", value: memory.importance }];
+  let total = memory.importance;
+  const add = (label, value) => { if (value) { components.push({ label, value }); total += value; } };
+
+  const rulerInvolved = memory.actorIds.includes(state.rulerId) || memory.targetIds.includes(state.rulerId);
+  add("Herrscher beteiligt", rulerInvolved ? cfg.rulerInvolvedBonus : 0);
+
+  const ruler = state.characters[state.rulerId];
+  const heirInvolved = ruler && (memory.actorIds.some(id => ruler.childrenIds.includes(id)) || memory.targetIds.some(id => ruler.childrenIds.includes(id)));
+  add("Thronfolger beteiligt", heirInvolved ? cfg.heirInvolvedBonus : 0);
+
+  const thread = getAllStoryThreads(state).find(t => t.memoryIds.includes(memory.id));
+  if (thread) add(`Teil des Threads "${thread.title}" (Importance ${thread.importance})`, Math.round(thread.importance * cfg.threadLinkBonusFactor));
+
+  return { components, total: Math.round(total) };
+}
+
+function isChronicleWorthy(state, memory) {
+  const cfg = CONFIG.chronicle;
+  const always = ALWAYS_CHRONICLE_MEMORY_TYPES.has(memory.type);
+  const breakdown = computeChronicleScoreBreakdown(state, memory);
+  const scored = breakdown.total >= cfg.scoredThreshold;
+  return { always, score: breakdown.total, scoreBreakdown: breakdown.components, scored, worthy: always || scored };
+}
+
+// §Punkt 87/88: Dedup — eine Memory, die bereits Teil einer bedeutenden,
+// abgeschlossenen Thread-Geschichte ist, tritt NICHT zusätzlich einzeln
+// auf (die Thread-Zusammenfassung hat Vorrang), außer sie ist selbst
+// ALWAYS-CHRONICLE-würdig (ein Herrschertod bleibt sichtbar, auch wenn er
+// zufällig Teil eines Threads war).
+function computeDynastyChronicle(state) {
+  const threads = getAllStoryThreads(state);
+  const summarizedMemoryIds = new Set();
+  for (const t of threads) {
+    if ((t.status === "RESOLVED" || t.status === "EXPIRED") && t.importance >= CONFIG.chronicle.threadSummaryThreshold) {
+      for (const mid of t.memoryIds) summarizedMemoryIds.add(mid);
+    }
+  }
+
+  const entries = [];
+  let nextId = 1;
+  for (const mem of allMemories(state)) {
+    const info = isChronicleWorthy(state, mem);
+    if (!info.worthy) continue;
+    if (summarizedMemoryIds.has(mem.id) && !ALWAYS_CHRONICLE_MEMORY_TYPES.has(mem.type)) continue;
+    const thread = threads.find(t => t.memoryIds.includes(mem.id));
+    entries.push({
+      id: "ce" + nextId++, year: mem.year, category: chronicleCategoryForMemoryType(mem.type),
+      importance: info.score, title: mem.type, text: mem.description || mem.type,
+      characterIds: mem.actorIds.concat(mem.targetIds), regionIds: mem.regionIds.slice(),
+      memoryIds: [mem.id], chainId: null, threadId: thread ? thread.id : null,
+    });
+  }
+
+  for (const t of threads) {
+    if ((t.status === "RESOLVED" || t.status === "EXPIRED") && t.importance >= CONFIG.chronicle.threadSummaryThreshold) {
+      const endYear = t.history.length ? t.history[t.history.length - 1].year : t.startedYear;
+      entries.push({
+        id: "ce" + nextId++, year: endYear, category: "GESCHICHTE",
+        importance: t.importance, title: t.title, text: summarizeStoryThread(t),
+        characterIds: t.actorIds.slice(), regionIds: t.regionIds.slice(),
+        memoryIds: t.memoryIds.slice(), chainId: null, threadId: t.id,
+      });
+    }
+  }
+
+  entries.sort((a, b) => a.year - b.year);
+  return entries;
+}
+
+// ---------- Ruler Eras (§Punkt 28/29) ----------
+// Rekonstruiert die Herrscherfolge ausschließlich aus bereits vorhandenen
+// SUCCESSION-Memories — kein zusätzlicher persistenter State nötig.
+function getRulerEras(state) {
+  const successions = getMemoriesByType(state, "SUCCESSION").sort((a, b) => a.year - b.year);
+  const gameStartYear = 1500;
+  if (successions.length === 0) return [{ rulerId: state.rulerId, startYear: gameStartYear, endYear: null }];
+  const eras = [];
+  let cursorYear = gameStartYear;
+  let cursorRulerId = successions[0].actorIds[0];
+  for (const s of successions) {
+    eras.push({ rulerId: cursorRulerId, startYear: cursorYear, endYear: s.year });
+    cursorYear = s.year;
+    cursorRulerId = s.targetIds[0];
+  }
+  eras.push({ rulerId: cursorRulerId, startYear: cursorYear, endYear: null });
+  return eras;
+}
+
+function getChronicleForRuler(state, rulerId) {
+  const era = getRulerEras(state).find(e => e.rulerId === rulerId);
+  if (!era) return [];
+  return computeDynastyChronicle(state).filter(e => e.year >= era.startYear && (era.endYear === null || e.year <= era.endYear));
+}
+
+// §Punkt 74: Snapshot beim Regierungsantritt — Grundlage für einen echten
+// Vorher/Nachher-Vergleich ohne erfundene Werte.
+function snapshotRulerEraStart(state, rulerId) {
+  const r = state.regions.player;
+  const totalPop = Object.values(r.population).reduce((s, g) => s + g.count, 0);
+  state.rulerEraSnapshots[rulerId] = { year: state.year, population: totalPop, treasury: state.treasury, prestige: state.prestige, titleIndex: state.titleIndex };
+}
+
+// ---------- Herrscherbiografie / Regierungsabschluss (§Punkt 30/31/72-75) ----------
+// §Punkt 75: fehlt ein Vorher-Wert (Altspielstand ohne Snapshot), wird er
+// NICHT erfunden — das entsprechende Feld bleibt schlicht `null`.
+function buildRulerBiography(state, rulerId) {
+  const c = state.characters[rulerId];
+  if (!c) return null;
+  const eras = getRulerEras(state);
+  const idx = eras.findIndex(e => e.rulerId === rulerId);
+  if (idx === -1) return null;
+  const era = eras[idx];
+  const nextEra = eras[idx + 1];
+  const startSnap = state.rulerEraSnapshots[rulerId] || null;
+  const isCurrent = !nextEra;
+  const r = state.regions.player;
+  const currentPop = Object.values(r.population).reduce((s, g) => s + g.count, 0);
+  // Das Ende von A ist derselbe Zeitpunkt wie der Start von B (Nachfolge
+  // geschieht ohne Zeitversatz) — daher liefert Bs Start-Snapshot exakt
+  // die End-Werte von A, ohne eine zweite Snapshot-Quelle zu benötigen.
+  const endSnap = nextEra ? state.rulerEraSnapshots[nextEra.rulerId] : (isCurrent ? { population: currentPop, treasury: state.treasury, prestige: state.prestige, titleIndex: state.titleIndex } : null);
+
+  const entries = getChronicleForRuler(state, rulerId);
+  return {
+    rulerId, name: `${c.name} ${c.surname || ""}`.trim(),
+    alive: c.alive,
+    reignStart: era.startYear, reignEnd: era.endYear,
+    reignYears: era.endYear !== null ? era.endYear - era.startYear : state.year - era.startYear,
+    highlights: entries.map(e => ({ year: e.year, text: e.text })),
+    populationStart: startSnap ? startSnap.population : null,
+    populationEnd: endSnap ? endSnap.population : null,
+    treasuryStart: startSnap ? Math.round(startSnap.treasury) : null,
+    treasuryEnd: endSnap ? Math.round(endSnap.treasury) : null,
+    titleStart: startSnap ? TITLES[startSnap.titleIndex].name : null,
+    titleEnd: endSnap ? TITLES[endSnap.titleIndex].name : null,
+  };
+}
+
+// §Punkt 72/73: templatebasierte Textzusammenfassung einer Regentschaft.
+function formatRulerBiography(bio) {
+  if (!bio) return "";
+  const lines = [];
+  lines.push(bio.name.toUpperCase());
+  lines.push(`Regierte ${bio.reignStart}–${bio.reignEnd !== null ? bio.reignEnd : "heute"}`);
+  lines.push(`${bio.reignYears} Regierungsjahre`);
+  if (bio.highlights.length) {
+    lines.push("");
+    lines.push("Während seiner/ihrer Herrschaft:");
+    for (const h of bio.highlights) lines.push(`• (${h.year}) ${h.text}`);
+  }
+  if (bio.populationStart !== null && bio.populationEnd !== null) {
+    lines.push("");
+    lines.push(`Bevölkerung: ${bio.populationStart} → ${bio.populationEnd}`);
+  }
+  if (bio.treasuryStart !== null && bio.treasuryEnd !== null) {
+    lines.push(`Staatskasse: ${bio.treasuryStart} → ${bio.treasuryEnd} Taler`);
+  }
+  return lines.join("\n");
+}
+
+// ---------- Dynasty Milestones (§Punkt 34/35) ----------
+function computeDynastyMilestones(state) {
+  const milestones = [];
+  const titleMemories = getMemoriesByType(state, "TITLE_GAINED").sort((a, b) => a.year - b.year);
+  const seenTitles = new Set();
+  for (const m of titleMemories) {
+    const titleId = m.metadata && m.metadata.titleId;
+    if (!titleId || seenTitles.has(titleId)) continue;
+    seenTitles.add(titleId);
+    milestones.push({ type: "TITLE_" + titleId.toUpperCase(), year: m.year, text: m.description });
+  }
+  if (state.stats.maxPopulation) milestones.push({ type: "MAX_POPULATION", value: state.stats.maxPopulation, text: `Höchster Bevölkerungsstand: ${state.stats.maxPopulation}` });
+  if (state.stats.maxTreasury) milestones.push({ type: "MAX_TREASURY", value: Math.round(state.stats.maxTreasury), text: `Höchste Staatskasse: ${Math.round(state.stats.maxTreasury)} Taler` });
+  if (state.stats.maxLand) milestones.push({ type: "MAX_LAND", value: Math.round(state.stats.maxLand), text: `Größtes Territorium: ${Math.round(state.stats.maxLand)} Hektar` });
+
+  const eras = getRulerEras(state);
+  let longest = null;
+  for (const e of eras) {
+    const years = (e.endYear !== null ? e.endYear : state.year) - e.startYear;
+    if (!longest || years > longest.years) longest = { rulerId: e.rulerId, years };
+  }
+  if (longest && state.characters[longest.rulerId]) {
+    const c = state.characters[longest.rulerId];
+    milestones.push({ type: "LONGEST_REIGN", rulerId: longest.rulerId, value: longest.years, text: `Längste Regentschaft: ${c.name} ${c.surname || ""} (${longest.years} Jahre)`.replace(/\s+/g, " ") });
+  }
+  return milestones;
+}
+
+// ---------- Dynasty Summary (§Punkt 77-79) ----------
+function computeDynastySummary(state) {
+  const eras = getRulerEras(state);
+  const threads = getAllStoryThreads(state);
+  const concluded = threads.filter(t => t.status === "RESOLVED" || t.status === "EXPIRED");
+  const byImportance = (a, b) => b.importance - a.importance;
+
+  const biggestCrisis = concluded.slice().sort(byImportance)[0] || null;
+  const mostSignificantWar = threads.filter(t => t.type === "FOREIGN_CONFLICT").sort(byImportance)[0] || null;
+  const mostImportantRival = threads.filter(t => t.type === "PERSONAL_RIVALRY" || t.type === "SUCCESSION_CONFLICT").sort(byImportance)[0] || null;
+  const marriageThreads = threads.filter(t => t.type === "DYNASTIC_ALLIANCE" && t.status === "RESOLVED" && t.resolution && t.resolution.type === "MARRIED");
+  const longestReign = computeDynastyMilestones(state).find(m => m.type === "LONGEST_REIGN") || null;
+
+  return {
+    rulerCount: eras.length,
+    generations: state.stats.generations,
+    longestReign,
+    biggestCrisis: biggestCrisis ? { title: biggestCrisis.title, importance: biggestCrisis.importance, resolution: biggestCrisis.resolution } : null,
+    mostSignificantWar: mostSignificantWar ? { title: mostSignificantWar.title, importance: mostSignificantWar.importance, resolution: mostSignificantWar.resolution } : null,
+    mostImportantRivalry: mostImportantRival ? { title: mostImportantRival.title, importance: mostImportantRival.importance, resolution: mostImportantRival.resolution } : null,
+    importantMarriages: marriageThreads.length,
+    highestTitleIndex: state.stats.highestTitleIndex,
+    highestTitleName: TITLES[state.stats.highestTitleIndex] ? TITLES[state.stats.highestTitleIndex].name : null,
+    maxPopulation: state.stats.maxPopulation,
+    maxTreasury: Math.round(state.stats.maxTreasury),
+    endedByNoHeir: state.gameOver === "no_heir",
+  };
+}
+
+// ---------- Debug (§Punkt 56-58) ----------
+function explainChronicleCandidate(state, memoryId) {
+  const memory = state.memories.byId[memoryId];
+  if (!memory) return null;
+  const info = isChronicleWorthy(state, memory);
+  return { memory, always: info.always, score: info.score, scoreBreakdown: info.scoreBreakdown, worthy: info.worthy };
+}
+
+// ============================================================
 // POLITICS — Titel-Aufstieg, Kaiserwahl, Regierungsstil, Religion,
 // alternative Siegbedingungen (§11/§12/§46/§47)
 // ============================================================
@@ -6433,6 +6963,15 @@ function resolveElection(state) {
     state.titleIndex = TITLES.findIndex(t => t.id === "kaiser");
     state.gameOver = "victory";
     addChronicle(state, "Die Kurfürsten haben entschieden: Du wurdest zum Kaiser gewählt!");
+    // §Phase-7-Punkt 21: die Kaiserkrönung bekam bisher KEINE Memory (dieser
+    // Pfad setzt titleIndex direkt statt über checkTitleProgress()) — ohne
+    // Memory wäre sie für die Dynasty Chronicle unsichtbar. Wiederverwendet
+    // TITLE_GAINED (kein neuer Typ nötig, §Punkt 19-Analogon aus Phase 4).
+    recordWorldEvent(state, {
+      type: "TITLE_GAINED", actorIds: [state.rulerId], targetIds: [],
+      importance: 100, emotionalWeight: 50, metadata: { titleId: "kaiser" },
+      description: `${state.characters[state.rulerId].name} wurde von den Kurfürsten zum Kaiser gewählt.`,
+    });
   } else {
     state.electionCooldown = cfg.cooldownYearsAfterLoss;
     state.prestige = Math.max(0, state.prestige - cfg.lossPrestigePenalty);
@@ -7814,6 +8353,7 @@ function finalizeYear(state) {
   state.stats.maxPopulation = Math.max(state.stats.maxPopulation, totalPlayerPop);
   state.stats.maxTreasury = Math.max(state.stats.maxTreasury, state.treasury);
   state.stats.highestTitleIndex = Math.max(state.stats.highestTitleIndex, state.titleIndex);
+  state.stats.maxLand = Math.max(state.stats.maxLand || 0, r.land); // §Phase-7-Punkt 34: für "größtes Territorium"-Meilenstein
 
   // §Phase-6-Punkt 41: aktive Chains IMMER zuerst fortschreiben (kann neue
   // Memories/Thread-Signale erzeugen), DANN Story Threads mit dem
@@ -9241,7 +9781,7 @@ document.getElementById('langSelect').addEventListener('change', (e) => setLocal
 document.getElementById('langSelectTitle').addEventListener('change', (e) => setLocale(e.target.value));
 document.getElementById('debugToggle').addEventListener('change', (e) => {
   document.getElementById('debugPanel').style.display = e.target.checked ? 'block' : 'none';
-  if (e.target.checked) { populateDebugEventSelect(); populateCharacterDebugSelect(); populateMemoryDebugFilters(); populateChainDebugSelect(); populateChainEligibilitySelect(); populateThreadDebugSelect(); }
+  if (e.target.checked) { populateDebugEventSelect(); populateCharacterDebugSelect(); populateMemoryDebugFilters(); populateChainDebugSelect(); populateChainEligibilitySelect(); populateThreadDebugSelect(); populateChronicleDebugSelect(); populateRulerEraDebugSelect(); }
 });
 
 // §Character-Core-Punkt 58-62: technischer Charakter-Inspektor — zeigt für
@@ -9471,7 +10011,7 @@ function doShowThreadDebug() {
 `ID: ${thread.id}
 Titel: ${thread.title}
 Typ: ${thread.type}
-Status: ${thread.status} (Stage: ${thread.stage})${thread.resolution ? ' — ' + thread.resolution : ''}
+Status: ${thread.status} (Stage: ${thread.stage})${thread.resolution ? ' — ' + thread.resolution.type + ' (' + thread.resolution.tone + ')' : ''}
 Startjahr: ${thread.startedYear} · letzte Aktivität: ${thread.lastActivityYear}
 
 Tension: ${thread.tension} · Importance: ${thread.importance} · Momentum: ${thread.momentum}
@@ -9515,6 +10055,91 @@ FOKUS-THREAD: ${focusThread ? focusThread.title + ' (' + focusThread.id + ')' : 
 
 ELIGIBLE CHAINS MIT DIRECTOR-SCORE
 ${scoreLines}`;
+}
+
+// §Phase-7-Punkt 56-58: Chronik-Kandidaten-Debug — zeigt für eine gewählte
+// Memory exakt dieselbe isChronicleWorthy()-Logik wie computeDynastyChronicle()
+// selbst (eine Quelle der Wahrheit, keine zweite Debug-Logik).
+function populateChronicleDebugSelect() {
+  const sel = document.getElementById('chronicleDebugSelect');
+  if (!state) return;
+  const mems = allMemories(state).slice().sort((a, b) => b.year - a.year).slice(0, 200);
+  sel.innerHTML = mems.map(m =>
+    `<option value="${m.id}">${m.id} — ${m.type} (${m.year})</option>`
+  ).join('') || '<option value="">— keine Erinnerungen vorhanden —</option>';
+}
+
+function doShowChronicleDebug() {
+  const id = document.getElementById('chronicleDebugSelect').value;
+  const out = document.getElementById('chronicleDebugOutput');
+  const result = explainChronicleCandidate(state, id);
+  if (!result) { out.textContent = 'Keine Erinnerung ausgewählt.'; return; }
+  const breakdownLines = result.scoreBreakdown.map(c => `  ${c.value >= 0 ? '+' : ''}${c.value}  ${c.label}`).join('\n');
+  out.textContent =
+`EREIGNIS: ${result.memory.type} (${result.memory.year})
+${result.memory.description || ''}
+
+IMMER CHRONIKWÜRDIG? ${result.always ? 'JA' : 'nein'}
+
+SCORE-BERECHNUNG
+${breakdownLines}
+= ${result.score}
+
+IN DYNASTY CHRONICLE AUFGENOMMEN: ${result.worthy ? 'JA' : 'NEIN'}
+WARUM: ${result.always ? 'Ereignistyp ist unbedingt chronikwürdig (§Always-Chronicle-Liste).' : (result.worthy ? 'Score ' + result.score + ' erreicht die Schwelle (CONFIG.chronicle.scoredThreshold).' : 'Score ' + result.score + ' liegt unter der Schwelle — bleibt nur im World Log.')}`;
+}
+
+function doShowDynastyChronicle() {
+  const out = document.getElementById('dynastyChronicleOutput');
+  const entries = computeDynastyChronicle(state);
+  if (!entries.length) { out.textContent = '(noch keine chronikwürdigen Ereignisse)'; return; }
+  out.textContent = entries.map(e => `${e.year} [${e.category}] ${e.title}\n  ${e.text}`).join('\n\n');
+}
+
+// §Phase-7-Punkt 28-33/72-75: Herrscher-Chronik/Biografie-Debug.
+function populateRulerEraDebugSelect() {
+  const sel = document.getElementById('rulerEraDebugSelect');
+  if (!state) return;
+  const eras = getRulerEras(state);
+  sel.innerHTML = eras.map(e => {
+    const c = state.characters[e.rulerId];
+    const name = c ? `${c.name} ${c.surname || ''}`.trim() : e.rulerId;
+    return `<option value="${e.rulerId}">${name} (${e.startYear}–${e.endYear !== null ? e.endYear : 'heute'})</option>`;
+  }).join('') || '<option value="">— keine Herrscher-Ären vorhanden —</option>';
+}
+
+function doShowRulerEraDebug() {
+  const rulerId = document.getElementById('rulerEraDebugSelect').value;
+  const out = document.getElementById('rulerEraDebugOutput');
+  const bio = buildRulerBiography(state, rulerId);
+  if (!bio) { out.textContent = 'Kein Herrscher ausgewählt.'; return; }
+  out.textContent = formatRulerBiography(bio);
+}
+
+// §Phase-7-Punkt 34-35/76-79: Dynasty Summary + Meilensteine — reine
+// Analyse aus echten Trackingwerten, keine neue Spielwirkung.
+function doShowDynastySummaryDebug() {
+  const out = document.getElementById('dynastySummaryDebugOutput');
+  const summary = computeDynastySummary(state);
+  const milestones = computeDynastyMilestones(state);
+  const fmtThread = (t) => t ? `${t.title} (Importance ${t.importance}${t.resolution ? ', ' + t.resolution.type + '/' + t.resolution.tone : ''})` : '(keine)';
+  const milestoneLines = milestones.map(m => `  • ${m.text}`).join('\n') || '  (noch keine Meilensteine)';
+  out.textContent =
+`ANZAHL HERRSCHER: ${summary.rulerCount} · GENERATIONEN: ${summary.generations}
+LÄNGSTE REGENTSCHAFT: ${summary.longestReign ? summary.longestReign.text : '(unbekannt)'}
+
+GRÖSSTE KRISE: ${fmtThread(summary.biggestCrisis)}
+BEDEUTENDSTER KRIEG: ${fmtThread(summary.mostSignificantWar)}
+WICHTIGSTE RIVALITÄT: ${fmtThread(summary.mostImportantRivalry)}
+BEDEUTENDE EHEN: ${summary.importantMarriages}
+
+HÖCHSTER TITEL: ${summary.highestTitleName || '(unbekannt)'}
+HÖCHSTE BEVÖLKERUNG: ${summary.maxPopulation}
+HÖCHSTE STAATSKASSE: ${summary.maxTreasury} Taler
+DYNASTIE OHNE ERBEN GEENDET: ${summary.endedByNoHeir ? 'JA' : 'nein'}
+
+MEILENSTEINE
+${milestoneLines}`;
 }
 
 function doDebug(fn) {
