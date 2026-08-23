@@ -42,24 +42,29 @@ function getWorldMapViewModel(state) {
     const strength = isPlayer
       ? Object.values(terr.deployment).reduce((a, b) => a + b, 0)
       : Math.round(terr.garrison);
+    // §Phase-8C.1-Punkt 31/40: "attackable" ist kein neuer Gameplay-Zustand,
+    // sondern dieselbe Bedingung, die js/war-map.js bereits für einen
+    // gültigen Angriff prüft (Krieg + direkte Adjazenz zu eigenem Gebiet,
+    // siehe aiTerritoryCounterAttack()) -- hier nur zur dezenten
+    // Hervorhebung auf der REICH-Karte, der eigentliche Angriff bleibt
+    // weiterhin über die unveränderte Kriegskarte.
+    const attackable = !isPlayer && !!state.warState[terr.owner]
+      && t.adjacent.some(adjId => state.territories[adjId].owner === "player");
+    // §Punkt 30: "ally" nutzt ausschließlich das bereits reale
+    // state.diplomacy[...].treaties.allianz (js/diplomacy.js).
+    const dip = state.diplomacy[terr.owner];
+    const ally = !isPlayer && !!(dip && dip.treaties && dip.treaties.allianz);
     return {
       id: t.id, name: t.name, x: t.x, y: t.y, terrain: t.terrain, capital: !!t.capital,
       ownerId: terr.owner, ownerName: owner ? owner.name : terr.owner,
-      isPlayerOwned: isPlayer, strength, hasForces: strength > 0,
+      isPlayerOwned: isPlayer, strength, hasForces: strength > 0, attackable, ally,
     };
   });
-  const lines = [];
-  const drawn = new Set();
-  for (const t of TERRITORIES) {
-    for (const adjId of t.adjacent) {
-      const key = [t.id, adjId].sort().join("|");
-      if (drawn.has(key)) continue;
-      drawn.add(key);
-      const other = territoryById(adjId);
-      lines.push({ x1: t.x, y1: t.y, x2: other.x, y2: other.y });
-    }
-  }
-  return { territories: nodes, lines };
+  // §Phase-8C.1-Punkt 8: die frühere Netzwerklinien-Liste entfällt --
+  // js/map-geometry.js (per Generator validiert) bildet JEDE deklarierte
+  // Adjazenz bereits als echte gemeinsame Gebietsgrenze ab, eine separate
+  // Verbindungslinien-Darstellung ist damit nicht mehr nötig.
+  return { territories: nodes };
 }
 
 // ---------- Kontextpanel (§31-38) ----------
