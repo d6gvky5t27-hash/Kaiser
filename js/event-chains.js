@@ -218,14 +218,17 @@ function notifyEventChainsOfSuccession(state, oldRulerId, newRulerId) {
 // Templates ist bewusst von großzügig/entgegenkommend zu hart/ablehnend
 // sortiert (siehe die jeweiligen queueChainDecision()-Aufrufe oben) — daher
 // ist "erste Option" eine sinnvolle CONCILIATORY- und "letzte Option" eine
-// sinnvolle AGGRESSIVE-Näherung, ohne dass Optionen einen eigenen
-// Metadaten-Tag brauchen.
+// sinnvolle AGGRESSIVE/HARDLINE-Näherung, ohne dass Optionen einen eigenen
+// Metadaten-Tag brauchen (§Phase-7-Punkt 43-49: HARDLINE ist bewusst ein
+// semantischer Alias von AGGRESSIVE — dieselbe "immer die härteste Option"-
+// Auswahl, nur unter dem im Phase-7-Auftrag verlangten Namen, damit die
+// Policy-Vergleichsmetriken vier klar benannte Policies zeigen).
 function resolvePendingEventWithPolicy(state, policy) {
   const ev = state.pendingEvent;
   if (!ev || !ev.options || !ev.options.length) return false;
   let idx = 0;
   if (policy === "RANDOM_VALID_OPTION") idx = Math.floor(rnd() * ev.options.length);
-  else if (policy === "AGGRESSIVE") idx = ev.options.length - 1;
+  else if (policy === "AGGRESSIVE" || policy === "HARDLINE") idx = ev.options.length - 1;
   else if (policy === "CONCILIATORY") idx = 0;
   else idx = 0; // FIRST_OPTION (Default)
   ev.options[idx].apply(state.regions.player, state);
