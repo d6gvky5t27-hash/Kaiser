@@ -379,7 +379,106 @@ nur wenn tatsächlich kein aktiver Thread existiert). Der Herrschername
 ist visuell größer als jeder Ressourcenwert (§8), die Karte nimmt den
 dominanten Anteil der Fläche ein (§3).
 
-## 5. Screen Inventory (Status nach Phase 8A + 8B)
+## 5. Phase 8C: Reich + Provinz + Wirtschaft
+
+Dritte Teilphase — "aus Tabellen wird eine lesbare Herrschaftsübersicht".
+Umfasst REICH-Übersicht (KPI-Leiste), PROVINZ-Tab (Bevölkerung/Nahrung/
+Kassenbuch) und WIRTSCHAFT-Tab (Waren/Steuern/Handel/Risiken), sowie die
+vertiefte WIRTSCHAFT/BEVÖLKERUNG-Ansicht im Kontextpanel (§48/49). Hof
+komplett, Dynastie/Stammbaum, Event-Fenster, Diplomatie, Krieg, Chronik-
+Buchansicht bleiben bewusst unangetastet — wie in 8B bleibt auch hier
+jede bestehende Funktion vollständig erhalten (`#priceTable`/`#popTable`/
+`#satBar` existieren technisch weiter, sind aber `display:none` bzw.
+durch die neuen Panels ersetzt; das alte Rendering läuft im Hintergrund
+harmlos mit, siehe §Phase-8C-Kommentare im Code).
+
+**Leitprinzip: "Wie geht es meinem Reich?" zuerst, "Warum?" auf Klick,
+exakte Zahlen weiterhin für Vertiefungswillige.** Die neue
+`#realmKpiStrip` zeigt 6 Kennzahlen (Staatskasse/Bevölkerung/Nahrung/
+Zufriedenheit/Wohlstand) mit Status-Wörtern (STABIL/ANGESPANNT/KRITISCH/
+WACHSTUM/RÜCKGANG) statt Farbe allein. Die 24-Zeilen-Warentabelle wurde
+durch 4 Kategorie-Karten (NAHRUNG/ROHSTOFFE/HANDWERK/LUXUS,
+`GOODS[gid].category`) ersetzt; ein Klick auf eine Ware öffnet die
+vollständige Preiserklärung (Formel-Zerlegung) und die Produktionskette
+als einfache Karten+Pfeile (keine Tech-Baum-Grafik, §28/29). Die
+10-Zeilen-Bevölkerungstabelle wurde durch Balken (Anteil in %) mit
+Detail-auf-Klick (Bedarf/Steueraufkommen/Geburten/Todesfälle) ersetzt.
+
+**"Keine Daten erfinden" wörtlich umgesetzt.** Jede neue Kennzahl ist auf
+eine bereits real vorhandene state-Quelle zurückgeführt (Kommentare im
+Code nennen die Quelle), z. B.:
+- Kassenbuch-Trend: `state.lastMonthlyReport` (nur EIN Monat existiert
+  real) — deshalb ehrlich "im letzten Monat" statt fälschlich "im letzten
+  Jahr" beschriftet.
+- Bevölkerungs-Jahrestrend: `r.lastPopSummary`/`r.lastNetMigration`
+  (echte Deltas, keine Mehrpunkt-Historie — die gibt es im state nicht).
+- Produktion/Jahr pro Ware: **eine neue, minimale Simulationsänderung**
+  in `js/advance-year.js` — `computeProduction(r)`s Rückgabewert wurde
+  bisher sofort verworfen; jetzt wird er zusätzlich als `r.lastProduction`
+  gespeichert (exakt dasselbe Muster wie `r.lastHarvestFactor`/
+  `r.lastPopBreakdown`). Keine Zahl geändert, keine neue Berechnung im
+  UI (das hätte `computeProduction()`s Warenverbrauch versehentlich
+  verdoppelt).
+- Steuern: nur EIN regionsweiter Satz existiert (`region.taxRate`) — wird
+  ehrlich als geteilter Satz je Gruppe dargestellt, keine erfundene
+  Differenzierung.
+- Baufortschritt-Balken (im Master-Prompt als Beispiel genannt): bewusst
+  **nicht gebaut** — Gebäude werden in der Simulation sofort beim Kauf
+  fertiggestellt, es existiert keine Baustellen-/Fortschritts-Mechanik,
+  ein Prozentwert wäre erfunden gewesen.
+
+**Ein realer Datenpfad-Bug gefunden und behoben:** `region.prices` wird
+nur einmal PRO JAHR gesetzt (`processAllRegions()`), ist also bei einem
+frischen Spiel `undefined`. Der alte, weiterhin mitlaufende
+`#priceTable`-Code berechnet `region.priceBreakdown` dagegen bei JEDEM
+Render neu. Die neue Warenkarte las ursprünglich `region.prices` für den
+angezeigten Preis, die Preiserklärung aber `region.priceBreakdown` — bei
+einem frischen Spiel liefen beide auseinander ("Holz — 6 Taler" oben,
+"Warum 2 Taler?" in der Erklärung). Behoben mit `resolveGoodPrice()`
+(bevorzugt `priceBreakdown[gid].gesamt`, dann `prices[gid]`, dann
+`GOODS[gid].base`), konsistent in allen neuen ViewModels verwendet.
+Dedizierter Regressionstest reproduziert exakt dieses Szenario.
+
+**Kontextpanel WIRTSCHAFT/BEVÖLKERUNG vertieft (§48/49).** Beide Tabs
+nutzen dieselben realen Felder wie die REICH-weiten Widgets, funktionieren
+aber für JEDE Region (Spieler UND KI), da `processAllRegions()` alle
+Regionen gleich behandelt: WIRTSCHAFT zeigt Top-Produktion des Jahres und
+etwaige Engpässe (Produktion < 85% des Verbrauchs), BEVÖLKERUNG zeigt
+Geburten/Todesfälle/Saldo des laufenden Jahres. Getestet für sowohl die
+eigene Hauptstadt als auch eine fremde Hauptstadt.
+
+**Zwei weitere reale Bugs gefunden und behoben** (wie in 8B durch
+Playwright-Klicktests mit `getBoundingClientRect()`, nicht durch reine
+Screenshot-Ansicht):
+1. `.popGroupBarFill` ist ein `<span>` (`display: inline` per Default) —
+   inline-Elemente ignorieren die CSS-Eigenschaft `width` vollständig,
+   auch als Inline-`style`. Jeder Bevölkerungsbalken rendere mit 0px
+   Füllbreite trotz korrektem `style="width:N%"`. Behoben mit
+   `display: block` auf `.popGroupBarFill`. **Wichtig für spätere
+   Teilphasen**: jedes `<span>`-basierte "Füllbalken"-Muster braucht
+   diesen Override.
+2. Die i18n-Wörterbücher für die 7 Seitenleisten-Labels
+   (`tab_reich_label` usw.) wurden in 8B versehentlich direkt in
+   `index.html` statt in ihrer echten Quelle `data/gamedata.js`
+   gepflegt — beim nächsten `node tools/build-bundle.js`-Lauf dieser
+   Teilphase stillschweigend überschrieben (Sidenav zeigte rohe Keys wie
+   "tab_reich_labe", abgeschnitten durch die schmale Leiste). Behoben
+   durch Ergänzung in `data/gamedata.js` (DE + EN). **Wichtig für spätere
+   Teilphasen**: vor Hand-Edits an scheinbar statischer Konfiguration in
+   `index.html` immer mit `grep -rln "<key>" js/ data/` prüfen, ob die
+   eigentliche Quelle woanders liegt.
+
+**Bundle-Größe:** 620.239 → 658.989 Zeichen (+38.750 Zeichen, +6,2%),
+Block 0 (automatisch generierter erster `<script>`-Block) 444.315
+Zeichen. Wachstum stammt fast vollständig aus `js/ui-viewmodels.js`
+(+387 Zeilen) und dem neuen HTML/CSS für KPI-Leiste, Warenkarten,
+Bevölkerungsbalken, Steuer-/Handelspanels.
+
+**Responsive erneut bei allen drei Pflichtauflösungen geprüft**
+(1920×1080/1440×900/1366×768) — kein horizontales Scrollen, KPI-Leiste
+und Warenkarten-Raster bleiben bei 1366×768 in einer Spalte lesbar.
+
+## 6. Screen Inventory (Status nach Phase 8A + 8B + 8C)
 
 | Screen/Bereich | Status | Anmerkung |
 |---|---|---|
@@ -389,7 +488,11 @@ dominanten Anteil der Fläche ein (§3).
 | Hauptbildschirm REICH (Karte/HUD/Nav/Kontextpanel/Story Card/Warnungen) | **REDESIGNED** | 8B, siehe Abschnitt 5 — neuer Standardbildschirm |
 | Topbar (Herrscher/Jahr/Schatz/Bevölkerung/Prestige/Legitimität/Nahrung) | **REDESIGNED** | 8B — Herrscher groß/zuerst, Werte als Icon+Zahl+Tooltip |
 | Hauptnavigation | **REDESIGNED** | 8B — schmale vertikale Seitenleiste statt horizontaler Tableiste, 7 Einträge (bestehende 6 + neu REICH) |
-| Provinz/Hof/Wirtschaft/Diplomatie/Militär-Panels (Seiteninhalt) | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | weiterhin über die Navigation erreichbar, Informationsarchitektur innerhalb der einzelnen Seiten unverändert (das ist 8C/8D/8E/8G) |
+| PROVINZ-Tab (Bevölkerung/Nahrung/Kassenbuch) | **REDESIGNED** | 8C — Balken statt Tabelle, Detail-auf-Klick, Mini-Kassenbuch; Regierungs-Regler/Kornausgabe/Chronik unverändert |
+| WIRTSCHAFT-Tab (Waren/Steuern/Handel/Risiken) | **REDESIGNED** | 8C — Kategorie-Karten statt 24-Zeilen-Tabelle, Preiserklärung + Produktionskette auf Klick; Regionalhandel/Arbitrage-Panel unverändert |
+| Kontextpanel WIRTSCHAFT/BEVÖLKERUNG-Tabs | **REDESIGNED** | 8C — echte Top-Produktion/Engpässe/Jahreswachstum, für Spieler- UND KI-Regionen |
+| Hof/Diplomatie/Militär-Panels (Seiteninhalt) | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | weiterhin über die Navigation erreichbar, Informationsarchitektur innerhalb der einzelnen Seiten unverändert (das ist 8D/8E/8G) |
+| Gebäude/Land/Schulden-Panels | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | unverändert, kein Baufortschritt (keine Datenbasis, §Abschnitt 5) |
 | Event-/Geburt-/Heirat-/Kassenbuch-Modals | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | kein Illustrationsbereich (§56-58), das ist 8F |
 | Kampf-Overlay | **REDESIGNED** (Tokens) | Battle Engine unverändert (§61 bestätigt), Strukturaufwertung ist 8G |
 | Kriegskarte-Overlay | **REDESIGNED** (Tokens) | Kartenstil (handgezeichnete Landkarte) weiterhin nicht vertieft, bleibt als reines Kriegs-Overlay bestehen |
@@ -404,9 +507,12 @@ dominanten Anteil der Fläche ein (§3).
 
 **Ehrliche Einordnung:** 8A lieferte das Design-System, 8B den
 map-zentrierten Hauptbildschirm mit echter HUD/Kontextpanel/Story-Card/
-Warnungs-Funktionalität — beide zusammen bereits ein klar sichtbarer
+Warnungs-Funktionalität, 8C machte REICH/PROVINZ/WIRTSCHAFT aus rohen
+Tabellen zu einer lesbaren, aber weiterhin vollständig ehrlichen
+Herrschaftsübersicht (Status-Wörter, Progressive Disclosure, keine
+erfundenen Trends) — drei Teilphasen zusammen bereits ein klar sichtbarer
 Wechsel weg vom "Dashboard"-Look hin zu "das ist mein Reich". Die in
 §72-73/71/70 explizit aufgeschobenen STRUKTURELLEN Neubauten (Hof-
 Charakterkarten, Stammbaum, Event-Illustrationen, Diplomatie-Umbau,
 Chronik-Buch, Kampf-Neuinszenierung) sind weiterhin bewusst NICHT Teil
-dieser Teilphase — sie sind laut Auftrag selbst als 8C–8H vorgesehen.
+dieser Teilphase — sie sind laut Auftrag selbst als 8D–8H vorgesehen.

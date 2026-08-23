@@ -2996,3 +2996,107 @@ weiterhin grün (außer der bekannten unseeded `economy_test.js`-
 Flakiness), keine neuen `rnd()`-Aufrufe (getestet), Battle Engine
 unverändert (bestätigt per Diff), keine neue SAVE_VERSION (keine
 State-Struktur geändert).
+
+## 2026-08-23 – Phase 8C (KAISERREICH-Next-Generation-Master-Prompt): Reich + Provinz + Wirtschaft
+
+Dritte Teilphase — "aus Tabellen wird eine lesbare Herrschafts-
+übersicht". Voller Ablauf, gefundene Bugs und Screen-Inventar in
+`UI_REDESIGN.md` Abschnitt 5/6. Leitprinzip: "Wie geht es meinem Reich?"
+zuerst (6 KPI-Kacheln mit Status-Wörtern STABIL/ANGESPANNT/KRITISCH/
+WACHSTUM/RÜCKGANG statt Farbe allein), "Warum?" auf Klick (Preis-
+erklärung, Produktionskette, Bevölkerungsgruppen-Detail), exakte Zahlen
+bleiben für Vertiefungswillige jederzeit erreichbar. Hof komplett,
+Dynastie/Stammbaum, Event-Fenster, Diplomatie, Krieg, Chronik-Buchansicht
+bleiben unangetastet.
+
+**"Keine Daten erfinden" wörtlich umgesetzt** — jede neue Kennzahl ist im
+Code auf ihre reale `state`-Quelle zurückgeführt: Kassenbuch-Trend
+ehrlich als "im letzten Monat" (nicht "-Jahr") beschriftet, da nur
+`state.lastMonthlyReport` existiert; Bevölkerungstrend aus
+`r.lastPopSummary`/`r.lastNetMigration` (echte Deltas, keine erfundene
+Mehrpunkt-Historie); Steuern ehrlich als EIN geteilter, regionsweiter
+Satz dargestellt (`region.taxRate`, keine erfundene Gruppendifferenzierung);
+ein "Baufortschritt"-Balken aus dem Master-Prompt-Beispiel wurde bewusst
+**nicht gebaut**, weil Gebäude in der Simulation sofort fertiggestellt
+werden und dafür schlicht keine Datenbasis existiert.
+
+**Eine minimale, präzedenzbasierte Simulationsänderung** in
+`js/advance-year.js`: `computeProduction(r)`s Rückgabewert wurde bisher
+sofort verworfen (`computeProduction(r);`); jetzt zusätzlich als
+`r.lastProduction` gespeichert (`r.lastProduction = computeProduction(r);`)
+— exakt dasselbe Muster wie das bereits bestehende `r.lastHarvestFactor`/
+`r.lastPopBreakdown`. Keine Zahl geändert, kein zweiter Berechnungsweg im
+UI (der hätte den Warenverbrauch in `computeProduction()` versehentlich
+verdoppelt). Golden-Snapshot-Fixtures unverändert kompatibel (neues Feld
+nicht Teil der geprüften Felder).
+
+**`js/ui-viewmodels.js` erheblich erweitert** (+387 Zeilen, weiterhin kein
+`rnd()`-Aufruf, getestet): `getRealmEconomyViewModel()`,
+`getMiniLedgerViewModel()`, `getPopulationOverviewViewModel()` +
+`getPopulationGroupDetailViewModel()`, `getFoodSupplyViewModel()`,
+`getGoodsCategoryViewModel()` + `getGoodDetailViewModel()` +
+`getProductionChainViewModel()`, `getTradeViewModel()`, `getTaxViewModel()`,
+`getProvinceListViewModel()`, `getEconomicRisksViewModel()`, sowie
+`getRegionSummaryViewModel()` erweitert um `topProduction`/`shortages`/
+`populationGrowth` (funktioniert identisch für Spieler- UND KI-Regionen,
+da `processAllRegions()` beide gleich behandelt).
+
+**Ein realer Preis-Inkonsistenz-Bug gefunden und behoben:**
+`region.prices` wird nur einmal PRO JAHR gesetzt, ist bei einem frischen
+Spiel also `undefined` — der weiterhin mitlaufende alte
+`#priceTable`-Code berechnet `region.priceBreakdown` dagegen bei jedem
+Render neu. Die neue Warenkarte zeigte dadurch oben einen anderen Preis
+("Holz — 6 Taler") als die eigene Preiserklärung darunter ("Warum 2
+Taler?"). Behoben mit `resolveGoodPrice()` (bevorzugt
+`priceBreakdown[gid].gesamt` vor `prices[gid]` vor `GOODS[gid].base`),
+konsistent in allen betroffenen ViewModels verwendet; dedizierter
+Regressionstest reproduziert exakt das Fresh-Game-Szenario.
+
+**Zwei weitere reale Bugs per Playwright-Klicktest gefunden und behoben**
+(reine Screenshots hätten sie übersehen): (1) `.popGroupBarFill` ist ein
+`<span>` (`display: inline` per Default) — inline-Elemente ignorieren
+`width` vollständig, auch als Inline-`style`; jeder Bevölkerungsbalken
+rendere mit 0px Füllbreite trotz korrektem `style="width:N%"`. Behoben
+mit `display: block`. (2) Die i18n-Labels der 7 Seitenleisten-Tabs
+(`tab_reich_label` usw.) wurden in 8B versehentlich direkt in
+`index.html` statt in ihrer echten Quelle `data/gamedata.js` gepflegt —
+beim ersten `build-bundle.js`-Lauf dieser Teilphase stillschweigend
+überschrieben. Behoben durch Ergänzung in `data/gamedata.js` (DE + EN);
+Lehre für künftige Teilphasen: vor Hand-Edits an scheinbar statischer
+Konfiguration in `index.html` immer per `grep -rln "<key>" js/ data/`
+prüfen, ob die eigentliche Quelle woanders liegt.
+
+**Kontextpanel WIRTSCHAFT/BEVÖLKERUNG-Tabs vertieft (§48/49)** — echte
+Top-Produktion/Engpässe/Jahreswachstum, getestet für die eigene
+Hauptstadt UND eine fremde KI-Hauptstadt (kein Sonderpfad nur für den
+Spieler).
+
+**Playwright-Klicktests** (nicht nur Screenshots) decken laut Master-
+Prompt-§62-Liste ab: Wirtschaft öffnen, Warenkategorie wechseln, Ware
+öffnen, Steuersatz ändern (inkl. Rückwirkung auf das Steuerpanel),
+Kassenbuch öffnen (vor UND nach dem ersten Monatswechsel), Region wählen
+(eigen + fremd, alle 4 Kontextpanel-Tabs), zurück, nächstes Jahr über 12
+Monate inkl. Event-/Geburt-/Heirat-/Kassenbuch-Modal-Behandlung. Zusätzlich
+geprüft: keine unsichtbaren Overlays blockieren Klicks auf neue Elemente
+(automatisierter `elementFromPoint()`-Scan, 0 Treffer), Tastaturfokus auf
+neuen Kontrollen sichtbar (3px solid outline).
+
+**6 Pflicht-Szenario-Screenshots** erstellt: stabile Wirtschaft,
+Nahrungskrise, negative Staatskasse, eine Ware mit realem, nicht
+erfundenem Engpass (nach einem vollen simulierten Jahr — Getreide-
+Produktion lag real unter dem Verbrauch), eine Provinz mit hoher
+Unzufriedenheit, 1366×768 (REICH/WIRTSCHAFT/PROVINZ, kein horizontales
+Scrollen).
+
+**Bewusst NICHT Teil dieser Teilphase:** Hof/Dynastie/Event-Fenster/
+Diplomatie/Krieg/Chronik komplett umbauen (8D–8H), Gebäude-Baufortschritt
+(keine Datenbasis), finaler Accessibility-/Polish-Pass über alle Screens
+(8I). Bundle-Größe 620.239 → 658.989 Zeichen (+6,2 %, primär
+`js/ui-viewmodels.js` +387 Zeilen plus HTML/CSS für KPI-Leiste, Waren-
+karten, Bevölkerungsbalken, Steuer-/Handelspanels). Alle 17 Testdateien
+grün (außer der bekannten unseeded `economy_test.js`-Flakiness), keine
+neuen `rnd()`-Aufrufe (getestet), Battle Engine unverändert (bestätigt
+per Diff, leerer `git diff --stat` für `battle-engine/` und
+`js/battle-bridge.js`), keine neue SAVE_VERSION (keine State-Struktur
+geändert, nur ein zusätzliches, additiv gespeichertes Feld
+`r.lastProduction`).
