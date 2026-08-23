@@ -41,6 +41,7 @@ const INDEX_PATH = path.join(ROOT, "index.html");
 // nicht ohne Grund verändern.
 const FILES = [
   "data/gamedata.js",
+  "js/map-geometry.js",
   "js/core.js",
   "js/economy.js",
   "js/population-dynasty.js",
