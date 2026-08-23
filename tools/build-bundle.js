@@ -49,6 +49,7 @@ const FILES = [
   "js/story-threads.js",
   "js/drama-director.js",
   "js/event-chains.js",
+  "js/chronicle.js",
   "js/politics.js",
   "js/diplomacy.js",
   "js/military.js",

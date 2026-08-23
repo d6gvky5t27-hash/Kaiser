@@ -172,7 +172,18 @@ function handleSuccession(state) {
 
   if (heirs.length === 0) {
     state.gameOver = "no_heir";
-    addChronicle(state, `Die Dynastie ${oldRuler.surname} stirbt ohne Erben aus. Deine Herrschaft endet.`);
+    const desc = `Mit dem Tod ${oldRuler.name} ${oldRuler.surname || ""}s im Jahre ${state.year} erlosch das Haus ${oldRuler.surname || ""} in direkter Linie.`.replace(/\s+/g, " ");
+    addChronicle(state, desc);
+    // §Phase-7-Punkt 83/84: das Aussterben der Dynastie ist der größtmögliche
+    // Schlusspunkt der gesamten Geschichte — bisher gab es dafür KEINE
+    // Memory (nur den Chronik-String), wodurch Dynasty Chronicle 2.0 dieses
+    // zentrale Ereignis nicht hätte finden können. Einziger neuer
+    // Memory-Typ dieser Phase (§Punkt 19-Analogon: nur wirklich nötig).
+    recordWorldEvent(state, {
+      type: "DYNASTY_ENDED", actorIds: [state.rulerId], targetIds: [],
+      emotionalWeight: -70, metadata: { surname: oldRuler.surname || "" },
+      description: desc,
+    });
     return;
   }
   const heir = heirs[0];
@@ -219,6 +230,7 @@ function handleSuccession(state) {
   }
 
   state.rulerId = heirId;
+  snapshotRulerEraStart(state, heirId); // §Phase-7-Punkt 74: Vorher/Nachher-Grundlage für die Regentschaftszusammenfassung
   addChronicle(state, `${heir.name} ${heir.surname} tritt im Alter von ${heir.age} Jahren die Nachfolge an.`);
   recordWorldEvent(state, {
     type: "SUCCESSION", actorIds: [oldRulerId], targetIds: [heirId],

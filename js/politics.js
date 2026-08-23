@@ -126,6 +126,15 @@ function resolveElection(state) {
     state.titleIndex = TITLES.findIndex(t => t.id === "kaiser");
     state.gameOver = "victory";
     addChronicle(state, "Die Kurfürsten haben entschieden: Du wurdest zum Kaiser gewählt!");
+    // §Phase-7-Punkt 21: die Kaiserkrönung bekam bisher KEINE Memory (dieser
+    // Pfad setzt titleIndex direkt statt über checkTitleProgress()) — ohne
+    // Memory wäre sie für die Dynasty Chronicle unsichtbar. Wiederverwendet
+    // TITLE_GAINED (kein neuer Typ nötig, §Punkt 19-Analogon aus Phase 4).
+    recordWorldEvent(state, {
+      type: "TITLE_GAINED", actorIds: [state.rulerId], targetIds: [],
+      importance: 100, emotionalWeight: 50, metadata: { titleId: "kaiser" },
+      description: `${state.characters[state.rulerId].name} wurde von den Kurfürsten zum Kaiser gewählt.`,
+    });
   } else {
     state.electionCooldown = cfg.cooldownYearsAfterLoss;
     state.prestige = Math.max(0, state.prestige - cfg.lossPrestigePenalty);

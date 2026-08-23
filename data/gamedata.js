@@ -506,6 +506,14 @@ const CONFIG = {
       recentResolutionBonus: -4, recentResolutionYears: 3,
     },
   },
+  // ---------- Phase 7: Narrative Calibration & Chronicle 2.0 (§Punkt 19/20/36) ----------
+  chronicle: {
+    scoredThreshold: 45,        // §Punkt 19/20: SCORED CHRONICLE — ab diesem Score chronikwürdig
+    threadSummaryThreshold: 50, // deckt sich bewusst mit dem MAJOR_STORY_RESOLVED-Schwellenwert aus Phase 6
+    rulerInvolvedBonus: 10,
+    heirInvolvedBonus: 8,
+    threadLinkBonusFactor: 0.2, // Anteil der Thread-Importance, der den Score einer verknüpften Memory anhebt
+  },
 };
 
 // §65/§79: die reinen Datentabellen (GOODS bis TITLES weiter unten) werden ab
@@ -1827,6 +1835,10 @@ const MEMORY_TYPES = {
   // einer bedeutsamen Story-Thread-Geschichte, wiederverwendet über alle
   // 8 Thread-Typen hinweg — keine Memory-Typ-Explosion.
   MAJOR_STORY_RESOLVED:      { importance: 70, decayRate: 0, direction: "none", tags: ["story", "resolution"] },
+  // --- neu in Phase 7 (§Punkt 84): das Ende einer Dynastie war bisher NUR
+  // ein Chronik-String, keine Memory — ohne Memory hätte Dynasty
+  // Chronicle 2.0 dieses zentrale Schlussereignis nicht finden können.
+  DYNASTY_ENDED:             { importance: 100, decayRate: 0, direction: "none", tags: ["dynasty", "ending"] },
 };
 
 // Event-System: TRIGGER/BEDINGUNGEN/TEXT/ENTSCHEIDUNGEN/KONSEQUENZEN (§38)

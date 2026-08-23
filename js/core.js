@@ -249,7 +249,7 @@ function newGame(options) {
     vassals: {}, // §29 Vasallisierung: { aiId: true }
     stats: { // §87 Spielende-Auswertung
       maxPopulation: 0, maxTreasury: 0, warsWon: 0, warsLost: 0,
-      generations: 1, disastersCount: 0, highestTitleIndex: 0,
+      generations: 1, disastersCount: 0, highestTitleIndex: 0, maxLand: 0,
     },
     log: [],
     pendingEvent: null,
@@ -265,6 +265,7 @@ function newGame(options) {
       recentIntensity: [], focusThreadId: null, recoveryWindowUntilYear: null, pacing: "QUIET",
       tensionBreakdown: [],
     },
+    rulerEraSnapshots: {}, // §Phase-7 Chronik 2.0: rulerId -> {year, population, treasury, prestige, titleIndex}, siehe js/chronicle.js
   };
 
   for (const ext of EXTRA_REGIONS) {
@@ -281,6 +282,7 @@ function newGame(options) {
   const id = nextCharId();
   state.characters[id] = ruler;
   state.rulerId = id;
+  snapshotRulerEraStart(state, id); // §Phase-7-Punkt 74: Ausgangswerte für die spätere Regentschaftszusammenfassung
 
   addChronicle(state, `Im Jahre 1500 übernahm ${ruler.name} ${dynastyName} die Herrschaft über ${state.regions.player.name}.`);
   initTerritories(state); // Kriegskarte (§Original-Vertiefung): Gebietsbesitz/Garnisonen initialisieren
@@ -303,7 +305,7 @@ function logLedger(state, label, amount) {
 
 // ---------- Landwirtschaft (§18/§19) ----------
 
-const SAVE_VERSION = 6;
+const SAVE_VERSION = 7;
 
 function serializeSave(state) {
   return JSON.stringify({
@@ -410,12 +412,41 @@ function migrateSaveV5ToV6(parsed) {
   return parsed;
 }
 
+// §Phase-7-Punkt 59-61: Resolution 2.0 ändert `thread.resolution` von einem
+// bloßen String zu einem strukturierten Objekt (§Punkt 8) — bereits
+// abgeschlossene Phase-6-Threads bekommen ihre Klassifikation NACHTRÄGLICH
+// über dieselbe classifyThreadResolution()-Funktion neu berechnet. Das ist
+// KEINE Fiktion (§Punkt 60): die Funktion liest ausschließlich bereits
+// real gespeicherte Fakten (abgeschlossene Chains, aktuelle Beziehungen) —
+// dasselbe echte Ergebnis, nur endlich korrekt kategorisiert, mit dem
+// ursprünglichen Jahr aus der History statt dem Migrationsjahr.
+// `state.rulerEraSnapshots` bleibt bewusst LEER (§Punkt 75: kein
+// erfundener Vorher-Wert für bereits vergangene Regentschaften).
+function migrateSaveV6ToV7(parsed) {
+  const s = parsed.state;
+  const allThreads = Object.assign({}, s.storyThreads.active, s.storyThreads.resolved);
+  for (const id in allThreads) {
+    const thread = allThreads[id];
+    if (thread.resolution && typeof thread.resolution === "string") {
+      const originalYear = thread.history && thread.history.length ? thread.history[thread.history.length - 1].year : thread.startedYear;
+      const reclassified = classifyThreadResolution(s, thread, "NATURAL_END");
+      reclassified.year = originalYear;
+      reclassified.legacyLabel = thread.resolution; // ursprünglicher String bleibt nachvollziehbar erhalten
+      thread.resolution = reclassified;
+    }
+  }
+  if (!s.rulerEraSnapshots) s.rulerEraSnapshots = {};
+  parsed.saveVersion = 7;
+  return parsed;
+}
+
 function deserializeSave(json) {
   let parsed = JSON.parse(json);
   if (parsed.saveVersion === 2) parsed = migrateSaveV2ToV3(parsed);
   if (parsed.saveVersion === 3) parsed = migrateSaveV3ToV4(parsed);
   if (parsed.saveVersion === 4) parsed = migrateSaveV4ToV5(parsed);
   if (parsed.saveVersion === 5) parsed = migrateSaveV5ToV6(parsed);
+  if (parsed.saveVersion === 6) parsed = migrateSaveV6ToV7(parsed);
   if (parsed.saveVersion !== SAVE_VERSION) {
     throw new Error("Inkompatible Spielstand-Version: " + parsed.saveVersion);
   }

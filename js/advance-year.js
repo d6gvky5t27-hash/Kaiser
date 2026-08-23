@@ -159,6 +159,7 @@ function finalizeYear(state) {
   state.stats.maxPopulation = Math.max(state.stats.maxPopulation, totalPlayerPop);
   state.stats.maxTreasury = Math.max(state.stats.maxTreasury, state.treasury);
   state.stats.highestTitleIndex = Math.max(state.stats.highestTitleIndex, state.titleIndex);
+  state.stats.maxLand = Math.max(state.stats.maxLand || 0, r.land); // §Phase-7-Punkt 34: für "größtes Territorium"-Meilenstein
 
   // §Phase-6-Punkt 41: aktive Chains IMMER zuerst fortschreiben (kann neue
   // Memories/Thread-Signale erzeugen), DANN Story Threads mit dem
