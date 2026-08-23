@@ -2926,3 +2926,73 @@ bekannten unseeded `economy_test.js`-Flakiness), keine neuen
 `rnd()`-Aufrufe, Battle Engine unverändert (bestätigt per Diff),
 Savegames unverändert (keine neue SAVE_VERSION nötig, da keine
 State-Struktur geändert wurde).
+
+## 2026-08-23 – Phase 8B (KAISERREICH-Next-Generation-Master-Prompt): Main Screen + Map + HUD
+
+Zweite Teilphase — "die Spielwelt wird zur Bühne". Voller Ablauf,
+Wireframes, gefundene Bugs und Screen-Inventar in `UI_REDESIGN.md`
+Abschnitt 4/5. Additiv statt ersetzend: alle 6 bestehenden Tabs bleiben
+vollständig erhalten (§1 "bestehende Funktionen müssen erhalten
+bleiben") — REICH ist ein neuer, 7. Tab und wird der neue Standard-
+Bildschirm (`currentPage = 'reich'`).
+
+**Neues Modul `js/ui-viewmodels.js`** (bundled, `tests/ui_viewmodel_test.js`,
+25 Prüfungen, alle grün): `getHudViewModel()`, `getWorldMapViewModel()`,
+`getRegionSummaryViewModel()`, `getPrimaryStoryViewModel()`,
+`getAlertViewModel()`, `getYearTransitionViewModel()` — reine
+Transformationen über bereits reale `state`-Werte, nachweislich kein
+`rnd()`-Aufruf. Die Weltkarte nutzt keine neue Kartenmechanik, sondern
+exakt dieselbe `TERRITORIES`/`state.territories`-Struktur, die die
+Kriegskarte (`js/war-map.js`, unverändert) bereits pflegt — eine zweite,
+dauerhaft sichtbare, eher lesende Darstellung derselben Wahrheit statt
+eines nur-während-des-Kriegs geöffneten Overlays. Klick auf ein Gebiet
+zeigt im Kontextpanel die Wirtschaftsdaten der es besitzenden Region
+(`state.regions[owner]` — die Simulation rechnet auf Regions-, nicht auf
+Territoriumsebene). Die Story Card übersetzt `state.drama.focusThreadId`
+(Phase 6) in natürlichsprachliche Sätze statt Debug-Werte zu zeigen; die
+Warnungen sind jede einzeln auf eine bereits bestehende Schwelle
+zurückgeführt (`grainRatio < 0.5`, `treasury < 0` wie in
+`computeDramaTensionBreakdown()`, Titelaufstiegs-Fortschritt wie in
+`checkTitleUp()`), keine neue Schwelle erfunden.
+
+**Drei reale Layout-Bugs per Playwright-Klicktest gefunden und behoben**
+(reine Screenshots hätten sie übersehen): (1) `#worldMapSvg` blockierte
+mit einem versehentlichen `z-index` alle Klicks auf Kartenknoten —
+`pointer-events: none` auf der reinen Linienebene behoben. (2) Die
+bestehende generische `[data-tip] { position: relative; ... }`-Tooltip-
+Regel gewann bei gleicher Selektor-Spezifität gegen `.reichNode`s
+`position: absolute` (jeder Kartenknoten trägt selbst ein Tooltip) —
+alle Knoten stapelten sich im Textfluss übereinander. Behoben mit der
+höher-spezifischen `div.reichNode`; relevant für JEDES künftige Element,
+das gleichzeitig `data-tip` und eigene Positionierung braucht. (3) Der
+globale `button`-Reset (`margin: 3px 3px 3px 0`) addierte sich in einem
+Flex-Container mit eigenem `gap` und drängte den letzten Kontextpanel-
+Tab aus dem sichtbaren Bereich — `margin: 0` auf den neuen Tab-Klassen.
+
+**Responsive, bei allen drei Pflichtauflösungen per Playwright geprüft**
+(1920×1080/1440×900/1366×768). `#frame` ist jetzt `width: min(96vw,
+1440px)` statt fest 960px. Bei 1366×768 zeigte sich zusätzlich: 4
+Kontextpanel-Tabs nebeneinander passen selbst im breiten Panel nicht
+komfortabel — auf ein 2×2-Raster umgestellt; die Kartenhöhe ist auf
+`max-height: 52vh` gedeckelt, damit Story Card/Warnungen/Jahreswechsel-
+Leiste ohne Scrollen sichtbar bleiben.
+
+**Visuell verifiziert** (5 Szenarien): Hauptbildschirm ohne Panel, Gebiet
+ausgewählt (eigen + fremd), aktive Geschichte ("Die Hungerjahre von
+Bayern" — natürlichsprachlich), kritische Warnungen (Nahrung kritisch/
+Krieg/Thronfolge ungeklärt, priorisiert vor "wichtig"), ruhiger Zustand
+("Das Reich befindet sich in ruhigen Jahren.", nur wenn tatsächlich kein
+aktiver Thread existiert).
+
+**Bewusst NICHT Teil dieser Teilphase:** Hof/Dynastie/Event-Fenster/
+Diplomatie/Chronik/Kampf komplett umbauen (8C–8H), finaler Accessibility-/
+Polish-Pass über alle Screens (8I). `js/*.js`-Änderung beschränkt sich auf
+das neue, rein lesende `js/ui-viewmodels.js` — kein bestehendes Modul
+verändert. Bundle-Größe 592.280 → 620.692 Bytes (+4,8 %, primär das neue
+ViewModel-Modul plus HTML/CSS für den neuen Hauptbildschirm). DOM-Knoten
+innerhalb `#frame`: 887 (Reich-Seite, inkl. aller weiterhin im DOM
+vorhandenen, nur per `display:none` verborgenen Alt-Seiten). Alle Tests
+weiterhin grün (außer der bekannten unseeded `economy_test.js`-
+Flakiness), keine neuen `rnd()`-Aufrufe (getestet), Battle Engine
+unverändert (bestätigt per Diff), keine neue SAVE_VERSION (keine
+State-Struktur geändert).

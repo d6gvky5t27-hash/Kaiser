@@ -297,33 +297,116 @@ Token-Werte — hier nur die Entscheidungen und Begründungen:
   gut, §159 "zentraler Tooltip-Stil" ist damit schon erfüllt), nur
   farblich an die neue Palette angepasst.
 
-## 4. Screen Inventory (Status nach dieser Teilphase)
+## 4. Phase 8B: Main Screen + Map + HUD
+
+Zweite Teilphase — "die Spielwelt wird zur Bühne". Umfasst ausschließlich
+Hauptlayout, Welt-/Regionskarte, obere Statusleiste, Hauptnavigation,
+Kontextpanel, Story Card/Warnungen, Jahreswechsel-Hinweis. Hof, Dynastie,
+Event-Fenster, Diplomatie, Chronik, Kampf bleiben bewusst unangetastet
+(§72-73/71/70).
+
+**Architekturentscheidung: additiv statt ersetzend.** Die bestehenden 6
+Tabs (Provinz/Hof/Wirtschaft/Diplomatie/Karte&Gebäude/Militär) bleiben
+vollständig erhalten und funktional unverändert (§1 oberste Regel:
+"Bestehende Funktionen müssen erhalten bleiben") — REICH ist ein NEUER,
+7. Tab, der zum Standardbildschirm wird. Kein bestehender Screen wurde
+entfernt oder umgebaut.
+
+**Weltkarte wiederverwendet echte, bereits bestehende Daten.** Statt einer
+neuen Kartenmechanik nutzt die neue, dauerhaft sichtbare Karte exakt
+dieselbe `TERRITORIES`/`state.territories`-Struktur, die die Kriegskarte
+(`js/war-map.js`) bereits seit einer früheren Ausbaustufe pflegt — 16
+Gebiete, real simulierter Besitzer/Garnison/Aufstellung. Die Kriegskarte
+selbst bleibt unverändert als eigenes Kriegs-Overlay bestehen; die neue
+Karte ist eine zweite, permanente, eher lesende Darstellung derselben
+Wahrheit. Klick auf ein Gebiet zeigt im Kontextpanel die Wirtschaftsdaten
+der ES BESITZENDEN Region (`state.regions[owner]`) — ehrlich so benannt,
+da die Simulation wirtschaftlich auf Regions-, nicht auf Territoriums-
+Ebene rechnet.
+
+**Neues Modul `js/ui-viewmodels.js`** (bundled, getestet in
+`tests/ui_viewmodel_test.js`, 25 Prüfungen): `getHudViewModel()`,
+`getWorldMapViewModel()`, `getRegionSummaryViewModel()`,
+`getPrimaryStoryViewModel()`, `getAlertViewModel()`,
+`getYearTransitionViewModel()` — reine Transformationen über bereits
+reale state-Werte, kein `rnd()`-Aufruf (getestet), keine Gameplaylogik.
+Die Story Card übersetzt `state.drama.focusThreadId`/`thread.status`
+(bereits vorhanden seit Phase 6) in natürlichsprachliche Sätze statt
+Debug-Werte zu zeigen. Die Warnungen sind jede einzeln auf eine bereits
+bestehende Schwelle zurückgeführt (Kommentare im Code nennen die Quelle),
+z. B. `grainRatio < 0.5` (dieselbe Schwelle wie ein bestehendes Debug-
+Event), `treasury < 0` (dieselbe Schwelle wie `computeDramaTensionBreakdown()`s
+"weakEconomy"), Titelaufstieg-Fortschritt (dieselben Felder wie der
+tatsächliche `checkTitleUp()`-Vergleich in `js/politics.js`).
+
+**Drei reale Layout-Bugs gefunden und behoben** (Playwright-Klicktest hat
+sie aufgedeckt, nicht nur Screenshots — reiner visueller Vergleich hätte
+sie übersehen):
+1. `#worldMapSvg` erhielt versehentlich ein `z-index` über der Knoten-
+   ebene und blockierte alle Klicks auf Gebiete — behoben mit
+   `pointer-events: none` auf der reinen Linienebene (SVGs, die nur
+   Dekoration zeichnen, sollten das grundsätzlich immer haben).
+2. Die bereits bestehende generische Tooltip-Regel `[data-tip] {
+   position: relative; ... }` (gleiche Selektor-Spezifität, aber später
+   in der Kaskade) überschrieb `position: absolute` auf allen
+   Kartenknoten, weil jeder Knoten selbst ein `data-tip`-Tooltip trägt —
+   alle Knoten landeten dadurch im normalen Textfluss übereinander
+   gestapelt. Behoben durch die höhere Spezifität `div.reichNode`
+   statt `.reichNode`. **Wichtig für spätere Teilphasen**: JEDES neue
+   Element, das gleichzeitig `data-tip` UND eine eigene `position`
+   braucht, ist von genau demselben Kaskaden-Konflikt betroffen.
+3. Der globale `button`-Reset setzt `margin: 3px 3px 3px 0` — in einem
+   Flex-Container mit eigenem `gap` addierte sich das zur Kontextpanel-
+   Tab-Reihe auf und drängte den letzten Tab aus dem sichtbaren Bereich.
+   Behoben mit `margin: 0` auf den neuen Tab-/Nav-Button-Klassen.
+
+**Responsive, per Playwright bei allen drei Pflichtauflösungen geprüft**
+(1920×1080/1440×900/1366×768, siehe Screenshots): `#frame` ist jetzt
+`width: min(96vw, 1440px)` statt fest 960px. Bei 1366×768 zeigte sich
+zusätzlich, dass 4 Kontextpanel-Tabs nebeneinander ("ÜBERSICHT/
+WIRTSCHAFT/BEVÖLKERUNG/MILITÄR") selbst im breiten Panel nicht bequem
+passen — auf ein 2×2-Raster umgestellt. Die Kartenhöhe ist zusätzlich auf
+`max-height: 52vh` gedeckelt, damit Story Card/Warnungen/Jahreswechsel-
+Leiste bei 768px Höhe ohne Scrollen sichtbar bleiben.
+
+**Visuell verifiziert** (5 Szenarien, §57/58): Hauptbildschirm ohne Panel,
+Gebiet ausgewählt (eigenes + fremdes Territorium), aktive Geschichte
+("Die Hungerjahre von Bayern" — ACTIVE, natürlichsprachlich statt
+Debug-Wert), kritische Warnungen (Nahrung kritisch/Krieg/Thronfolge
+ungeklärt, alle mit rotem Punkt priorisiert vor der gelben "wichtig"-
+Stufe), ruhiger Zustand ("Das Reich befindet sich in ruhigen Jahren.",
+nur wenn tatsächlich kein aktiver Thread existiert). Der Herrschername
+ist visuell größer als jeder Ressourcenwert (§8), die Karte nimmt den
+dominanten Anteil der Fläche ein (§3).
+
+## 5. Screen Inventory (Status nach Phase 8A + 8B)
 
 | Screen/Bereich | Status | Anmerkung |
 |---|---|---|
 | Design Tokens (Farben/Typografie/Spacing/Radius/Schatten/Buttons/Z-Index) | **REDESIGNED** | 8A, siehe Abschnitt 3 |
 | Titelbildschirm / Intro | **REDESIGNED** | erbt Tokens vollständig, Layout unverändert (bereits zentral/emotional, §123/124 im Kern schon erfüllt) |
 | Charaktererstellung | **REDESIGNED** | erbt Tokens, Formularstruktur unverändert |
-| Topbar / Navigation (Pagetabs) | **REDESIGNED** | Tokens + Button-System angewendet; BLEIBT strukturell eine horizontale Tableiste (kein Karten-Hauptbildschirm, kein Seitennav-Umbau — das ist 8B/spätere Teilphase) |
-| Provinz/Hof/Wirtschaft/Diplomatie/Militär-Panels | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | Farben/Schrift/Buttons neu, Informationsarchitektur (§140, Charakterkarten, Stammbaum, Story-Thread-Sichtbarkeit) NICHT verändert |
-| Event-/Geburt-/Heirat-/Kassenbuch-Modals | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | kein Illustrationsbereich (§56-58), keine große Entscheidungs-Button-Neugestaltung |
-| Kampf-Overlay | **REDESIGNED** (Tokens) | Battle Engine unverändert (§64/§82 bestätigt), Strukturaufwertung §65-69 nicht Teil dieser Teilphase |
-| Kriegskarte-Overlay | **REDESIGNED** (Tokens) | Kartenstil (§12-17, handgezeichnete Landkarte) nicht Teil dieser Teilphase |
-| Weltkarte als Hauptbildschirm-Zentrum (§10/§11) | **LEGACY** | noch nicht begonnen — größter struktureller Umbau, für eine eigene Folge-Teilphase vorgesehen |
-| Charakterportraits/Placeholder-System (§36-38) | **LEGACY** | noch nicht begonnen |
-| Dynastie-/Stammbaum-Ansicht (§45-49) | **LEGACY** | noch nicht begonnen |
-| Story-Thread-Spieler-UI (§50-54) | **LEGACY** | noch nicht begonnen (nur Debug-Panel vorhanden) |
-| Chronik-als-Buch-Ansicht (§76-82) | **LEGACY** | noch nicht begonnen (bestehende `#chronicle`-Liste bleibt) |
-| Game Over / Dynastie-Ende-Inszenierung (§129-131) | **REDESIGNED** (Tokens) | Struktur unverändert |
+| Hauptbildschirm REICH (Karte/HUD/Nav/Kontextpanel/Story Card/Warnungen) | **REDESIGNED** | 8B, siehe Abschnitt 5 — neuer Standardbildschirm |
+| Topbar (Herrscher/Jahr/Schatz/Bevölkerung/Prestige/Legitimität/Nahrung) | **REDESIGNED** | 8B — Herrscher groß/zuerst, Werte als Icon+Zahl+Tooltip |
+| Hauptnavigation | **REDESIGNED** | 8B — schmale vertikale Seitenleiste statt horizontaler Tableiste, 7 Einträge (bestehende 6 + neu REICH) |
+| Provinz/Hof/Wirtschaft/Diplomatie/Militär-Panels (Seiteninhalt) | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | weiterhin über die Navigation erreichbar, Informationsarchitektur innerhalb der einzelnen Seiten unverändert (das ist 8C/8D/8E/8G) |
+| Event-/Geburt-/Heirat-/Kassenbuch-Modals | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | kein Illustrationsbereich (§56-58), das ist 8F |
+| Kampf-Overlay | **REDESIGNED** (Tokens) | Battle Engine unverändert (§61 bestätigt), Strukturaufwertung ist 8G |
+| Kriegskarte-Overlay | **REDESIGNED** (Tokens) | Kartenstil (handgezeichnete Landkarte) weiterhin nicht vertieft, bleibt als reines Kriegs-Overlay bestehen |
+| Welt-/Regionskarte als Hauptbildschirm-Zentrum | **REDESIGNED** | 8B — siehe Abschnitt 5 |
+| Charakterportraits/Placeholder-System | **LEGACY** | noch nicht begonnen (8D) — Topbar-Portrait ist bewusst nur ein einfacher Emoji-Platzhalter |
+| Dynastie-/Stammbaum-Ansicht | **LEGACY** | noch nicht begonnen (8D) |
+| Story-Thread-Spieler-UI | **REDESIGNED** (Story Card, Kurzform) / **LEGACY** (volle Ansicht) | 8B liefert nur die kompakte Fokus-Karte auf dem Hauptbildschirm (§12-15/43), eine vollständige Story-Thread-Liste/-Historie im Spieler-UI ist 8F |
+| Chronik-als-Buch-Ansicht | **LEGACY** | noch nicht begonnen (8H, bestehende `#chronicle`-Liste bleibt) |
+| Game Over / Dynastie-Ende-Inszenierung | **REDESIGNED** (Tokens) | Struktur unverändert |
 | Debug-Panel | **REDESIGNED** (Tokens) | bewusst weiterhin optisch als Debug erkennbar (§146), keine Graphic-Novel-Anmutung gewünscht |
-| Responsive/Accessibility-Politur (8I) | **LEGACY** | noch nicht begonnen |
+| Responsive/Accessibility-Politur (8I) | **PARTIAL** | 8B bereits bei 3 Pflichtauflösungen getestet und angepasst (siehe Abschnitt 5), ein finaler Accessibility-/Polish-Pass über ALLE Screens bleibt 8I vorbehalten |
 
-**Ehrliche Einordnung:** Diese erste Teilphase liefert das komplette
-Design-System (Farben, Typografie, Abstände, Schatten, Buttons, Z-Index)
-und wendet es auf die GESAMTE bestehende Oberfläche an — das ist bereits
-ein klar sichtbarer Wechsel weg vom Comic-Look hin zur Renaissance-
-Palette. Die in §10-17/36-58/76-82 verlangten STRUKTURELLEN Neubauten
-(Karten-Hauptbildschirm, Charakterkarten, Stammbaum, Story-Thread-UI,
-Chronik-Buch) sind bewusst NICHT Teil dieser Teilphase — sie sind laut
-Auftrag selbst als spätere Teilphasen (8B–8H) vorgesehen und würden in
-einem einzigen Rutsch genau den in §116 verbotenen "Großbang" darstellen.
+**Ehrliche Einordnung:** 8A lieferte das Design-System, 8B den
+map-zentrierten Hauptbildschirm mit echter HUD/Kontextpanel/Story-Card/
+Warnungs-Funktionalität — beide zusammen bereits ein klar sichtbarer
+Wechsel weg vom "Dashboard"-Look hin zu "das ist mein Reich". Die in
+§72-73/71/70 explizit aufgeschobenen STRUKTURELLEN Neubauten (Hof-
+Charakterkarten, Stammbaum, Event-Illustrationen, Diplomatie-Umbau,
+Chronik-Buch, Kampf-Neuinszenierung) sind weiterhin bewusst NICHT Teil
+dieser Teilphase — sie sind laut Auftrag selbst als 8C–8H vorgesehen.
