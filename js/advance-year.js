@@ -43,7 +43,13 @@ function processAllRegions(state) {
     if (weather.factor < 0.8 || weather.factor > 1.2) {
       addChronicle(state, `In ${r.name} herrschte ${weather.name} (Ernteeinfluss ${(weather.factor*100).toFixed(0)}%).`);
     }
-    computeProduction(r);
+    // §Phase-8C: computeProduction() gab ihr Ergebnis bisher nur transient
+    // zurück (sofort verworfen) -- für eine ehrliche "Produktion/Jahr"-Anzeige
+    // (statt sie im UI ein zweites Mal zu berechnen, was computeProduction()s
+    // Warenverbrauch versehentlich verdoppeln würde) wird der bereits
+    // berechnete echte Wert hier nur zusätzlich gespeichert, siehe r.lastHarvestFactor/
+    // r.lastPopBreakdown für dasselbe etablierte Muster.
+    r.lastProduction = computeProduction(r);
     computeGrainBalance(r); // vor der Verteilung erfassen: verfügbares Getreide vs. Grundbedarf
     updatePriceNoise(r); // Marktspekulation: Preise schwanken auch ohne Angebots-/Nachfrageänderung
     const prices = computeRegionalPrices(r);
