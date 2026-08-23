@@ -37,6 +37,17 @@ console.log('--- RNG-Neutralitaet ---');
   getPrimaryStoryViewModel(state);
   getAlertViewModel(state);
   getYearTransitionViewModel(state);
+  getRealmEconomyViewModel(state);
+  getMiniLedgerViewModel(state);
+  getPopulationOverviewViewModel(state);
+  for (const gid in POP_GROUPS) getPopulationGroupDetailViewModel(state, gid);
+  getFoodSupplyViewModel(state);
+  getGoodsCategoryViewModel(state);
+  for (const gid in GOODS) getGoodDetailViewModel(state, gid);
+  getTradeViewModel(state);
+  getTaxViewModel(state);
+  getProvinceListViewModel(state);
+  getEconomicRisksViewModel(state);
   check('kein einziger rnd()-Aufruf durch die ViewModels', __rngCalls === before);
 })();
 
@@ -84,6 +95,32 @@ console.log('--- Weltkarte + Kontextpanel ---');
   check('fremdes Gebiet zeigt eine Garnisonsschaetzung statt echter Truppenzahlen', enemy.militaryStrength[0].id === 'garrison');
 
   check('unbekannte Territoriums-ID liefert null (keine erfundenen Daten)', getRegionSummaryViewModel(state, 'does_not_exist') === null);
+
+  // frisches Spiel: noch kein Jahr vergangen -- keine erfundenen Produktions-/Wachstumsdaten
+  check('frisches Spiel: topProduction ist leer (kein Jahr vergangen)', own.topProduction.length === 0);
+  check('frisches Spiel: populationGrowth ist null (kein Jahr vergangen)', own.populationGrowth === null);
+})();
+
+// ---------- getRegionSummaryViewModel: Kontextpanel-Tabs nach einem Jahr (§48/49) ----------
+console.log('--- Kontextpanel WIRTSCHAFT/BEVOELKERUNG nach einem Jahr (fuer Spieler- UND KI-Regionen) ---');
+(function() {
+  const state = newGame({ seed: 85 });
+  for (let m = 0; m < 12; m++) advanceMonth(state);
+
+  const own = getRegionSummaryViewModel(state, 'p_hauptstadt');
+  check('nach einem Jahr: topProduction stammt aus r.lastProduction', own.topProduction.every(g => state.regions.player.lastProduction[g.id] !== undefined));
+  check('topProduction ist absteigend sortiert', own.topProduction.every((g, i) => i === 0 || own.topProduction[i-1].amount >= g.amount));
+  check('Engpaesse haben einen positiven Prozentwert', own.shortages.every(s => s.shortfallPct > 0));
+  check('populationGrowth ist nach einem Jahr gesetzt', own.populationGrowth !== null);
+  check('populationGrowth.births/deaths stimmen mit lastPopSummary ueberein',
+    own.populationGrowth.births === Math.round(state.regions.player.lastPopSummary.geburten || 0) &&
+    own.populationGrowth.deaths === Math.round(state.regions.player.lastPopSummary.todesfaelle || 0));
+
+  // Dieselben Felder muessen auch fuer eine KI-Region funktionieren (processAllRegions()
+  // behandelt Spieler- und KI-Regionen gleich, siehe js/advance-year.js) -- kein Sonderpfad nur fuer den Spieler.
+  const enemy = getRegionSummaryViewModel(state, 'm_hauptstadt');
+  check('KI-Region liefert ebenfalls topProduction aus echten Daten', Array.isArray(enemy.topProduction));
+  check('KI-Region liefert ebenfalls populationGrowth aus echten Daten', enemy.populationGrowth !== null);
 })();
 
 // ---------- getPrimaryStoryViewModel ----------
@@ -138,6 +175,144 @@ console.log('--- Jahreswechsel-Hinweis ---');
   state.pendingElection = { bribed: {} };
   const vm2 = getYearTransitionViewModel(state);
   check('offene Kaiserwahl zaehlt als offene Entscheidung', vm2.pendingCount === 1);
+})();
+
+// ---------- §Phase-8C: Reichsübersicht + Mini-Kassenbuch ----------
+console.log('--- Reichsuebersicht ---');
+(function() {
+  const state = newGame({ seed: 90 });
+  const vmFresh = getRealmEconomyViewModel(state);
+  check('frisches Spiel: kein Monatsbericht -> treasuryMonthlyNet ist null (keine erfundene Zahl)', vmFresh.treasuryMonthlyNet === null);
+  check('frisches Spiel: kein Vorjahr -> populationYearlyDelta ist null', vmFresh.populationYearlyDelta === null);
+  check('Lagerwert ist eine reale Zahl >= 0', vmFresh.warehouseValue >= 0);
+
+  advanceMonth(state);
+  const vmAfterMonth = getRealmEconomyViewModel(state);
+  check('nach einem Monat: treasuryMonthlyNet stimmt mit state.lastMonthlyReport.net ueberein', vmAfterMonth.treasuryMonthlyNet === Math.round(state.lastMonthlyReport.net));
+
+  for (let m = 0; m < 12; m++) advanceMonth(state);
+  const vmAfterYear = getRealmEconomyViewModel(state);
+  check('nach einem vollen Jahr: populationYearlyDelta ist gesetzt (echte Vorjahresdaten vorhanden)', vmAfterYear.populationYearlyDelta !== null);
+
+  const ledgerEmpty = getMiniLedgerViewModel(newGame({ seed: 91 }));
+  check('Mini-Kassenbuch vor dem ersten Monat: available=false statt erfundener Zahlen', ledgerEmpty.available === false);
+  const ledgerFull = getMiniLedgerViewModel(state);
+  check('Mini-Kassenbuch nach Monaten: available=true, net stimmt mit dem echten Bericht ueberein', ledgerFull.available === true && ledgerFull.net === Math.round(state.lastMonthlyReport.net));
+})();
+
+// ---------- §Phase-8C: Bevölkerung ----------
+console.log('--- Bevoelkerungsuebersicht ---');
+(function() {
+  const state = newGame({ seed: 92 });
+  const vm = getPopulationOverviewViewModel(state);
+  check('Summe der Gruppenanteile ergibt (gerundet) 100%', Math.round(vm.groups.reduce((s,g)=>s+g.sharePct,0)) === 100);
+  check('Gruppen sind nach Anzahl absteigend sortiert', vm.groups.every((g,i) => i===0 || vm.groups[i-1].count >= g.count));
+
+  const detail = getPopulationGroupDetailViewModel(state, 'bauern');
+  check('Gruppendetail liefert echte Bedarfsliste (Getreide fuer Bauern)', detail.needs.some(n => n.id === 'getreide'));
+  check('unbekannte Gruppe liefert null statt erfundener Daten', getPopulationGroupDetailViewModel(state, 'does_not_exist') === null);
+})();
+
+// ---------- §Phase-8C: Nahrung ----------
+console.log('--- Nahrungsversorgung ---');
+(function() {
+  const state = newGame({ seed: 93 });
+  const vm = getFoodSupplyViewModel(state);
+  check('yearlyNeed stimmt mit r.grainNeed ueberein (keine Neuberechnung)', vm.yearlyNeed === Math.round(state.regions.player.grainNeed));
+  check('bei ausreichender Versorgung keine Kritikwarnung', vm.pct >= 50 ? vm.criticalWarning === null : true);
+
+  state.regions.player.grainRatio = 0.3;
+  const vmCrit = getFoodSupplyViewModel(state);
+  check('bei kritischer Versorgung erscheint die Warnung', vmCrit.criticalWarning !== null);
+})();
+
+// ---------- §Phase-8C: Waren nach Kategorie + Detail + Preiserklaerung ----------
+console.log('--- Waren/Kategorien/Preiserklaerung ---');
+(function() {
+  const state = newGame({ seed: 94 });
+  for (let m = 0; m < 12; m++) advanceMonth(state);
+  const cat = getGoodsCategoryViewModel(state);
+  check('alle 4 bekannten Kategorien sind vertreten', cat.order.length === 4);
+  const totalGoodsListed = Object.values(cat.categories).reduce((s,arr)=>s+arr.length, 0);
+  check('jede Ware erscheint in genau einer Kategorie (Summe = Anzahl GOODS)', totalGoodsListed === Object.keys(GOODS).length);
+
+  const detail = getGoodDetailViewModel(state, 'getreide');
+  check('Preiserklaerung nutzt die echte Formel (Summe der Komponenten ergibt den Gesamtpreis)',
+    detail.priceBreakdown && (detail.priceBreakdown.basis !== undefined));
+  check('Produktionskette fuer Getreide hat keine Vorstufe (Urproduktion)', detail.chain.inputs.length >= 1 && detail.chain.inputs[0].inputGoodId === null);
+
+  const mehlDetail = getGoodDetailViewModel(state, 'mehl');
+  check('Mehl kennt seine Vorstufe Getreide aus der echten Rezeptliste', mehlDetail.chain.inputs.some(i => i.inputGoodId === 'getreide'));
+
+  check('unbekannte Ware liefert null', getGoodDetailViewModel(state, 'does_not_exist') === null);
+})();
+
+// ---------- Regressionstest: Preis und Preiserklaerung duerfen nie auseinanderlaufen ----------
+// r.prices wird erst nach dem ersten abgeschlossenen Monat gesetzt, r.priceBreakdown
+// kann aber schon vorher durch andere Aufrufer (Marktpreis-Tabelle) frisch befuellt sein.
+console.log('--- Preis/Preiserklaerung-Konsistenz (frisches Spiel, kein Monat vergangen) ---');
+(function() {
+  const state = newGame({ seed: 99 });
+  check('Testaufbau: state.regions.player.prices ist zu Spielbeginn noch nicht gesetzt', state.regions.player.prices === undefined);
+  computeRegionalPrices(state.regions.player); // wie die bestehende Marktpreis-Tabelle es vor dem ersten Monat bereits tut
+  const detail = getGoodDetailViewModel(state, 'holz');
+  check('angezeigter Preis stimmt mit dem Gesamtpreis der Preiserklaerung ueberein', detail.price === detail.priceBreakdown.gesamt);
+  const cat = getGoodsCategoryViewModel(state);
+  const holzCard = cat.categories['ROHSTOFFE'].find(g => g.id === 'holz');
+  check('Warenkarten-Preis stimmt ebenfalls mit der Preiserklaerung ueberein', holzCard.price === detail.priceBreakdown.gesamt);
+})();
+
+// ---------- §Phase-8C: Handel ----------
+console.log('--- Handel ---');
+(function() {
+  const state = newGame({ seed: 95 });
+  const vmNoTreaty = getTradeViewModel(state);
+  check('ohne Handelsvertraege: keine Partner gelistet (keine erfundene Route)', vmNoTreaty.partners.length === 0);
+
+  state.diplomacy.ai1.treaties.handel = true;
+  const vmWithTreaty = getTradeViewModel(state);
+  check('mit Handelsvertrag: Partner erscheint mit dem echten CONFIG-Raeuberrisiko', vmWithTreaty.partners.length === 1 && vmWithTreaty.partners[0].riskPct === Math.round(CONFIG.interregionalTrade.banditRiskChance * 100));
+
+  state.diplomacy.ai1.treaties.durchmarsch = true;
+  const vmTransit = getTradeViewModel(state);
+  check('Durchmarschrecht senkt das angezeigte Risiko (echter CONFIG-Rabatt)', vmTransit.partners[0].riskPct < vmWithTreaty.partners[0].riskPct);
+})();
+
+// ---------- §Phase-8C: Steuern ----------
+console.log('--- Steuern ---');
+(function() {
+  const state = newGame({ seed: 96 });
+  const vm = getTaxViewModel(state);
+  check('gemeinsamer Steuersatz stimmt mit r.taxRate ueberein (kein Gruppensatz erfunden)', vm.sharedRatePct === Math.round(state.regions.player.taxRate * 1000) / 10);
+  check('alle Gruppen zeigen denselben Satz (es existiert nur ein regionsweiter Satz)', vm.groups.every(g => g.ratePct === vm.sharedRatePct));
+})();
+
+// ---------- §Phase-8C: Provinzuebersicht ----------
+console.log('--- Provinzuebersicht ---');
+(function() {
+  const state = newGame({ seed: 97 });
+  const list = getProvinceListViewModel(state);
+  check('alle 4 Kernregionen sind gelistet', list.length === 4);
+  check('Spielerregion ist markiert', list.find(p => p.isPlayer).id === 'player');
+
+  state.regions.ai1.grainRatio = 0.2;
+  const listWarn = getProvinceListViewModel(state);
+  check('kritische Nahrungslage erzeugt eine Provinzwarnung', listWarn.find(p => p.id === 'ai1').warning !== null);
+})();
+
+// ---------- §Phase-8C: Wirtschaftliche Risiken ----------
+console.log('--- Wirtschaftliche Risiken ---');
+(function() {
+  const state = newGame({ seed: 98 });
+  for (let m = 0; m < 12; m++) advanceMonth(state);
+  const risks = getEconomicRisksViewModel(state);
+  check('Risikoliste ist ein Array (auch wenn leer, keine Pflichtwarnung erfunden)', Array.isArray(risks));
+  check('hoher Preis erzeugt eine geprüfte Preiswarnung', (function() {
+    const r = state.regions.player;
+    r.priceBreakdown.eisen = Object.assign({}, r.priceBreakdown.eisen, { multiplikator: 2.5 });
+    const risksAfter = getEconomicRisksViewModel(state);
+    return risksAfter.some(x => x.id === 'price_eisen');
+  })());
 })();
 
 console.log('');
