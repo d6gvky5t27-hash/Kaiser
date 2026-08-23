@@ -192,19 +192,91 @@ function recordThreadHistory(thread, year, note) {
   thread.history.push({ year, status: thread.status, note });
 }
 
-// ---------- Importance/Momentum (§Punkt 30/32) ----------
-function computeThreadImportance(state, thread) {
-  let imp = 20;
+// ---------- Importance 2.0 (§Phase-7-Punkt 3-7) ----------
+// Wichtigster Audit-Fund vor dieser Überarbeitung (§Punkt 2/3): Importance
+// variierte für SUCCESSION_CONFLICT/PERSONAL_RIVALRY praktisch GAR NICHT
+// (jede der 115 SUCCESSION_CONFLICT-Threads in den Phase-6-Metriken hatte
+// exakt Importance 43) — Ursache war, dass `thread.actorIds` für diese
+// Typen bewusst nur die GEGENSPIELER-ID enthält, nie die des Herrschers
+// (der wird absichtlich LIVE über state.rulerId referenziert, §Phase-6-
+// Punkt 59-Analogon) — der alte `actorIds.includes(state.rulerId)`-Check
+// konnte dadurch strukturell NIE zutreffen. Behoben durch eine explizite
+// `threadInvolvesRuler()`-Prüfung statt einer reinen ID-Mitgliedschaft.
+// Wichtig (§Punkt 7): Importance ist NICHT Tension — ein friedlich
+// gelöster Thronfolgestreit kann Tension 0, aber Importance 80+ behalten
+// (Tension wird oben nie in die Importance-Formel einbezogen).
+function threadInvolvesRuler(state, thread) {
+  if (thread.actorIds.includes(state.rulerId)) return true;
+  if (thread.regionIds.includes("player")) return true;
+  // Diese drei Typen sind per Definition IMMER auf den Herrscher bezogen
+  // (Rivalität/Anspruch gegen ihn, eigene kaiserliche Ambition) — das ist
+  // keine erfundene Pauschale, sondern folgt direkt aus den jeweiligen
+  // detect()-Funktionen oben, die genau das voraussetzen.
+  return thread.type === "SUCCESSION_CONFLICT" || thread.type === "PERSONAL_RIVALRY" || thread.type === "IMPERIAL_AMBITION";
+}
+
+function threadInvolvesHeir(state, thread) {
   const ruler = state.characters[state.rulerId];
-  if (thread.actorIds.includes(state.rulerId)) imp += 20;
-  if (ruler && thread.actorIds.some(id => ruler.childrenIds.includes(id))) imp += 15; // Erbe beteiligt
-  if (thread.regionIds.includes("player")) imp += 10;
-  if (thread.type === "FOOD_CRISIS" || thread.type === "ECONOMIC_CRISIS") imp += 10; // betrifft die Bevölkerung
-  if (thread.type === "IMPERIAL_AMBITION") imp += 25; // Kaiserwahl, §Punkt 56 "sehr groß"
-  if (thread.type === "SUCCESSION_CONFLICT") imp += 20; // Thronfolge, §Punkt 56 "groß"
-  if (thread.type === "FOREIGN_CONFLICT" && thread.regionIds.some(id => state.warState && state.warState[id])) imp += 15; // echter Krieg
-  imp += Math.min(thread.memoryIds.length * 3, 15); // historischer Einfluss
-  return clamp(Math.round(imp), 0, 100);
+  if (ruler && thread.actorIds.some(id => ruler.childrenIds.includes(id))) return true;
+  // Ein Thronfolgestreit handelt per Definition davon, wer die Nachfolge
+  // antritt/angetreten hat — der (unbeteiligte) Thronfolger ist die
+  // implizite Gegenseite jedes SUCCESSION_CONFLICT-Threads.
+  return thread.type === "SUCCESSION_CONFLICT";
+}
+
+// §Punkt 6: vollständig aufgeschlüsselte, debuggbare Komponenten statt
+// einer Blackbox — dieselbe Struktur dient sowohl der internen Berechnung
+// als auch explainThreadImportance() fürs Debug-Panel (eine Quelle der
+// Wahrheit).
+function computeThreadImportanceBreakdown(state, thread) {
+  const components = [{ label: "Basis", value: 15 }];
+  let total = 15;
+  const add = (label, value) => { if (value) { components.push({ label, value }); total += value; } };
+
+  add("Herrscher beteiligt", threadInvolvesRuler(state, thread) ? 15 : 0);
+  add("Thronfolger betroffen", threadInvolvesHeir(state, thread) ? 15 : 0);
+
+  const strongClaim = thread.actorIds.some(id => {
+    const c = state.characters[id];
+    return c && c.claims.some(cl => cl.titleId === "player" && (cl.strength === "strong" || cl.strength === "primary"));
+  });
+  add("Starker Anspruch beteiligt", strongClaim ? 10 : 0);
+
+  const ruler = state.characters[state.rulerId];
+  const rivalryInvolved = thread.type === "PERSONAL_RIVALRY" || thread.type === "SUCCESSION_CONFLICT" ||
+    (ruler && thread.actorIds.some(id => ruler.rivalIds.includes(id)));
+  add("Rivalität", rivalryInvolved ? 8 : 0);
+
+  const atWar = thread.type === "FOREIGN_CONFLICT" && thread.regionIds.some(id => state.warState && state.warState[id]);
+  add("Krieg", atWar ? 20 : 0);
+
+  const rulerChangedDuring = thread.history.some(h => h.note && h.note.includes("Herrscher wechselte"));
+  add("Herrscherwechsel während der Geschichte", rulerChangedDuring ? 10 : 0);
+
+  add("Wirtschaftlicher/Versorgungsschaden", (thread.type === "ECONOMIC_CRISIS" || thread.type === "FOOD_CRISIS") ? 12 : 0);
+
+  const endYear = thread.history.length ? thread.history[thread.history.length - 1].year : state.year;
+  const duration = Math.max(0, endYear - thread.startedYear);
+  add(`Dauer ${duration} Jahre`, Math.min(Math.round(duration / 2), 15));
+
+  add(`${thread.memoryIds.length} bedeutende Erinnerung(en)`, Math.min(thread.memoryIds.length * 4, 16));
+
+  add("Kaiser-/Titelbezug", thread.type === "IMPERIAL_AMBITION" ? 20 : 0);
+
+  const reachedClimax = thread.history.some(h => h.status === "CLIMAX");
+  add("CLIMAX erreicht", reachedClimax ? 15 : 0);
+
+  add(`${thread.chainIds.length} Event Chain(s)`, Math.min(thread.chainIds.length * 5, 15));
+
+  return { components, total: clamp(Math.round(total), 0, 100) };
+}
+
+function computeThreadImportance(state, thread) {
+  return computeThreadImportanceBreakdown(state, thread).total;
+}
+
+function explainThreadImportance(state, thread) {
+  return computeThreadImportanceBreakdown(state, thread);
 }
 
 function updateThreadMomentum(thread, gainedNewSignal) {
@@ -237,18 +309,101 @@ function threadParticipantsAlive(state, thread) {
   return thread.actorIds.every(id => { const c = state.characters[id]; return c ? c.alive : true; });
 }
 
-function resolveStoryThread(state, thread, resolution) {
+// ---------- Resolution 2.0 (§Phase-7-Punkt 8-13) ----------
+// Bildet einen abgeschlossenen Chain-Ausgang (Phase 5, bereits vorhanden)
+// auf eine der 14 vereinheitlichten Thread-Resolution-Kategorien ab.
+// AUSSCHLIESSLICH echte, bereits vorhandene Daten (§Punkt 11) — kein
+// rnd()-Aufruf. `tone` beschreibt den dramaturgischen Ausgang, keine
+// moralische Bewertung (§Punkt 10/42).
+const CHAIN_OUTCOME_RESOLUTION_MAP = {
+  APPOINTED: { type: "APPOINTED", tone: "PEACEFUL", outcome: "POSITIVE" },
+  RECONCILED: { type: "RECONCILED", tone: "PEACEFUL", outcome: "POSITIVE" },
+  COMPENSATED: { type: "COMPROMISE", tone: "PEACEFUL", outcome: "POSITIVE" },
+  PROMISED: { type: "COMPROMISE", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  MARRIED: { type: "MARRIED", tone: "TRIUMPHANT", outcome: "POSITIVE" },
+  MARRIED_WITH_DOWRY: { type: "MARRIED", tone: "TRIUMPHANT", outcome: "POSITIVE" },
+  ESCALATED: { type: "ESCALATED", tone: "CONFLICT", outcome: "NEGATIVE" },
+  SIDE_CHANGED: { type: "ESCALATED", tone: "CONFLICT", outcome: "NEGATIVE" },
+  RESIGNED: { type: "ESCALATED", tone: "CONFLICT", outcome: "NEGATIVE" },
+  PUBLICLY_EXPOSED: { type: "SUCCESS", tone: "TRIUMPHANT", outcome: "POSITIVE" },
+  FAILED_ACCUSATION: { type: "FAILED", tone: "TRAGIC", outcome: "NEGATIVE" },
+  DISMISSED: { type: "SUCCESS", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  QUIET_AUDIT: { type: "SUCCESS", tone: "AMBIGUOUS", outcome: "POSITIVE" },
+  NOT_PROVEN: { type: "SUPPRESSED", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  IGNORED: { type: "SUPPRESSED", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  RECOVERED: { type: "SUCCESS", tone: "PEACEFUL", outcome: "POSITIVE" },
+  PROLONGED: { type: "FAILED", tone: "TRAGIC", outcome: "NEGATIVE" },
+  TAX_LOWERED: { type: "COMPROMISE", tone: "PEACEFUL", outcome: "POSITIVE" },
+  PRIVILEGE_GRANTED: { type: "COMPROMISE", tone: "PEACEFUL", outcome: "POSITIVE" },
+  DEESCALATED: { type: "RECONCILED", tone: "PEACEFUL", outcome: "POSITIVE" },
+  APOLOGY: { type: "RECONCILED", tone: "PEACEFUL", outcome: "POSITIVE" },
+  COMPENSATION: { type: "COMPROMISE", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  MOBILIZED: { type: "ESCALATED", tone: "CONFLICT", outcome: "NEGATIVE" },
+  DECLINED: { type: "ABANDONED", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  CONCESSION: { type: "COMPROMISE", tone: "PEACEFUL", outcome: "POSITIVE" },
+  NEGOTIATED: { type: "COMPROMISE", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  REFUSED: { type: "ESCALATED", tone: "CONFLICT", outcome: "NEGATIVE" },
+  ISOLATED: { type: "SUPPRESSED", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  MONITORED: { type: "NATURAL_END", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  CAMPAIGNING: { type: "SUCCESS", tone: "TRIUMPHANT", outcome: "POSITIVE" },
+  DISCREET_SUPPORT: { type: "SUCCESS", tone: "AMBIGUOUS", outcome: "POSITIVE" },
+  DEFERRED: { type: "ABANDONED", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+  PARTIAL_RECONCILIATION: { type: "COMPROMISE", tone: "AMBIGUOUS", outcome: "NEUTRAL" },
+};
+
+function classifyThreadResolution(state, thread, fallbackType) {
+  const primaryActorId = thread.actorIds[0] || null;
+  const sourceChainIds = thread.chainIds.slice();
+  const consequences = [];
+
+  // 1. Tod eines Beteiligten übersticht alles andere.
+  if (primaryActorId && state.characters[primaryActorId] && !state.characters[primaryActorId].alive) {
+    return { type: "DIED", tone: "TRAGIC", outcome: "NEGATIVE", primaryActorId, consequences: ["Ein zentraler Beteiligter ist verstorben."], sourceChainIds };
+  }
+  // 2. Auswärtiger Konflikt: Krieg oder Frieden ist bereits eindeutig im Weltzustand sichtbar.
+  if (thread.type === "FOREIGN_CONFLICT") {
+    const atWar = thread.regionIds.some(id => state.warState && state.warState[id]);
+    return atWar
+      ? { type: "WAR", tone: "CONFLICT", outcome: "NEGATIVE", primaryActorId, consequences, sourceChainIds }
+      : { type: "PEACE", tone: "PEACEFUL", outcome: "POSITIVE", primaryActorId, consequences, sourceChainIds };
+  }
+  // 3. Letzter abgeschlossener Chain-Ausgang (Phase 5) ist die genaueste Quelle.
+  const lastResolvedChainId = sourceChainIds.slice().reverse().find(cid => state.eventChains.resolved[cid]);
+  const lastChain = lastResolvedChainId ? state.eventChains.resolved[lastResolvedChainId] : null;
+  if (lastChain) {
+    const mapped = CHAIN_OUTCOME_RESOLUTION_MAP[lastChain.resolution];
+    if (mapped) {
+      if (primaryActorId) {
+        const rel = computeRelationshipBreakdown(state, primaryActorId, state.rulerId).total;
+        if (rel > 10) consequences.push("Die Beziehung hat sich deutlich verbessert.");
+        else if (rel < -10) consequences.push("Die Beziehung bleibt angespannt.");
+      }
+      return Object.assign({ primaryActorId, consequences, sourceChainIds }, mapped);
+    }
+  }
+  // 4. Fallback für Threads ohne (noch) abgeschlossene Chain: aktuelle Beziehung.
+  if (primaryActorId) {
+    const rel = computeRelationshipBreakdown(state, primaryActorId, state.rulerId).total;
+    if (rel >= 20) return { type: "RECONCILED", tone: "PEACEFUL", outcome: "POSITIVE", primaryActorId, consequences: ["Die Beziehung hat sich deutlich erholt."], sourceChainIds };
+    if (rel <= -20) return { type: "SUPPRESSED", tone: "AMBIGUOUS", outcome: "NEUTRAL", primaryActorId, consequences: [], sourceChainIds };
+  }
+  return { type: fallbackType || "NATURAL_END", tone: "AMBIGUOUS", outcome: "NEUTRAL", primaryActorId, consequences: [], sourceChainIds };
+}
+
+function resolveStoryThread(state, thread, fallbackType) {
+  const resolution = classifyThreadResolution(state, thread, fallbackType);
+  resolution.year = state.year;
   thread.status = "RESOLVED";
   thread.stage = STAGE_FOR_STATUS.RESOLVED;
   thread.resolution = resolution;
-  recordThreadHistory(thread, state.year, `${thread.title}: ${resolution}.`);
+  recordThreadHistory(thread, state.year, `${thread.title}: ${resolution.type} (${resolution.tone}).`);
   // §Punkt 70: nur wirklich bedeutsame Geschichten hinterlassen eine
   // strukturierte Abschluss-Memory — keine Memory-Typ-/Mengen-Explosion.
   if (thread.importance >= 50) {
     const memory = recordWorldEvent(state, {
       type: "MAJOR_STORY_RESOLVED", actorIds: thread.actorIds.slice(), regionIds: thread.regionIds.slice(),
-      importance: thread.importance, emotionalWeight: 0,
-      metadata: { threadId: thread.id, threadType: thread.type },
+      importance: thread.importance, emotionalWeight: resolution.outcome === "POSITIVE" ? 20 : (resolution.outcome === "NEGATIVE" ? -20 : 0),
+      metadata: { threadId: thread.id, threadType: thread.type, resolutionType: resolution.type },
       description: `${thread.title} findet ihren Abschluss.`,
     });
     thread.memoryIds.push(memory.id);
@@ -258,10 +413,12 @@ function resolveStoryThread(state, thread, resolution) {
 }
 
 function expireStoryThread(state, thread, reason) {
+  const resolution = classifyThreadResolution(state, thread, "NATURAL_END");
+  resolution.year = state.year;
   thread.status = "EXPIRED";
   thread.stage = STAGE_FOR_STATUS.EXPIRED;
-  thread.resolution = reason;
-  recordThreadHistory(thread, state.year, `${thread.title}: ${reason}.`);
+  thread.resolution = resolution;
+  recordThreadHistory(thread, state.year, `${thread.title}: ${reason} (${resolution.type}).`);
   delete state.storyThreads.active[thread.id];
   state.storyThreads.resolved[thread.id] = thread;
 }
@@ -272,7 +429,19 @@ function advanceStoryThread(state, thread) {
 
   const typeDef = STORY_THREAD_TYPES[thread.type];
   const signals = typeDef ? typeDef.detect(state) : [];
-  const matching = signals.find(s => candidateMatchesThread(thread, s));
+  let matching = signals.find(s => candidateMatchesThread(thread, s));
+  // §Phase-7-Audit-Fund: eine gerade laufende, an diesen Thread angehängte
+  // Event Chain IST selbst ein echtes, objektiv vorhandenes Signal — der
+  // generische Typ-Detektor (oben) ist auf DISCOVERY zugeschnitten und
+  // erkennt eine reine Chain-Situation (z. B. "Berater wurde übergangen",
+  // ohne dass daraus schon eine Rivalität geworden ist) nicht immer als
+  // "Rivalität". Ohne diesen Fallback fielen chain-getriebene Threads nach
+  // nur einem Jahr fälschlich auf FADED zurück, sobald der generische
+  // Detektor (der etwas anderes prüft) nicht zufällig mitbestätigte.
+  if (!matching) {
+    const hasActiveChain = thread.chainIds.some(cid => state.eventChains.active[cid]);
+    if (hasActiveChain) matching = { strength: Math.max(thread.tension, 45), memoryIds: [] };
+  }
 
   let gainedNewSignal = false;
   if (matching) {
@@ -296,9 +465,9 @@ function advanceStoryThread(state, thread) {
     if (thread.status === "CLIMAX" || thread.status === "ACTIVE") {
       thread.status = "AFTERMATH";
     } else if (thread.status === "AFTERMATH") {
-      if (yearsSinceActivity >= CONFIG.storyThreads.aftermathYears) { resolveStoryThread(state, thread, "RESOLVED"); return; }
+      if (yearsSinceActivity >= CONFIG.storyThreads.aftermathYears) { resolveStoryThread(state, thread, "NATURAL_END"); return; }
     } else if (thread.status === "BUILDING" || thread.status === "DORMANT") {
-      resolveStoryThread(state, thread, "FADED"); // wurde nie zu einer richtigen Geschichte
+      resolveStoryThread(state, thread, "ABANDONED"); // wurde nie zu einer richtigen Geschichte
       return;
     }
   } else {
@@ -395,8 +564,14 @@ function summarizeStoryThread(thread) {
     ? `${thread.startedYear}–${thread.history[thread.history.length - 1].year}`
     : `${thread.startedYear}–`;
   const lines = thread.history.map(h => `${h.year}:\n${h.note}`);
-  return `${thread.title.toUpperCase()}\n${years}\n` + lines.join("\n") +
-    (thread.resolution ? `\nERGEBNIS:\n${thread.resolution}` : "");
+  let result = `${thread.title.toUpperCase()}\n${years}\n` + lines.join("\n");
+  if (thread.resolution) {
+    result += `\nERGEBNIS:\n${thread.resolution.type} (${thread.resolution.tone})`;
+    if (thread.resolution.consequences && thread.resolution.consequences.length) {
+      result += "\n" + thread.resolution.consequences.join(" ");
+    }
+  }
+  return result;
 }
 
 // §Punkt 45/46-Analogon: "warum (nicht) als Thread erkannt?"
