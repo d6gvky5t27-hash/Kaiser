@@ -588,11 +588,11 @@
   }
   #titleUpBanner.show { opacity: 1; transform: translate(-50%, 0); }
   #titleUpBanner .sub { font-family: var(--font); font-size: var(--fs-body); margin-top: var(--sp-2); color: var(--ink); letter-spacing: 0; }
-  #eventModal, #birthModal, #marriageModal, #ledgerModal, #advisorCandidatesModal, #characterDebugModal, #characterDetailModal {
+  #eventModal, #birthModal, #marriageModal, #ledgerModal, #advisorCandidatesModal, #characterDebugModal, #characterDetailModal, #storyViewModal {
     position: fixed; inset: 0; background: rgba(44,31,18,0.7);
     display: none; align-items: center; justify-content: center; z-index: var(--z-modal);
   }
-  #eventBox, #birthBox, #marriageBox, #ledgerBox, #advisorCandidatesBox, #characterDebugBox, #characterDetailBox {
+  #eventBox, #birthBox, #marriageBox, #ledgerBox, #advisorCandidatesBox, #characterDebugBox, #characterDetailBox, #storyViewBox {
     width: 540px; max-width: 92vw; background: var(--panel); border: 4px solid var(--ink); border-radius: var(--r-lg);
     box-shadow: var(--shadow-lg); padding: var(--sp-4); font-size: var(--fs-md); color: var(--ink);
     line-height: 1.6; max-height: 88vh; overflow-y: auto;
@@ -752,6 +752,84 @@
   .diploActionsGroup { margin-top: var(--sp-2); }
   .diploActionsGroup .groupLabel { font-size: var(--fs-micro); color: var(--umber); text-transform: uppercase; letter-spacing: 0.5px; margin: var(--sp-2) 0 3px 0; }
   .diploActionsGroup button { margin: 2px 4px 2px 0; }
+
+  /* ============================================================
+     §Phase-8F "Events + Story Threads Redesign": aus Textboxen werden
+     historische Szenen. Event-Hierarchie (§2), Illustrationssystem (§7-12),
+     Entscheidungskarten statt Buttons (§23/24), Story-Kontext (§18-21).
+     ============================================================ */
+  #eventBox { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+  #eventBox.severity-major, #eventBox.severity-critical { width: 860px; }
+  #eventBox.severity-critical { border-color: var(--gold); box-shadow: 0 0 0 2px var(--ink), 0 0 24px rgba(179,137,63,0.35), var(--shadow-lg); }
+  .evHeader {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--panel-dark); color: #f2e6c9; padding: var(--sp-2) var(--sp-3);
+    font-family: var(--font-display); font-size: var(--fs-body); letter-spacing: 0.8px; text-transform: uppercase;
+    border-bottom: 2px solid var(--gold); flex-shrink: 0;
+  }
+  .evBody { display: flex; overflow-y: auto; }
+  .evIllustrationCol { flex: 0 0 300px; }
+  .eventScene { width: 100%; height: 100%; min-height: 260px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+  .eventSceneMotif { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+  .evContentCol { flex: 1; min-width: 0; padding: var(--sp-4); }
+  #eventBox.severity-minor .evContentCol, #eventBox.severity-important .evContentCol { padding: var(--sp-3) var(--sp-4); }
+  .evTitle { font-family: var(--font-display); font-weight: 600; font-size: var(--fs-h1); line-height: 1.15; margin: 0 0 var(--sp-1) 0; }
+  #eventBox.severity-minor .evTitle, #eventBox.severity-important .evTitle { font-size: var(--fs-xl); }
+  .severityTag { display: inline-block; font-size: var(--fs-micro); font-weight: 700; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 3px; border: 1px solid var(--ink); margin-bottom: var(--sp-2); }
+  .severityTag.sev-important { background: var(--ochre); color: var(--ink); }
+  .severityTag.sev-major { background: var(--accent); color: #fff6e2; }
+  .severityTag.sev-critical { background: var(--gold); color: var(--ink); }
+  .evText { font-size: var(--fs-md); line-height: 1.65; margin: var(--sp-2) 0; }
+  #eventBox.severity-minor .evText { font-size: var(--fs-body); }
+  .evParticipants { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-2) 0; }
+  .evParticipants .charCard { flex: 1 1 220px; }
+  .evOrigin { font-style: italic; color: var(--umber); font-size: var(--fs-body); margin-top: var(--sp-1); }
+  .evThreadTimeline { display: flex; flex-direction: column; gap: 2px; margin-top: var(--sp-1); font-size: var(--fs-micro); color: var(--umber); }
+  .evDecisions { display: flex; flex-wrap: wrap; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); background: rgba(32,24,17,0.04); border-top: 2px solid var(--ink); flex-shrink: 0; }
+  /* §23/24/28/29: Entscheidungen als Karten -- keine Gut/Böse-Farblogik,
+     nur ein neutraler Rahmen der auf Hover/Fokus reagiert. */
+  .decisionCard {
+    flex: 1 1 200px; text-align: left; padding: var(--sp-3); background: var(--panel);
+    border: 2px solid var(--ink); border-radius: var(--r-sm); cursor: pointer;
+    font-family: var(--font); box-shadow: none; transition: background 0.15s ease, box-shadow 0.15s ease;
+  }
+  .decisionCard:hover, .decisionCard:focus-visible { background: #fff8e6; box-shadow: var(--shadow-sm); outline: 2px solid var(--gold); outline-offset: 1px; }
+  .decisionTitle { font-family: var(--font-display); font-weight: 600; font-size: var(--fs-body); line-height: 1.35; }
+  .decisionCost { font-size: var(--fs-micro); color: var(--umber); margin-top: 4px; }
+  @media (prefers-reduced-motion: no-preference) {
+    #eventBox.severity-major, #eventBox.severity-critical { animation: evReveal 0.35s ease-out; }
+    .eventSceneMotif { animation: evMotifFade 0.6s ease-out; }
+  }
+  @keyframes evReveal { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes evMotifFade { from { opacity: 0; } to { opacity: 1; } }
+
+  /* ---------- Geburt/Vermählung: Portraits ergänzt (§50/51), Ablauf unverändert ---------- */
+  #birth-portrait, #marriage-portraits { display: flex; justify-content: center; margin: var(--sp-2) 0; }
+
+  /* ---------- Story-Ansicht (§35-42): echte Player-facing Geschichten-Liste ---------- */
+  #storyCard { cursor: pointer; }
+  #storyCard:hover, #storyCard:focus-visible { box-shadow: var(--shadow-sm); outline: 2px solid var(--gold); outline-offset: 1px; }
+  #storyViewBox { width: 620px; }
+  .storyThreadEntry { border: 2px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-3); margin-bottom: var(--sp-2); background: rgba(44,31,18,0.04); }
+  .storyThreadEntry .stTitle { font-family: var(--font-display); font-weight: 600; font-size: var(--fs-md); }
+  .storyThreadEntry .stYears { font-size: var(--fs-micro); color: var(--umber); margin-left: 6px; }
+  .storyThreadEntry .stStage { font-style: italic; margin: 3px 0; }
+  .storyThreadEntry .stParticipants { font-size: var(--fs-body); color: var(--umber); }
+  .storyResolvedRow { font-size: var(--fs-body); color: var(--umber); padding: 3px 0; }
+
+  /* §65: 1366x768 -- Illustration schmaler statt seitlich, Optionen
+     untereinander statt nebeneinander, kein unbenutzbares Vollbild-Scrollen
+     (Titel/Optionen bleiben durch das feste evHeader/evDecisions-Layout
+     immer sichtbar, nur .evBody scrollt intern, §66). */
+  @media (max-height: 800px), (max-width: 1400px) {
+    #eventBox.severity-major, #eventBox.severity-critical { width: 94vw; max-height: 90vh; }
+    .evBody { flex-direction: column; max-height: calc(90vh - 130px); }
+    .evIllustrationCol { flex: 0 0 100px; }
+    .eventScene { min-height: 100px; }
+    .evIllustrationCol .charPortrait { width: 64px !important; height: 64px !important; }
+    .eventSceneMotif svg { width: 90px !important; height: 90px !important; }
+    .decisionCard { flex: 1 1 100%; }
+  }
 
   .slider-row { display:flex; align-items:center; gap: var(--sp-2); margin: var(--sp-2) 0; }
   input[type=range] { width: 120px; accent-color: var(--accent2); }
@@ -1031,7 +1109,7 @@
           </div>
         </div>
         <div id="reichFooter">
-          <div id="storyCard"></div>
+          <div id="storyCard" tabindex="0" role="button" onclick="openStoryView()" onkeydown="if(event.key==='Enter'||event.key===' ')openStoryView()"></div>
           <div id="alertList"></div>
         </div>
       </div>
@@ -1292,14 +1370,17 @@
   </div>
 </div>
 
-<div id="eventModal"><div id="eventBox">
-  <h3 id="ev-title"></h3>
-  <p id="ev-text"></p>
-  <div id="ev-options"></div>
-</div></div>
+<!-- §Phase-8F: Inhalt komplett von showEvent()/renderEventPresentation()
+     erzeugt (Illustration/Titel/Beteiligte/Story-Kontext/Entscheidungskarten),
+     siehe dort -- die alten festen #ev-title/#ev-text-Elemente sind damit
+     durch eine reichhaltigere, aber weiterhin serverseitig (JS) erzeugte
+     Struktur ersetzt. #ev-options bleibt als Container-ID erhalten
+     (Entscheidungskarten sind weiterhin <button>-Elemente darin). -->
+<div id="eventModal"><div id="eventBox"></div></div>
 
 <div id="birthModal"><div id="birthBox">
   <h3>⚜ Nachwuchs am Hof! ⚜</h3>
+  <div id="birth-portrait"></div>
   <p id="birth-text"></p>
   <label style="font-size:var(--fs-body);">Name des Kindes</label>
   <input type="text" id="birth-name-input">
@@ -1308,6 +1389,7 @@
 
 <div id="marriageModal"><div id="marriageBox">
   <h3>💍 Vermählung am Hof! 💍</h3>
+  <div id="marriage-portraits"></div>
   <p id="marriage-text"></p>
   <div style="text-align:center; margin-top:var(--sp-3);"><button onclick="closeMarriageAnnouncement()">Weiter</button></div>
 </div></div>
@@ -1318,6 +1400,10 @@
      Detailansicht -- ein wiederverwendetes Modal statt eines eigenen
      Vollbildschirms pro Charakter. -->
 <div id="characterDetailModal"><div id="characterDetailBox"></div></div>
+
+<!-- §Phase-8F-Punkt 35/36: echte Geschichten-Ansicht, erreichbar über die
+     Story Card oder eine kleine Schaltfläche -- keine Debug-Zahlen (§37). -->
+<div id="storyViewModal"><div id="storyViewBox"></div></div>
 
 <div id="characterDebugModal"><div id="characterDebugBox"></div></div>
 
@@ -4990,6 +5076,25 @@ function handleSuccession(state) {
       state.advisorLevels[role] = 0;
       adv.advisorRole = null;
     }
+  }
+
+  // §Phase-8F-Punkt 47-49/73: Herrschertod + Erbfolge sind der bedeutsamste
+  // Moment des Spiels, bisher aber unsichtbar (nur eine Chronik-Zeile).
+  // Nutzt das bereits vorhandene pendingEvent-Fenster (§48 "bestehender
+  // Tod-/Succession-Ablauf bleibt" -- hier wird NICHTS neu berechnet, nur
+  // ein bereits abgeschlossenes Ergebnis sichtbar gemacht, reine
+  // Bestätigung statt einer echten Entscheidung). state.pendingEvent ist an
+  // dieser Stelle im Jahresablauf garantiert leer (advanceYear() setzt es
+  // zu Beginn zurück, updateDynasty() läuft vor jeder anderen Event-Quelle)
+  // -- der Guard bleibt trotzdem als Sicherheitsnetz.
+  if (!state.pendingEvent) {
+    const oldRuler = state.characters[oldRulerId];
+    state.pendingEvent = {
+      title: `${heir.name} ${heir.surname || ""} folgt auf den Thron`.replace(/\s+/g, " "),
+      text: `${oldRuler ? (oldRuler.name + " " + (oldRuler.surname || "")).trim() : "Der Herrscher"} ist tot. ${heir.name} ${heir.surname || ""} besteigt im Alter von ${heir.age} Jahren den Thron.`.replace(/\s+/g, " "),
+      source: "SUCCESSION", oldRulerId, newRulerId: heirId,
+      options: [{ label: "Die Herrschaft antreten", apply: () => {} }],
+    };
   }
 }
 
@@ -10407,16 +10512,24 @@ function getRegionSummaryViewModel(state, territoryId) {
 // Bewusst NUR natürlichsprachliche Stufenbeschreibungen — keine
 // Debug-Werte (Tension/Momentum/Director-Score bleiben im Debug-Panel,
 // §14/53/145).
+// §Phase-8F-Punkt 39: alle 6 Status natürlichsprachlich (vorher fehlten
+// DORMANT/RESOLVED -- fielen auf den generischen Fallback-Text zurück).
 const THREAD_STAGE_TEXT = {
+  DORMANT: "Der Konflikt ruht.",
   BUILDING: "Die Spannungen wachsen.",
-  ACTIVE: "Die Lage bleibt angespannt.",
-  CLIMAX: "Der Konflikt erreicht einen Höhepunkt.",
-  AFTERMATH: "Die Lage beruhigt sich.",
+  ACTIVE: "Der Konflikt bestimmt den Hof.",
+  CLIMAX: "Die Lage spitzt sich zu.",
+  AFTERMATH: "Die Folgen wirken nach.",
+  RESOLVED: "Die Geschichte ist beendet.",
 };
+// §Phase-8F-Fund: RELIGIOUS_CONFLICT ist der reale Thread-Typ (siehe
+// STORY_THREAD_TYPES/CHAIN_THREAD_TYPE in js/story-threads.js) -- der
+// bisherige Schlüssel "RELIGIOUS_TENSION" war ein Tippfehler aus 8B, der
+// seit Einführung des Typs in Phase 6 stumm auf den "⚜"-Fallback zurückfiel.
 const THREAD_ICON_BY_TYPE = {
   SUCCESSION_CONFLICT: "⚜", PERSONAL_RIVALRY: "⚔", DYNASTIC_ALLIANCE: "💍",
   FOOD_CRISIS: "🌾", FOREIGN_CONFLICT: "🛡", IMPERIAL_AMBITION: "👑",
-  RELIGIOUS_TENSION: "✝", ECONOMIC_CRISIS: "💰",
+  RELIGIOUS_CONFLICT: "✝", ECONOMIC_CRISIS: "💰",
 };
 
 function getPrimaryStoryViewModel(state) {
@@ -11347,6 +11460,184 @@ function getForeignPowerDetailViewModel(state, aiId) {
     relationship: getDiplomaticRelationshipViewModel(state, aiId),
     story: getDiplomaticStoryViewModel(state, aiId),
   };
+}
+
+// ============================================================
+// Phase 8F: EVENTS + STORY THREADS -- "aus Textboxen werden historische
+// Szenen". Nur bereits vorhandene Daten (Event-/Chain-/Thread-/Memory-
+// Felder) angezeigt -- keine neue Gameplaylogik, keine Fake-Vorhersagen,
+// keine invented Folgen (§17/26/27/42/61/77).
+// ============================================================
+
+// ---------- §2: Event-Hierarchie (rein visuelle Klassifikation) ----------
+// Random-Events tragen keine Wichtigkeits-Zahl -- die einzige bereits
+// reale Signifikanz-Markierung ist das bestehende disastersCount-Flag
+// (js/advance-year.js finalizeYear(): genau diese drei IDs). Chain-
+// Entscheidungen sind laut Spieldesign (Phase 5/6) grundsätzlich
+// bedeutender als Flavour-Events; innerhalb einer Chain hebt die reale
+// Thread-Importance/CLIMAX-Phase eine Entscheidung auf CRITICAL.
+const DISASTER_EVENT_IDS = ["seuche", "rebellion", "brand_in_der_stadt"];
+function getEventSeverity(state, ev) {
+  if (!ev) return { level: "MINOR", label: "" };
+  if (ev.source === "SUCCESSION") return { level: "CRITICAL", label: "ENTSCHEIDENDER MOMENT" };
+  if (ev.source === "EVENT_CHAIN") {
+    const thread = ev.chainId ? getThreadForChain(state, ev.chainId) : null;
+    if (thread && (thread.status === "CLIMAX" || thread.importance >= 70)) return { level: "CRITICAL", label: "ENTSCHEIDENDER MOMENT" };
+    return { level: "MAJOR", label: "BEDEUTSAM" };
+  }
+  if (ev.id && DISASTER_EVENT_IDS.includes(ev.id)) return { level: "IMPORTANT", label: "WICHTIG" };
+  return { level: "MINOR", label: "" };
+}
+
+// ---------- §8/45/46: Illustrationskategorie + Domäne + Farbe + Symbol ----------
+// EIN Tabelle statt drei getrennter -- Kategorie, Unterzeilen-Domäne,
+// Akzentfarbe (auf bereits vorhandene Design-Tokens gemappt) und
+// Symbolname gehören inhaltlich zusammen.
+const EVENT_CATEGORY_INFO = {
+  dynasty:    { domainLabel: "DYNASTIE",   accentVar: "--accent",     icon: "crown" },
+  succession: { domainLabel: "DYNASTIE",   accentVar: "--accent",     icon: "crown" },
+  marriage:   { domainLabel: "DYNASTIE",   accentVar: "--accent",     icon: "rings" },
+  death:      { domainLabel: "DYNASTIE",   accentVar: "--panel-dark", icon: "candle" },
+  rivalry:    { domainLabel: "HOF",        accentVar: "--accent",     icon: "seal" },
+  advisor:    { domainLabel: "HOF",        accentVar: "--accent",     icon: "seal" },
+  corruption: { domainLabel: "HOF",        accentVar: "--accent",     icon: "coin" },
+  famine:     { domainLabel: "WIRTSCHAFT", accentVar: "--ochre",      icon: "wheat" },
+  trade:      { domainLabel: "WIRTSCHAFT", accentVar: "--ochre",      icon: "scale" },
+  diplomacy:  { domainLabel: "DIPLOMATIE", accentVar: "--blue",       icon: "scroll" },
+  border:     { domainLabel: "DIPLOMATIE", accentVar: "--blue",       icon: "boundary" },
+  religion:   { domainLabel: "GLAUBE",     accentVar: "--purple",     icon: "chapel" },
+  war:        { domainLabel: "KRIEG",      accentVar: "--red-muted",  icon: "sword" },
+  imperial:   { domainLabel: "POLITIK",    accentVar: "--gold",       icon: "crown" },
+};
+// §8/9: bestehende Eventtypen auf die Kategorien abgebildet -- keine
+// Kategorie ohne reales Vorbild erfunden; ohne sauberen Treffer bleibt es
+// bewusst ohne Eintrag (Fallback-Rahmen, §56), statt eine Kategorie zu
+// erzwingen, die nicht passt.
+const RANDOM_EVENT_CATEGORY = {
+  kornspeicher_leer: "famine", gute_ernte: "trade", haendler_beschwerde: "trade",
+  seuche: "death", adel_fordert_amt: "advisor", handwerker_innovation: "trade",
+  raeuberbanden: "trade", kirche_spende: "religion", handelsroute_eroeffnet: "trade",
+  wildererbande: "border", brand_in_der_stadt: "death", bettlerplage: "famine",
+  handwerkerstreik: "trade", wunderheiler: "religion", fremder_gesandter: "diplomacy",
+  erbstreit_adel: "succession", steuerhinterziehung: "corruption", rebellion: "war",
+  ketzerei_entdeckt: "religion", wallfahrt: "religion",
+};
+const CHAIN_EVENT_CATEGORY = {
+  passed_over_heir: "succession", grieved_advisor: "advisor", corrupt_treasurer: "corruption",
+  famine_crisis: "famine", trade_conflict: "trade", border_conflict: "border",
+  dynastic_marriage: "marriage", church_conflict: "religion", rising_rival: "rivalry",
+  imperial_ambition: "imperial",
+};
+function getEventCategory(state, ev) {
+  if (!ev) return null;
+  if (ev.source === "SUCCESSION") return "succession";
+  if (ev.source === "EVENT_CHAIN") {
+    // §62/63: queueChainDecision() speichert nur chainId auf pendingEvent
+    // (chainId/threadId bleiben intern, §63) -- die templateId (und damit
+    // die reale Kategorie aus CHAIN_TEMPLATES) kommt aus der noch aktiven
+    // Chain selbst.
+    const chain = ev.chainId && state.eventChains.active[ev.chainId];
+    return chain ? (CHAIN_EVENT_CATEGORY[chain.templateId] || null) : null;
+  }
+  if (ev.id) return RANDOM_EVENT_CATEGORY[ev.id] || null;
+  return null;
+}
+
+// ---------- §13: beteiligte Charaktere (nur story-relevante Fakten,
+// keine Skills) ----------
+function getEventParticipantsViewModel(state, ev) {
+  if (!ev) return [];
+  let ids = [];
+  if (ev.source === "SUCCESSION") {
+    ids = [ev.oldRulerId, ev.newRulerId].filter(Boolean);
+  } else if (ev.source === "EVENT_CHAIN" && ev.chainId) {
+    const chain = state.eventChains.active[ev.chainId];
+    if (chain) ids = chain.actorIds.concat(chain.targetIds);
+  }
+  const seen = new Set();
+  return ids.filter(id => state.characters[id] && !seen.has(id) && seen.add(id))
+    .map(id => getCharacterCardViewModel(state, id));
+}
+
+// ---------- §18/20/21: Story-/Vorgeschichte-Kontext ----------
+// Nur wenn das Ereignis wirklich Teil einer Chain/eines Threads ist --
+// kein Fake-Drama ohne echten Thread (§44).
+function getStoryContextViewModel(state, ev) {
+  if (!ev || ev.source !== "EVENT_CHAIN" || !ev.chainId) return null;
+  const chain = state.eventChains.active[ev.chainId];
+  if (!chain) return null;
+  const thread = getThreadForChain(state, ev.chainId);
+  const originMemoryId = chain.originatingMemoryIds && chain.originatingMemoryIds[0];
+  const originMemory = originMemoryId ? state.memories.byId[originMemoryId] : null;
+  return {
+    threadTitle: thread ? thread.title : chain.name,
+    stageText: thread ? (THREAD_STAGE_TEXT[thread.status] || "Die Geschichte entwickelt sich weiter.") : null,
+    // §20: max. 3-4 relevante Beats aus der echten Chain-Historie.
+    timeline: chain.history.slice(-4).map(h => ({ year: h.year, note: h.note || h.choice || h.event })),
+    originText: originMemory ? originMemory.description : null,
+  };
+}
+
+// ---------- §23/24/26/27: Entscheidungskarten ----------
+// Optionen kennen nur label/outcome/apply -- keine deklarierten Folgen
+// (effect ist eine Blackbox-Funktion). Ein "(-NNN Taler)"-Hinweis, der
+// bereits WÖRTLICH im echten label steht (z.B. "Getreide importieren
+// (-800 Taler)"), wird als eigene Kosten-Zeile herausgelöst -- keine neue
+// Zahl, nur andere Darstellung derselben bereits vorhandenen Textinfo.
+function getDecisionCardViewModel(option, index) {
+  const label = option.label || "";
+  const costMatch = label.match(/\(([+\-−]?\s?\d[\d.,]*\s*Taler[^)]*)\)\s*$/);
+  const title = costMatch ? label.slice(0, costMatch.index).trim() : label;
+  return {
+    index, title: title || label, sentence: label,
+    costText: costMatch ? costMatch[1].trim() : null,
+  };
+}
+
+// ---------- §60: Gesamt-Präsentations-ViewModel für das Event-Modal ----------
+function getEventPresentationViewModel(state, ev) {
+  if (!ev) return null;
+  const severity = getEventSeverity(state, ev);
+  const category = getEventCategory(state, ev);
+  const categoryInfo = category ? EVENT_CATEGORY_INFO[category] : null;
+  const participants = getEventParticipantsViewModel(state, ev);
+  const storyContext = getStoryContextViewModel(state, ev);
+  const decisionCards = (ev.options || []).map((opt, i) => getDecisionCardViewModel(opt, i));
+  return {
+    title: ev.title, storyText: ev.text,
+    subtitleDomain: categoryInfo ? categoryInfo.domainLabel : null,
+    year: state.year,
+    severity, category, categoryInfo,
+    participants, storyContext, decisionCards,
+    isSuccession: ev.source === "SUCCESSION",
+    oldRulerId: ev.oldRulerId || null, newRulerId: ev.newRulerId || null,
+  };
+}
+
+// ---------- §35-41: Story-Ansicht (Spieler-UI, keine Debug-Zahlen) ----------
+// Maximal 2-4 aktuell relevante Threads (§40): DORMANT-Threads sind für
+// den Spieler noch nichts Sichtbares (kein Signal ist noch zu keiner
+// Geschichte geworden) -- gleiche Filterung wie getPrimaryStoryViewModel().
+function getStoryViewViewModel(state) {
+  const active = getActiveStoryThreads(state).filter(t => t.status !== "DORMANT")
+    .sort((a, b) => b.importance - a.importance).slice(0, 4);
+  const activeCards = active.map(t => ({
+    id: t.id, title: t.title, icon: THREAD_ICON_BY_TYPE[t.type] || "⚜",
+    years: `${t.startedYear}–`, stageText: THREAD_STAGE_TEXT[t.status] || "Die Geschichte entwickelt sich weiter.",
+    participants: t.actorIds.filter(id => state.characters[id]).map(id => {
+      const c = state.characters[id];
+      return `${c.name} ${c.surname || ""}`.trim();
+    }),
+    lastEvent: t.history.length ? t.history[t.history.length - 1].note : null,
+    timeline: t.history.slice(-4).map(h => ({ year: h.year, note: h.note })),
+  }));
+  // §41: abgeschlossene Geschichten -- nur ein kurzer Link, keine volle
+  // Archivierung (das übernimmt 8H/Chronik).
+  const resolved = Object.values(state.storyThreads.resolved)
+    .sort((a, b) => (b.history[b.history.length - 1]?.year || 0) - (a.history[a.history.length - 1]?.year || 0))
+    .slice(0, 3)
+    .map(t => ({ id: t.id, title: t.title, endedYear: t.history.length ? t.history[t.history.length - 1].year : null }));
+  return { activeThreads: activeCards, recentlyResolved: resolved, hasAny: activeCards.length > 0 };
 }
 
 </script>
@@ -12577,6 +12868,39 @@ function renderStoryCard() {
   }
 }
 
+// §Phase-8F-Punkt 35-42: echte Geschichten-Ansicht -- maximal 2-4 aktuell
+// relevante Threads, natürlichsprachlicher Stand, kompakte Historie, kein
+// Tension-/Momentum-/Director-Score (§37/93, das bleibt im Debug-Panel).
+function openStoryView() {
+  const vm = getStoryViewViewModel(state);
+  document.getElementById('storyViewBox').innerHTML = renderStoryViewHtml(vm);
+  document.getElementById('storyViewModal').style.display = 'flex';
+}
+function closeStoryView() {
+  document.getElementById('storyViewModal').style.display = 'none';
+}
+function renderStoryViewHtml(vm) {
+  let html = `<h3>GESCHICHTEN AM HOF</h3>`;
+  if (!vm.hasAny) {
+    html += `<p><i>Das Reich befindet sich in ruhigen Jahren -- keine Geschichte prägt derzeit den Hof.</i></p>`;
+  } else {
+    html += vm.activeThreads.map(t => `
+      <div class="storyThreadEntry">
+        <span class="stTitle">${t.icon} ${t.title}</span><span class="stYears">${t.years}</span>
+        <div class="stStage">${t.stageText}</div>
+        ${t.participants.length ? `<div class="stParticipants">Beteiligte: ${t.participants.join(' · ')}</div>` : ''}
+        ${t.lastEvent ? `<div class="stParticipants">Letztes Ereignis: „${t.lastEvent}“</div>` : ''}
+        ${t.timeline.length > 1 ? `<div class="evThreadTimeline" style="margin-top:6px;">${t.timeline.map(b => `<span class="evBeat">${b.year}: ${b.note}</span>`).join('')}</div>` : ''}
+      </div>`).join('');
+  }
+  if (vm.recentlyResolved.length) {
+    html += `<h4 style="margin-top:var(--sp-3);">KÜRZLICH ABGESCHLOSSEN</h4>`;
+    html += vm.recentlyResolved.map(t => `<div class="storyResolvedRow">${t.title} — diese Geschichte endete ${t.endedYear || '–'}.</div>`).join('');
+  }
+  html += `<div style="text-align:center; margin-top:var(--sp-3);"><button onclick="closeStoryView()">Schließen</button></div>`;
+  return html;
+}
+
 // §Phase-8B-Punkt 16/17: Warnungen priorisiert, kompakt, kein Wetter-Spam.
 function renderAlerts() {
   const vm = getAlertViewModel(state);
@@ -13508,6 +13832,87 @@ function buildHeraldryShieldSvg(h) {
   </svg>`;
 }
 
+// ============================================================
+// §Phase-8F: EVENT-ILLUSTRATIONSSYSTEM -- deterministische "Graphic Novel
+// Panel"-Szenen aus Kategorie + realen Beteiligten, kein rnd(), keine
+// zweite Portraitlogik (buildPortraitSvg() aus 8D wird direkt
+// wiederverwendet). §11: Variation ausschließlich über hashStringToInt()
+// aus Kategorie/Charakter-ID/Jahr, niemals über Math.random().
+// ============================================================
+
+// §11/57: kleine Linien-Motive je Kategorie (0 0 100 100), "Tintenlinie"
+// statt Emoji/Clipart -- bewusst einfache, ruhige Formen.
+const EVENT_MOTIF_PATHS = {
+  crown: 'M20 70 L20 45 L35 58 L50 38 L65 58 L80 45 L80 70 Z M20 70 L80 70 L80 78 L20 78 Z',
+  rings: 'M38 55 m-16 0 a16 16 0 1 0 32 0 a16 16 0 1 0 -32 0 M62 55 m-16 0 a16 16 0 1 0 32 0 a16 16 0 1 0 -32 0',
+  seal: 'M50 25 L58 40 L75 42 L62 54 L66 71 L50 62 L34 71 L38 54 L25 42 L42 40 Z',
+  coin: 'M50 50 m-26 0 a26 26 0 1 0 52 0 a26 26 0 1 0 -52 0 M50 50 m-14 0 a14 14 0 1 0 28 0 a14 14 0 1 0 -28 0',
+  wheat: 'M50 20 L50 80 M50 30 L38 22 M50 30 L62 22 M50 42 L38 34 M50 42 L62 34 M50 54 L38 46 M50 54 L62 46 M50 66 L38 58 M50 66 L62 58',
+  scale: 'M50 15 L50 75 M22 30 L78 30 M22 30 L14 52 A14 10 0 0 0 30 52 Z M78 30 L70 52 A14 10 0 0 0 86 52 Z M32 80 L68 80 L50 70 Z',
+  scroll: 'M25 30 Q25 20 35 20 L70 20 Q75 20 75 27 L75 73 Q75 80 68 80 L30 80 Q25 80 25 70 Z M75 27 Q68 27 68 20 M25 70 Q32 70 32 78',
+  boundary: 'M50 20 L58 20 L58 65 L42 65 L42 20 Z M35 65 L65 65 L65 82 L35 82 Z M30 42 L42 42 M58 42 L70 42',
+  chapel: 'M50 18 L50 30 M42 30 L58 30 M28 78 L28 45 L50 25 L72 45 L72 78 Z M44 78 L44 58 L56 58 L56 78',
+  sword: 'M50 15 L50 60 M40 22 L60 22 M50 60 L40 72 M50 60 L60 72 M50 72 L50 82',
+  candle: 'M50 30 Q46 20 50 12 Q54 20 50 30 M44 30 L56 30 L54 78 L46 78 Z',
+};
+function buildEventMotifSvg(icon, opts) {
+  opts = opts || {};
+  const size = opts.size || 130;
+  const opacity = opts.opacity !== undefined ? opts.opacity : 0.22;
+  const path = EVENT_MOTIF_PATHS[icon] || EVENT_MOTIF_PATHS.seal;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 100 100" style="opacity:${opacity};">
+    <path d="${path}" fill="none" stroke="#f2e6c9" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+// §7/10: eine kleine Portraitbüste innerhalb der Szene -- identisch zur
+// Hof-/Dynastie-Darstellung (buildPortraitSvg), nur größer gerahmt.
+function buildEventScenePortrait(card, opts) {
+  opts = opts || {};
+  if (!card || !card.portrait) return '';
+  const size = opts.size || 108;
+  const cls = ['charPortrait', 'rank-' + card.portrait.rank, !card.alive ? 'dead' : ''].filter(Boolean).join(' ');
+  return `<div class="${cls}" style="width:${size}px; height:${size}px;" data-tip="${card.fullName}${card.alive ? '' : ' †'} -- ${card.roleLabel}">${buildPortraitSvg(card.portrait)}</div>`;
+}
+
+// §6/7/56: die eigentliche Szenenkomposition -- Kategorie-Hintergrund +
+// Motiv-Wasserzeichen + bis zu 2 echte Portraits, je nach Kategorie leicht
+// unterschiedlich angeordnet (Rivalität: geteilter Hintergrund; Heirat:
+// verbundene Ringe; Erbfolge: alt entsättigt -> neu). Ohne Beteiligte
+// bleibt es beim hochwertigen generischen Rahmen + Motiv (§56) statt einem
+// leeren grauen Kasten.
+function renderEventIllustration(vm) {
+  const info = vm.categoryInfo;
+  const accent = info ? info.accentVar : '--umber';
+  const icon = info ? info.icon : 'seal';
+  const seed = hashStringToInt((vm.category || 'none') + '|' + (vm.participants||[]).map(p=>p.id).join(',') + '|' + vm.year);
+  const tiltA = (seed % 7) - 3, tiltB = ((seed >> 3) % 7) - 3;
+
+  let peopleHtml = '';
+  if (vm.isSuccession) {
+    const oldCard = vm.participants.find(p => p.id === vm.oldRulerId);
+    const newCard = vm.participants.find(p => p.id === vm.newRulerId);
+    peopleHtml = `<div style="display:flex; align-items:center; gap:14px; z-index:1;">
+      <div style="filter:grayscale(1) brightness(0.7); opacity:0.85;">${buildEventScenePortrait(oldCard, {size:92})}</div>
+      <div style="font-size:28px; color:var(--gold);">→</div>
+      <div>${buildEventScenePortrait(newCard, {size:108})}</div>
+    </div>`;
+  } else if (vm.participants.length === 2) {
+    peopleHtml = `<div style="display:flex; align-items:center; gap:22px; z-index:1;">
+      <div style="transform:rotate(${tiltA}deg);">${buildEventScenePortrait(vm.participants[0], {size:100})}</div>
+      <div style="width:2px; height:90px; background:rgba(242,230,201,0.35);"></div>
+      <div style="transform:rotate(${tiltB}deg);">${buildEventScenePortrait(vm.participants[1], {size:100})}</div>
+    </div>`;
+  } else if (vm.participants.length === 1) {
+    peopleHtml = `<div style="z-index:1; transform:rotate(${tiltA}deg);">${buildEventScenePortrait(vm.participants[0], {size:118})}</div>`;
+  }
+
+  return `<div class="eventScene" style="background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(${accent}) 38%, #201811) 0%, #17120d 78%);">
+    <div class="eventSceneMotif">${buildEventMotifSvg(icon, { size: 190, opacity: peopleHtml ? 0.14 : 0.3 })}</div>
+    ${peopleHtml}
+  </div>`;
+}
+
 // ---------- Dynastie / Stammbaum (§36-49) ----------
 function renderDynastyPage() {
   const vm = getDynastyTreeViewModel(state);
@@ -14243,6 +14648,10 @@ function showBirthAnnouncement(childId) {
   document.getElementById('birth-text').textContent =
     `${ruler.gender === 'm' ? 'Dir' : 'Dir'} wurde ein ${child.gender === 'm' ? 'Sohn' : 'Tochter'} geboren!`;
   document.getElementById('birth-name-input').value = child.name;
+  // §Phase-8F-Punkt 51: Heraldik + Familienportrait statt Babycomic-Optik --
+  // die schon vorhandene Portraitkarte des Kindes, kein neues System.
+  const childCard = getCharacterCardViewModel(state, childId);
+  document.getElementById('birth-portrait').innerHTML = childCard ? buildEventScenePortrait(childCard, { size: 88 }) : '';
   document.getElementById('birthModal').style.display = 'flex';
   playBeep(660, 0.1);
   setTimeout(() => playBeep(880, 0.15), 120);
@@ -14267,6 +14676,15 @@ function showMarriageAnnouncement(spouseId) {
   const ruler = state.characters[state.rulerId];
   document.getElementById('marriage-text').innerHTML =
     `${ruler.name} ${ruler.surname} hat sich mit <b>${spouse.name}</b> vermählt!<br>Der Hof feiert die Vermählung.`;
+  // §Phase-8F-Punkt 50: beide Portraits + Verbindungssiegel statt reinem Text.
+  const rulerCard = getCharacterCardViewModel(state, state.rulerId);
+  const spouseCard = getCharacterCardViewModel(state, spouseId);
+  document.getElementById('marriage-portraits').innerHTML = `
+    <div style="display:flex; align-items:center; gap:14px;">
+      ${buildEventScenePortrait(rulerCard, { size: 84 })}
+      <span style="font-size:22px; color:var(--gold);">💍</span>
+      ${buildEventScenePortrait(spouseCard, { size: 84 })}
+    </div>`;
   document.getElementById('marriageModal').style.display = 'flex';
   playBeep(523, 0.1);
   setTimeout(() => playBeep(659, 0.1), 120);
@@ -14279,12 +14697,48 @@ function closeMarriageAnnouncement() {
   advanceToNextPendingScreen();
 }
 
+// §Phase-8F-Punkt 6/87: Kategorie+Jahr, Illustration+Titel+Story+Beteiligte,
+// Entscheidungskarten -- ein historischer Moment statt Titel/Text/Button.
+// MINOR-Events (§3) bleiben kompakt: keine Illustrationsspalte/Beteiligte.
+function renderEventPresentation(vm) {
+  const isMinor = vm.severity.level === 'MINOR';
+  let html = `<div class="evHeader"><span>${vm.subtitleDomain || 'EREIGNIS'}</span><span>ANNO ${vm.year}</span></div>`;
+  html += `<div class="evBody">`;
+  if (!isMinor) html += `<div class="evIllustrationCol">${renderEventIllustration(vm)}</div>`;
+  html += `<div class="evContentCol">`;
+  if (vm.severity.label) html += `<div class="severityTag sev-${vm.severity.level.toLowerCase()}">${vm.severity.label}</div>`;
+  html += `<h3 class="evTitle">${vm.title}</h3>`;
+  html += `<p class="evText">${vm.storyText}</p>`;
+  // §13: nur story-relevante Fakten (Card-Ansicht kennt bereits keine Skills).
+  if (!isMinor && vm.participants.length) {
+    html += `<div class="evParticipants">` + vm.participants.map(p => buildCharCardHtml(p, { sizeClass: 'size-small' })).join('') + `</div>`;
+  }
+  // §18-21: Story-/Vorgeschichte-Kontext nur wenn ein echter Thread/Chain-Ursprung existiert.
+  if (vm.storyContext) {
+    html += `<div class="storyMini"><b>TEIL DER GESCHICHTE</b><br><i>${vm.storyContext.threadTitle}</i>`;
+    if (vm.storyContext.stageText) html += `<br>${vm.storyContext.stageText}`;
+    if (vm.storyContext.originText) html += `<div class="evOrigin"><b>VORGESCHICHTE</b> — ${vm.storyContext.originText}</div>`;
+    if (vm.storyContext.timeline.length > 1) {
+      html += `<div class="evThreadTimeline">` + vm.storyContext.timeline.map(t => `<span class="evBeat">${t.year}: ${t.note}</span>`).join('') + `</div>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`; // evContentCol
+  html += `</div>`; // evBody
+  // §23/24: Entscheidungskarten -- #ev-options bleibt die Container-ID.
+  html += `<div class="evDecisions" id="ev-options">` + vm.decisionCards.map(c => `
+    <button class="decisionCard" onclick="resolveEvent(${c.index})">
+      <div class="decisionTitle">${c.title}</div>
+      ${c.costText ? `<div class="decisionCost">Kosten: ${c.costText}</div>` : ''}
+    </button>`).join('') + `</div>`;
+  return html;
+}
+
 function showEvent(ev) {
-  document.getElementById('ev-title').textContent = ev.title;
-  document.getElementById('ev-text').textContent = ev.text;
-  const optHtml = ev.options.map((opt, i) =>
-    `<button onclick="resolveEvent(${i})">${opt.label}</button>`).join('<br>');
-  document.getElementById('ev-options').innerHTML = optHtml;
+  const vm = getEventPresentationViewModel(state, ev);
+  const box = document.getElementById('eventBox');
+  box.className = 'severity-' + vm.severity.level.toLowerCase();
+  box.innerHTML = renderEventPresentation(vm);
   document.getElementById('eventModal').style.display = 'flex';
 }
 
