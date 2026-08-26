@@ -586,3 +586,335 @@ function getEconomicRisksViewModel(state) {
     text: `Handel mit ${riskyPartner.name}: erhöhtes Räuberrisiko (${riskyPartner.riskPct}%).` });
   return risks.slice(0, 8);
 }
+
+// ============================================================
+// §Phase-8D "Hof + Dynastie + Charaktere": Menschen statt Zahlen. Reine
+// Anzeige-Transformationen über das bereits reale Charaktermodell
+// (js/characters.js: computeRelationshipBreakdown/computeLoyalty/Claims/
+// Rivalitäten, js/memory.js: World Memory, js/story-threads.js) -- KEINE
+// Gameplaylogik, KEIN rnd()-Aufruf. Portrait-/Wappen-Varianz kommt aus
+// einem deterministischen String-Hash (§69), nie aus der Simulations-RNG.
+// ============================================================
+
+// ---------- deterministischer Hash (§69: kein Math.random()/rnd()) ----------
+function hashStringToInt(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+// ---------- Portrait-Platzhalter (§5/6/7/8) ----------
+// Rein aus vorhandenen Charakterdaten abgeleitet: Geschlecht, Alter, Rang
+// (Herrscher/Hofamt/Adel), Haus. Liefert nur einen BESCHREIBENDEN
+// Datensatz -- das eigentliche SVG-Bauteil entsteht in index.html
+// (Darstellung bleibt Sache der Render-Schicht, siehe Trennung in
+// js/ui-viewmodels.js überall sonst in diesem Modul).
+function ageGroupOf(age) {
+  if (age < 14) return "kind";
+  if (age < 26) return "jung";
+  if (age < 56) return "erwachsen";
+  return "alt";
+}
+const PORTRAIT_RANK = { herrscher: 4, hoch: 3, amt: 2, adel: 1 };
+function getPortraitViewModel(state, characterId) {
+  const c = state.characters[characterId];
+  if (!c) return null;
+  const isRuler = characterId === state.rulerId;
+  const rank = isRuler ? "herrscher" : (c.advisorRole ? "amt" : (c.claims.some(cl => cl.strength === "primary" || cl.strength === "strong") ? "hoch" : "adel"));
+  const seed = hashStringToInt(characterId + "|" + c.name + "|" + (c.surname || ""));
+  return {
+    gender: c.gender, ageGroup: ageGroupOf(c.age), alive: c.alive, rank, rankOrder: PORTRAIT_RANK[rank],
+    variant: seed % 5, // rein dekorative Formvariante (Haartracht/Kopfbedeckung), kein Gameplaybezug
+    initials: (c.name ? c.name[0] : "?") + (c.surname ? c.surname.replace(/^von\s+/, "")[0] : ""),
+  };
+}
+
+// ---------- Wappen-Platzhalter (§47-49) ----------
+// Klein und sauber gehalten (§49: "keine Heraldik-Engine als neues
+// Projekt") -- ein deterministischer Hash aus dem Hausnamen wählt aus
+// wenigen festen Paletten/Mustern/Symbolen, KEIN rnd().
+const HERALDRY_FIELD_COLORS = ["#6e2226", "#1b2534", "#33472e", "#4a3524", "#3d5570", "#63633a"];
+const HERALDRY_CHARGE_COLORS = ["#b3893f", "#f2e6c9", "#8a3d3d", "#a97e34"];
+const HERALDRY_DIVISIONS = ["plain", "fess", "pale", "chevron"];
+const HERALDRY_SYMBOLS = ["lion", "eagle", "tower", "star", "boar"];
+function getHeraldryViewModel(houseName) {
+  const seed = hashStringToInt(houseName || "Kaisersberg");
+  return {
+    fieldColor: HERALDRY_FIELD_COLORS[seed % HERALDRY_FIELD_COLORS.length],
+    chargeColor: HERALDRY_CHARGE_COLORS[Math.floor(seed / 7) % HERALDRY_CHARGE_COLORS.length],
+    division: HERALDRY_DIVISIONS[Math.floor(seed / 13) % HERALDRY_DIVISIONS.length],
+    symbol: HERALDRY_SYMBOLS[Math.floor(seed / 29) % HERALDRY_SYMBOLS.length],
+  };
+}
+
+// ---------- Trait-Badges (§13-15) ----------
+// TRAITS in data/gamedata.js trägt nur `name` + ein reines effects-Objekt,
+// keine vorgeschriebenen Beschreibungssätze (siehe Recherche zu Phase 8D)
+// -- die Kurzbeschreibung entsteht hier GENERISCH aus den echten
+// effects-Schlüsseln (kein erfundener Fließtext pro Trait, keine
+// erfundenen Zahlen: die Werte kommen direkt aus TRAITS[i].effects).
+const TRAIT_EFFECT_LABEL = {
+  prestigeGain: "Prestigegewinn", loyaltyMod: "Loyalität", claimAggression: "Anspruchs-Ehrgeiz",
+  treasuryDrain: "Staatskasse", satisfactionBonus: "Zufriedenheit", productionBonus: "Produktion",
+  advisorEffectMod: "Amtswirkung", relationshipMod: "Beziehung (fremde Sicht)",
+  memoryDecayModPositive: "Verblassen guter Erinnerungen", memoryDecayModNegative: "Verblassen schlechter Erinnerungen",
+  memoryWeightAmplifierNegative: "Gewicht schlechter Erinnerungen",
+};
+function fmtEffectValue(key, v) {
+  if (key === "prestigeGain" || key === "treasuryDrain" || key === "productionBonus" || key === "advisorEffectMod") return (v >= 0 ? "+" : "") + Math.round(v * 100) + "%";
+  return (v >= 0 ? "+" : "") + v;
+}
+function getTraitBadgeViewModel(traitId) {
+  const t = TRAITS.find(x => x.id === traitId);
+  if (!t) return null;
+  const effectParts = Object.keys(t.effects).map(k => `${TRAIT_EFFECT_LABEL[k] || k} ${fmtEffectValue(k, t.effects[k])}`);
+  return { id: traitId, name: t.name, effectText: effectParts.join(" · ") || "Keine spielmechanische Wirkung." };
+}
+
+// ---------- Anspruchs-/Beziehungs-/Loyalitäts-Beschriftung ----------
+const CLAIM_STRENGTH_LABEL = { weak: "Schwacher Anspruch", strong: "Starker Anspruch", primary: "Vorrangiger Anspruch" };
+const CLAIM_REASON_LABEL = {
+  eldest_child: "ältestes Kind des Herrschers", child: "Kind des Herrschers",
+  sibling_of_ruler: "Geschwister des Herrschers", succession_passed_over: "bei der Nachfolge übergangen",
+};
+// Strukturelle (nicht-memory-basierte) Beziehungsgründe aus
+// computeRelationshipBreakdown() -- die memory-basierten Modifikatoren
+// tragen bereits eine echte, vorformulierte Beschreibung (memory.description).
+const RELATIONSHIP_STRUCTURAL_LABEL = {
+  eltern_kind: "Eltern-Kind-Verhältnis", geschwister: "Geschwister", ehepartner: "Ehepartner",
+  gleiches_haus: "gleiches Haus", amt_innehat: "bekleidet ein Hofamt", charisma: "Charisma",
+};
+function labelForRelationshipModifier(state, m) {
+  if (m.memoryId && state.memories.byId[m.memoryId]) return state.memories.byId[m.memoryId].description;
+  return RELATIONSHIP_STRUCTURAL_LABEL[m.source] || m.source;
+}
+// §17: echte, bereits vorhandene Berechnung (computeRelationshipBreakdown),
+// hier nur mit Anzeige-Labels versehen -- keine neue Zahl erfunden.
+function getRelationshipDisplayViewModel(state, fromId, toId) {
+  const breakdown = computeRelationshipBreakdown(state, fromId, toId);
+  return {
+    total: breakdown.total,
+    components: breakdown.modifiers.map(m => ({ label: labelForRelationshipModifier(state, m), value: Math.round(m.value * 10) / 10, year: m.year || null })),
+  };
+}
+// §18: spiegelt computeLoyalty() rein lesend für die Anzeige -- dieselbe
+// Formel wie js/characters.js, keine zweite abweichende Berechnung.
+function getLoyaltyDisplayViewModel(state, characterId) {
+  if (characterId === state.rulerId) return { total: 100, components: [{ label: "Der Herrscher ist sich selbst treu", value: 100 }] };
+  const c = state.characters[characterId];
+  if (!c) return { total: 50, components: [] };
+  const rel = computeRelationshipBreakdown(state, characterId, state.rulerId);
+  const components = [{ label: "Basis", value: 50 }];
+  components.push({ label: "Beziehung zum Herrscher", value: Math.round(rel.total * 0.3 * 10) / 10 });
+  const traitLoyalty = traitEffectSum(c, "loyaltyMod");
+  if (traitLoyalty) components.push({ label: "Charakterzüge", value: traitLoyalty });
+  if (c.advisorRole) components.push({ label: "Hofamt", value: 8 });
+  const legTerm = Math.round((state.legitimacy - 50) * 0.1 * 10) / 10;
+  if (legTerm) components.push({ label: "Legitimität des Herrschers", value: legTerm });
+  const relevantClaim = c.claims.find(cl => cl.titleId === "player" && cl.strength !== "none");
+  if (relevantClaim) {
+    const claimBase = { weak: 4, strong: 12, primary: 20 }[relevantClaim.strength] || 0;
+    const aggression = traitEffectSum(c, "claimAggression");
+    components.push({ label: `Eigener Anspruch (${CLAIM_STRENGTH_LABEL[relevantClaim.strength]})`, value: -Math.round((claimBase + aggression * 0.5) * 10) / 10 });
+  }
+  const total = Math.round(clamp(components.reduce((s, x) => s + x.value, 0), 0, 100));
+  return { total, components };
+}
+
+// ---------- Rollen-Label (wer ist diese Person für den Herrscher?) ----------
+function getCharacterRoleLabel(state, characterId) {
+  const c = state.characters[characterId];
+  const ruler = state.characters[state.rulerId];
+  if (!c) return "";
+  if (characterId === state.rulerId) return c.gender === "m" ? "Herrscher" : "Herrscherin";
+  if (!c.alive) return "Verstorben";
+  if (ruler && characterId === ruler.spouseId) return c.gender === "m" ? "Gemahl" : "Gemahlin";
+  if (c.advisorRole && ADVISOR_ROLES[c.advisorRole]) return ADVISOR_ROLES[c.advisorRole].name;
+  const primaryClaim = c.claims.find(cl => cl.titleId === "player" && cl.strength === "primary");
+  if (primaryClaim && ruler && c.parentId === state.rulerId) return c.gender === "m" ? "Thronfolger" : "Thronfolgerin";
+  if (ruler && c.parentId === state.rulerId) return c.gender === "m" ? "Sohn des Herrschers" : "Tochter des Herrschers";
+  if (ruler && ruler.parentId && c.parentId === ruler.parentId) return c.gender === "m" ? "Bruder des Herrschers" : "Schwester des Herrschers";
+  if (ruler && c.parentId === ruler.spouseId) return c.gender === "m" ? "Stiefsohn" : "Stieftochter";
+  return `Haus ${c.surname || "unbekannt"}`;
+}
+
+// §31: max. 1-2 wichtige Warnhinweise pro Karte, priorisiert -- jede
+// Bedingung liest ausschließlich bereits reale Felder.
+function getCharacterWarnings(state, characterId) {
+  const c = state.characters[characterId];
+  if (!c) return [];
+  const warnings = [];
+  const strongClaim = c.claims.find(cl => cl.titleId === "player" && (cl.strength === "strong" || cl.strength === "primary"));
+  if (strongClaim && characterId !== state.rulerId) warnings.push({ id: "claim", text: strongClaim.strength === "primary" ? "VORRANGIGER ANSPRUCH" : "STARKER THRONANSPRUCH", severity: strongClaim.strength === "primary" ? 3 : 2 });
+  if (c.rivalIds && c.rivalIds.includes(state.rulerId)) warnings.push({ id: "rival", text: "RIVALE", severity: 3 });
+  if (c.traits.includes("korrupt") && c.advisorRole) warnings.push({ id: "corrupt", text: "KORRUPT", severity: 1 });
+  if (characterId !== state.rulerId && c.alive) {
+    const loy = c.loyalty !== undefined ? c.loyalty : computeLoyalty(state, characterId);
+    if (loy < 35) warnings.push({ id: "loyalty", text: "NIEDRIGE LOYALITÄT", severity: 2 });
+  }
+  return warnings.sort((a, b) => b.severity - a.severity).slice(0, 2).map(w => ({ id: w.id, text: w.text }));
+}
+
+// ---------- Character Card (§9-14/30-31/86-89) ----------
+function getCharacterCardViewModel(state, characterId) {
+  const c = state.characters[characterId];
+  if (!c) return null;
+  const topTraits = c.traits.slice(0, 2).map(id => getTraitBadgeViewModel(id)).filter(Boolean);
+  return {
+    id: characterId, name: c.name, surname: c.surname || "", fullName: `${c.name} ${c.surname || ""}`.trim(),
+    gender: c.gender, age: c.age, alive: c.alive, ageGroup: ageGroupOf(c.age),
+    roleLabel: getCharacterRoleLabel(state, characterId),
+    portrait: getPortraitViewModel(state, characterId),
+    topTraits, loyalty: c.alive ? (characterId === state.rulerId ? 100 : (c.loyalty !== undefined ? c.loyalty : computeLoyalty(state, characterId))) : null,
+    warnings: c.alive ? getCharacterWarnings(state, characterId) : [],
+    isRuler: characterId === state.rulerId,
+  };
+}
+
+// ---------- Character Detail (§9-25) ----------
+const STAT_LABEL = {
+  intelligenz: "Intelligenz", diplomatie: "Diplomatie", verwaltung: "Verwaltung", militaer: "Militär",
+  handel: "Handel", charisma: "Charisma", finanzen: "Finanzen", intrige: "Intrige",
+};
+const MEMORY_TIMELINE_LIMIT = 8;
+function getCharacterDetailViewModel(state, characterId) {
+  const c = state.characters[characterId];
+  if (!c) return null;
+  const isRuler = characterId === state.rulerId;
+  const card = getCharacterCardViewModel(state, characterId);
+
+  const skills = Object.keys(STAT_LABEL).map(k => ({ id: k, label: STAT_LABEL[k], value: c.stats[k] }));
+  const traits = c.traits.map(id => getTraitBadgeViewModel(id)).filter(Boolean);
+  const claims = c.claims.filter(cl => cl.strength !== "none").map(cl => ({
+    titleId: cl.titleId, strength: cl.strength, strengthLabel: CLAIM_STRENGTH_LABEL[cl.strength] || cl.strength,
+    reasonLabel: CLAIM_REASON_LABEL[cl.reason] || cl.reason || "",
+  }));
+  const rivalries = (c.rivalIds || []).map(rid => {
+    const rival = state.characters[rid];
+    const originId = c.rivalryOrigin ? c.rivalryOrigin[rid] : null;
+    const origin = originId ? state.memories.byId[originId] : null;
+    return {
+      id: rid, name: rival ? `${rival.name} ${rival.surname || ""}`.trim() : "Unbekannt", alive: rival ? rival.alive : false,
+      originText: origin ? origin.description : null, originYear: origin ? origin.year : null,
+    };
+  });
+
+  const allMems = getMemoriesForCharacter(state, characterId).slice().sort((a, b) => a.year - b.year);
+  const relevantMems = allMems.filter(m => isChronicleWorthy(state, m).worthy);
+  const shown = (relevantMems.length ? relevantMems : allMems).slice(-MEMORY_TIMELINE_LIMIT);
+  const memoryTimeline = shown.map(m => ({ year: m.year, text: m.description, type: m.type }));
+  const hiddenCount = Math.max(0, allMems.length - shown.length);
+
+  const currentThread = getActiveStoryThreads(state).find(t => t.status !== "DORMANT" && t.actorIds.includes(characterId));
+  const currentStory = currentThread ? {
+    title: currentThread.title, icon: THREAD_ICON_BY_TYPE[currentThread.type] || "⚜",
+    stageText: THREAD_STAGE_TEXT[currentThread.status] || "Die Geschichte entwickelt sich weiter.",
+  } : null;
+
+  return {
+    ...card,
+    house: c.surname || "", health: c.alive ? Math.round(c.health) : null,
+    skills, traits, claims, rivalries,
+    relationship: (!isRuler && c.alive) ? getRelationshipDisplayViewModel(state, characterId, state.rulerId) : null,
+    loyaltyBreakdown: c.alive ? getLoyaltyDisplayViewModel(state, characterId) : null,
+    memoryTimeline, hiddenMemoryCount: hiddenCount, totalMemoryCount: allMems.length,
+    currentStory,
+    spouseId: c.spouseId, parentId: c.parentId, childrenIds: c.childrenIds.slice(),
+  };
+}
+
+// ---------- Hof (§27-35) ----------
+function getCourtViewModel(state) {
+  const ruler = state.characters[state.rulerId];
+  const spouseCard = ruler && ruler.spouseId ? getCharacterCardViewModel(state, ruler.spouseId) : null;
+  const heirId = ruler ? ruler.childrenIds.find(id => {
+    const cl = state.characters[id] && state.characters[id].claims.find(x => x.titleId === "player" && x.strength === "primary");
+    return !!cl && state.characters[id].alive;
+  }) : null;
+  const offices = [];
+  for (const role in ADVISOR_ROLES) {
+    const roleInfo = ADVISOR_ROLES[role];
+    const advisorId = state.advisors[role];
+    const filled = advisorId && state.characters[advisorId] && state.characters[advisorId].alive;
+    offices.push({
+      role, roleName: roleInfo.name, desc: roleInfo.desc, statKey: roleInfo.statKey, statLabel: STAT_LABEL[roleInfo.statKey],
+      filled: !!filled, card: filled ? getCharacterCardViewModel(state, advisorId) : null,
+      level: filled ? (state.advisorLevels[role] || 1) : null, maxLevel: CONFIG.advisors.maxLevel,
+    });
+  }
+  return {
+    rulerCard: ruler ? getCharacterCardViewModel(state, state.rulerId) : null,
+    spouseCard, heirCard: heirId ? getCharacterCardViewModel(state, heirId) : null,
+    offices,
+  };
+}
+
+// ---------- Erbfolge (§44-46) ----------
+// Spiegelt NUR die bereits reale Erbenermittlung aus handleSuccession()
+// (js/population-dynasty.js) für eine Vorschau -- die eigentliche
+// Streitwürfelung (rnd()) findet dort weiterhin ausschließlich beim
+// tatsächlichen Herrschertod statt, hier wird nichts gewürfelt.
+function getSuccessionViewModel(state) {
+  const ruler = state.characters[state.rulerId];
+  if (!ruler) return { heirs: [], disputeRisk: false };
+  const heirs = ruler.childrenIds
+    .map(id => state.characters[id])
+    .filter(c => c && c.alive)
+    .sort((a, b) => b.age - a.age)
+    .map((c, idx) => {
+      const id = Object.keys(state.characters).find(k => state.characters[k] === c);
+      return { id, name: `${c.name} ${c.surname || ""}`.trim(), age: c.age, order: idx + 1, isPrimary: idx === 0, card: getCharacterCardViewModel(state, id) };
+    });
+  const disputeRisk = heirs.length > 1 && Math.abs(heirs[0].age - heirs[1].age) <= CONFIG.succession.disputeAgeClosenessYears;
+  return { heirs, disputeRisk, hasHeir: heirs.length > 0 };
+}
+
+// ---------- Dynastie / Stammbaum (§36-49) ----------
+function getDynastyTreeViewModel(state) {
+  const ruler = state.characters[state.rulerId];
+  const houseName = state.dynastyName || (ruler ? ruler.surname : "") || "";
+  const parentCard = ruler && ruler.parentId && state.characters[ruler.parentId] ? getCharacterCardViewModel(state, ruler.parentId) : null;
+  const siblings = ruler && ruler.parentId
+    ? Object.keys(state.characters).filter(id => state.characters[id].parentId === ruler.parentId && id !== state.rulerId).map(id => getCharacterCardViewModel(state, id))
+    : [];
+  const children = ruler ? ruler.childrenIds.map(id => getCharacterCardViewModel(state, id)).filter(Boolean) : [];
+  const eras = getRulerEras(state);
+  const deceasedRulers = eras.filter(e => e.rulerId !== state.rulerId).map(e => {
+    const bio = buildRulerBiography(state, e.rulerId);
+    const rc = state.characters[e.rulerId];
+    return {
+      id: e.rulerId, name: rc ? `${rc.name} ${rc.surname || ""}`.trim() : "Unbekannt",
+      startYear: e.startYear, endYear: e.endYear, bio,
+      card: rc ? getCharacterCardViewModel(state, e.rulerId) : null,
+    };
+  });
+  return {
+    houseName, heraldry: getHeraldryViewModel(houseName),
+    rulerCard: ruler ? getCharacterCardViewModel(state, state.rulerId) : null,
+    spouseCard: ruler && ruler.spouseId ? getCharacterCardViewModel(state, ruler.spouseId) : null,
+    parentCard, siblings, children,
+    succession: getSuccessionViewModel(state),
+    deceasedRulers,
+    generations: state.stats ? state.stats.generations : 0,
+  };
+}
+
+// ---------- Beraterkandidaten (§32-35) ----------
+function getAdvisorCandidateViewModel(state) {
+  const sel = state.pendingAdvisorSelection;
+  if (!sel) return null;
+  const roleInfo = ADVISOR_ROLES[sel.role];
+  const candidates = sel.candidates.map((cand, idx) => {
+    const c = cand.existingId ? state.characters[cand.existingId] : cand.generated;
+    const originLabel = cand.existingId ? "Geschwister des Herrschers" : `Haus ${c.surname || "unbekannt"}`;
+    return {
+      index: idx, name: c.name, surname: c.surname || "", age: c.age, gender: c.gender,
+      portrait: { gender: c.gender, ageGroup: ageGroupOf(c.age), alive: true, rank: "adel", rankOrder: 1, variant: hashStringToInt((cand.existingId || c.name + c.surname)) % 5, initials: (c.name[0] || "?") + (c.surname ? c.surname.replace(/^von\s+/, "")[0] : "") },
+      originLabel, relevantSkillLabel: STAT_LABEL[roleInfo.statKey], relevantSkillValue: c.stats[roleInfo.statKey],
+      traits: c.traits.map(id => getTraitBadgeViewModel(id)).filter(Boolean),
+      loyalty: cand.existingId ? computeLoyalty(state, cand.existingId) : (c.loyalty !== undefined ? c.loyalty : 50),
+      salaryDemand: Math.round(c.salaryDemand || sel.cost),
+    };
+  });
+  return { role: sel.role, roleName: roleInfo.name, roleDesc: roleInfo.desc, statLabel: STAT_LABEL[roleInfo.statKey], cost: sel.cost, candidates };
+}
