@@ -847,38 +847,130 @@
     align-items: center; justify-content: center; z-index: var(--z-overlay-battle);
   }
   #btFrame {
-    width: 900px; max-height: 90vh; overflow-y: auto; background: var(--blue);
+    width: 980px; max-height: 92vh; overflow-y: auto; background: var(--blue);
     border: 5px solid var(--ink); border-radius: var(--r-lg); box-shadow: var(--shadow-lg);
     padding: var(--sp-3); color: #fff6e2;
   }
-  #btTitleBar { text-align: center; font-family: var(--font-display); letter-spacing: 0.5px; }
-  #btBattlefield {
-    display: flex; justify-content: space-between; align-items: center; background: #3a5a2d;
-    border: 3px solid var(--ink); border-radius: var(--r-md); padding: var(--sp-4); margin-bottom: var(--sp-3); min-height: 120px; position: relative;
+  /* §18/19: kurzer, respektierter Übergang statt eines abrupten Screen-
+     Wechsels -- 300-600ms, per prefers-reduced-motion abschaltbar. */
+  @media (prefers-reduced-motion: no-preference) {
+    #btOverlay[style*="flex"] #btFrame { animation: btFrameIn 0.45s ease-out; }
   }
-  #btBattlefield::before {
-    content: "SCHLACHTFELD"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    color: rgba(255,255,255,0.18); font-family: var(--font-display); font-size: var(--fs-md); letter-spacing: 3px;
+  @keyframes btFrameIn { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
+  #btEyebrow { text-align: center; font-size: var(--fs-micro); letter-spacing: 1px; color: var(--gold); text-transform: uppercase; min-height: 14px; }
+  #btTitleBar { text-align: center; font-family: var(--font-display); letter-spacing: 0.5px; margin-top: 2px; }
+
+  /* §35: historische, segmentierte Phasenleiste -- nur echte BATTLE_PHASES. */
+  #btPhaseBar { display: flex; gap: 2px; margin: var(--sp-2) 0 var(--sp-3); }
+  .btPhaseSeg {
+    flex: 1 1 0; text-align: center; font-size: var(--fs-micro); padding: 5px 2px; letter-spacing: 0.3px;
+    background: rgba(255,246,226,0.08); border: 1px solid rgba(255,246,226,0.25); color: rgba(255,246,226,0.55);
   }
-  .btArmySide { display: flex; flex-direction: column; gap: var(--sp-1); width: 44%; z-index: 1; }
-  .btArmySide.right { align-items: flex-end; text-align: right; }
-  .btUnitRow { display: flex; gap: var(--sp-1); flex-wrap: wrap; }
-  .btUnitRow.right { justify-content: flex-end; }
-  .btUnitBlock {
-    background: var(--panel); color: var(--ink); border: 2px solid var(--ink); border-radius: 8px; padding: var(--sp-1) var(--sp-2);
-    font-size: var(--fs-micro); text-align: center; box-shadow: var(--shadow-sm); min-width: 58px;
-  }
-  .btUnitBlock .cnt { font-weight: bold; }
-  .btMoraleBar { width: 100%; height: 5px; background: rgba(0,0,0,0.25); border: 1px solid var(--ink); border-radius: 4px; margin-top: 2px; overflow: hidden; }
-  .btMoraleBar > div { height: 100%; background: var(--accent2); }
+  .btPhaseSeg.done { background: rgba(179,137,63,0.35); color: #fff6e2; }
+  .btPhaseSeg.current { background: var(--gold); color: #241a10; font-weight: 700; border-color: #fff6e2; }
+
   #btMessageBanner {
     background: var(--accent); color: #fff6e2; text-align: center; padding: var(--sp-3);
     font-family: var(--font-display); font-size: var(--fs-md); letter-spacing: 0.5px; margin-bottom: var(--sp-3); min-height: 20px;
     border: 2px solid var(--ink); border-radius: var(--r-sm);
   }
+
+  /* §20/22: drei Spalten -- eigene Armee | Schlachtfeld | Gegner --
+     statt fünf Zahlenkästchen. */
+  #btBattlefield {
+    display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: var(--sp-3); align-items: start;
+    margin-bottom: var(--sp-3);
+  }
+  .btArmyPanel {
+    background: rgba(20,14,8,0.35); border: 2px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-2);
+    display: flex; flex-direction: column; gap: var(--sp-1);
+  }
+  .btArmyPanel.right { text-align: right; }
+  .btArmyPanel .btArmyName { font-family: var(--font-display); font-weight: 600; font-size: var(--fs-body); }
+  .btArmyPanel .btArmyCommander { font-size: var(--fs-micro); color: rgba(255,246,226,0.75); }
+  .btArmyPanel .btArmyMoraleLabel { font-size: var(--fs-micro); margin-top: 2px; }
+  .btArmyMoraleBar { width: 100%; height: 7px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,246,226,0.3); border-radius: 4px; overflow: hidden; margin: 2px 0 4px; }
+  .btArmyMoraleBar > div { height: 100%; background: var(--gold); }
+  .btArmyPanel .btUnitList { display: flex; flex-direction: column; gap: 4px; }
+  .btArmyPanel.right .btUnitToken { flex-direction: row-reverse; }
+
+  /* §21/28-33: stilisiertes 2D-Schlachtfeld -- Gelände sichtbar, eigene
+     Seite unten/links, Gegner oben/rechts (hier: rechte Spalte). Keine
+     Einzelsoldaten-Simulation, nur abstrahierte Stacks in den Seitenpanels. */
+  #btBattlefieldVisual {
+    position: relative; min-height: 220px; border: 3px solid var(--ink); border-radius: var(--r-md);
+    overflow: hidden; box-shadow: inset 0 0 24px rgba(0,0,0,0.4);
+  }
+  #btBattlefieldVisual::after {
+    content: "SCHLACHTFELD"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    color: rgba(255,255,255,0.14); font-family: var(--font-display); font-size: var(--fs-md); letter-spacing: 3px; pointer-events: none;
+  }
+  .terrain-ebene { background: linear-gradient(to bottom, #6b8f4a 0%, #587a3c 60%, #486530 100%); }
+  .terrain-wald { background: linear-gradient(to bottom, #3d5a2f 0%, #2c4321 60%, #223418 100%); }
+  .terrain-huegel { background: linear-gradient(to bottom, #7a9560 0%, #64794c 55%, #8c8563 100%); }
+  .terrain-sumpf { background: linear-gradient(to bottom, #5a5f43 0%, #454a34 60%, #363a28 100%); }
+  .terrain-stadt, .terrain-burg {
+    background:
+      repeating-linear-gradient(90deg, rgba(0,0,0,0.12) 0px, rgba(0,0,0,0.12) 18px, transparent 18px, transparent 36px),
+      linear-gradient(to bottom, #8a7d63 0%, #6e6350 60%, #574d3d 100%);
+  }
+  .btTerrainDeco { position: absolute; opacity: 0.5; pointer-events: none; }
+  @media (prefers-reduced-motion: no-preference) {
+    /* §46: kurze, CSS-only "Beats" -- wenige Pixel Bewegung, keine Dauerschleifen. */
+    .btBeat-fernkampf { animation: btBeatFlash 0.5s ease-out; }
+    .btBeat-hauptkampf { animation: btBeatClash 0.4s ease-out; }
+    .btBeat-moralpruefung { animation: btBeatFlash 0.5s ease-out; }
+  }
+  @keyframes btBeatFlash { 0% { background: rgba(255,246,226,0); } 35% { background: rgba(255,246,226,0.28); } 100% { background: rgba(255,246,226,0); } }
+  @keyframes btBeatClash { 0%, 100% { transform: translateX(0); } 30% { transform: translateX(-4px); } 60% { transform: translateX(4px); } }
+
+  /* §26: Formationstoken pro Stack -- kleine illustrierte Silhouetten statt
+     Zahlenkästchen, Brettspiel-Miniatur-Stil. */
+  .btUnitToken {
+    display: flex; align-items: center; gap: 6px; background: var(--panel); color: var(--ink);
+    border: 2px solid var(--ink); border-radius: 8px; padding: 4px 6px; box-shadow: var(--shadow-sm);
+  }
+  .btUnitToken.dead { opacity: 0.35; filter: grayscale(0.6); }
+  .btUnitGlyph { width: 26px; height: 26px; flex-shrink: 0; }
+  .btUnitGlyph svg { width: 100%; height: 100%; }
+  .btUnitTextCol { flex: 1 1 auto; min-width: 0; }
+  .btUnitLabel { font-size: var(--fs-micro); font-weight: 600; }
+  .btUnitCount { font-size: var(--fs-micro); }
+  .btUnitCount .cas { color: var(--c-danger); }
+  .btMoraleBar { width: 100%; height: 5px; background: rgba(0,0,0,0.25); border: 1px solid var(--ink); border-radius: 4px; margin-top: 2px; overflow: hidden; }
+  .btMoraleBar > div { height: 100%; background: var(--accent2); }
+
+  /* §36: Formation als kleines Konzeptdiagramm statt reinem Dropdown --
+     rein dekorativ, keine neue Formationsmechanik. */
+  #btFormationDiagram { display: flex; flex-direction: column; gap: 3px; align-items: center; margin: var(--sp-2) 0; }
+  .btFormRow { display: flex; gap: 3px; }
+  .btFormBlock { width: 14px; height: 14px; background: var(--gold); border: 1px solid #1a1208; border-radius: 2px; }
+  .btFormBlock.gap { background: transparent; border-color: transparent; }
+
   #btDecisionBox {
     background: var(--panel-dark); padding: var(--sp-3); margin-bottom: var(--sp-3); border-radius: var(--r-sm);
     border: 2px solid var(--gold); display: none;
+  }
+
+  /* §49-60: Ergebnisbildschirm -- historischer Moment statt Datentabelle. */
+  .btResultTitle { text-align: center; font-family: var(--font-display); font-size: var(--fs-xl); color: var(--gold); text-shadow: 2px 2px 0 #0a0c11; padding: var(--sp-3) 0 var(--sp-2); }
+  .btResultGrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); margin: var(--sp-2) 0; }
+  .btResultSide { background: rgba(20,14,8,0.35); border: 2px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-3); }
+  .btResultSide .rsName { font-family: var(--font-display); font-weight: 600; margin-bottom: 4px; }
+  .btResultSide .rsRow { display: flex; justify-content: space-between; font-size: var(--fs-body); margin: 2px 0; }
+  .btResultSide .rsRow .label { color: rgba(255,246,226,0.7); }
+  .btResultHint { border: 2px solid var(--gold); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); margin-top: var(--sp-2); font-size: var(--fs-body); background: rgba(179,137,63,0.15); }
+  .btResultWhy { margin-top: var(--sp-3); }
+  .btOwnershipNote { text-align: center; color: var(--gold); font-style: italic; margin-top: var(--sp-2); }
+
+  /* §73: 1366x768 -- Armeepanels kompakter, Schlachtfeld zentral, Log
+     bleibt (nur intern) scrollbar statt horizontalem Overflow. */
+  @media (max-width: 1400px) {
+    #btFrame { width: 96vw; }
+    #btBattlefield { grid-template-columns: 1fr; }
+    .btArmyPanel.right { text-align: left; }
+    .btArmyPanel.right .btUnitToken { flex-direction: row; }
+    .btResultGrid { grid-template-columns: 1fr; }
   }
 
   /* Kriegskarte: Risiko-artige Gebietseroberung (§Original-Vertiefung) */
@@ -891,27 +983,46 @@
     border: 5px solid var(--ink); border-radius: var(--r-lg); box-shadow: var(--shadow-lg);
     padding: var(--sp-3); color: #fff6e2;
   }
+  /* §Phase-8G-Punkt 4/8: dieselbe handgezeichnete politische Karte wie
+     die Reichsseite (MAP_GEOMETRY/.territoryNode/.territoryFill) --
+     "Kriegsmodus" derselben Karte statt einer zweiten, billigen Kriegskarte
+     aus farbigen Kreisen. */
   #warMapBoard {
-    /* Quadratisch, damit x-/y-Prozentwerte gleich skalieren (bei einem
-       rechteckigen Container würden die Knoten je nach Achse unterschiedlich
-       groß wirken und überlappen) */
-    position: relative; width: 100%; aspect-ratio: 1 / 1; background: #3a5a2d;
-    border: 3px solid var(--ink); border-radius: var(--r-md); margin-bottom: var(--sp-3); overflow: hidden;
+    position: relative; width: 100%; max-width: 640px; margin: 0 auto var(--sp-3);
+    aspect-ratio: 1340 / 1900; max-height: 64vh; border-radius: var(--r-md);
+    background: linear-gradient(155deg, #4a3a26 0%, #382c1c 45%, #2a2014 100%);
+    border: 4px solid var(--ink); box-shadow: inset 0 0 0 2px rgba(230,200,140,0.2);
+    overflow: hidden;
   }
   #warMapSvg { position: absolute; inset: 0; width: 100%; height: 100%; }
-  #warMapNodes { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .wmNode {
-    position: absolute; transform: translate(-50%, -50%); width: 11%; aspect-ratio: 1;
-    border-radius: 50%; border: 3px solid var(--ink); cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: var(--shadow-sm); transition: transform 0.1s;
-  }
-  .wmNode:hover { transform: translate(-50%, -50%) scale(1.1); z-index: 5; }
-  .wmNode.selected { outline: 3px solid #fff6e2; outline-offset: 2px; z-index: 4; }
-  .wmNode.capital { border-width: 4px; border-color: var(--gold); }
-  .wmNodeLabel { font-family: var(--font-display); font-size: var(--fs-body); color: #fff6e2; text-shadow: 1px 1px 0 rgba(0,0,0,0.5); }
+  /* §6: dünne, gestrichelte Konfliktlinie entlang echter Nachbarschaft
+     zwischen Spieler- und Kriegsgegner-Gebiet -- keine neue Frontmechanik,
+     nur eine visuelle Hervorhebung der bereits bestehenden Grenze. */
+  .frontLine { fill: none; stroke: #c65b4a; stroke-width: 5; stroke-dasharray: 3 8; stroke-linecap: round; opacity: 0.85; pointer-events: none; }
+  /* §12/13: Marschroute -- handgezeichnete Tuschelinie mit Pfeilspitze in
+     Bannerfarbe (Gold), nur bei realer Adjazenz (getMarchRouteViewModel). */
+  .marchRoute { fill: none; stroke: var(--gold); stroke-width: 6; stroke-linecap: round; opacity: 0.92; pointer-events: none; }
+  #marchArrowhead path { fill: var(--gold); }
+  .territoryNode.attackTarget .territoryFill { stroke: var(--c-danger); stroke-width: 8; filter: brightness(1.14) saturate(1.1); }
   #warMapDetail { color: var(--ink); }
   #warMapDetail select, #warMapDetail input { font-family: var(--font); font-size: var(--fs-body); padding: 4px; border-radius: var(--r-sm); border: 2px solid var(--ink); }
+  .armyCardRow { display: flex; justify-content: space-between; font-size: var(--fs-body); margin: 3px 0; }
+  .armyCardRow .label { color: var(--umber); }
+  .armyCardTroopList { font-size: var(--fs-body); margin: var(--sp-1) 0; }
+  .attackSummaryBox {
+    border: 2px solid var(--c-danger); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3);
+    margin-top: var(--sp-2); background: rgba(198,91,74,0.08);
+  }
+  .attackSummaryBox .asTitle { font-family: var(--font-display); font-weight: 600; color: var(--c-danger); }
+
+  /* §61-63: Kriegsübersicht auf dem Militär-Tab -- nur echte Gebietszahlen. */
+  #warCardList { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+  .warCard { flex: 1 1 260px; border: 2px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); background: rgba(198,91,74,0.05); }
+  .warCardName { font-family: var(--font-display); font-weight: 600; }
+  .warCardSince { font-size: var(--fs-micro); color: var(--umber); font-weight: 400; }
+  .warCardRow { display: flex; justify-content: space-between; font-size: var(--fs-body); margin: 2px 0; }
+  .warCardRow .label { color: var(--umber); }
+  .warCardStory { font-size: var(--fs-body); font-style: italic; margin: 4px 0; }
 </style>
 </head>
 <body>
@@ -1256,6 +1367,7 @@
     <h2 class="title">SCHLACHTFORMATION (Übersichts-Schätzung)</h2>
     <div id="formationMenu" style="margin-bottom:var(--sp-3);"></div>
     <div id="siegePanel" style="margin-bottom:var(--sp-3);"></div>
+    <div id="activeWarsSection" style="margin-bottom:var(--sp-3);"></div>
     <h2 class="title">KRIEGSERKLÄRUNG</h2>
     <div id="warMenu"></div>
   </div>
@@ -1446,74 +1558,70 @@
 
 <div id="btOverlay">
   <div id="btFrame">
+    <div id="btEyebrow"></div>
     <h2 class="title" id="btTitleBar">⚔ SCHLACHT ⚔</h2>
 
     <div id="btSetup">
       <div class="diploBlock">
         <div class="subhead">Formation</div>
-        <select id="btFormation"></select>
+        <select id="btFormation" onchange="btRenderFormationDiagram()"></select>
+        <div id="btFormationDiagram"></div>
         <div class="subhead">Taktik</div>
         <select id="btTactic"></select>
       </div>
       <div style="text-align:center; margin-top:var(--sp-3);">
-        <button onclick="btStartBattle()">⚔ SCHLACHT BEGINNEN ⚔</button>
+        <button class="btn-imperial" onclick="btStartBattle()">⚔ SCHLACHT BEGINNEN ⚔</button>
       </div>
     </div>
 
     <div id="btBattleUi" style="display:none;">
+      <div id="btPhaseBar"></div>
       <div id="btMessageBanner"></div>
 
       <div id="btBattlefield">
-        <div class="btArmySide">
-          <div id="btLabelA" style="margin-bottom:var(--sp-1);"></div>
-          <div class="btUnitRow" id="btUnitsA"></div>
-        </div>
-        <div class="btArmySide right">
-          <div id="btLabelB" style="margin-bottom:var(--sp-1);"></div>
-          <div class="btUnitRow right" id="btUnitsB"></div>
-        </div>
+        <div class="btArmyPanel" id="btPanelA"></div>
+        <div id="btBattlefieldVisual"></div>
+        <div class="btArmyPanel right" id="btPanelB"></div>
       </div>
 
       <div id="btDecisionBox">
         <div id="btDecisionText" style="color:var(--gold); margin-bottom:var(--sp-2);"></div>
-        <div id="btDecisionOptions"></div>
+        <div class="evDecisions" id="btDecisionOptions"></div>
       </div>
 
+      <div class="subhead">Feldbericht</div>
       <div class="diploBlock" style="max-height:140px; overflow-y:auto;" id="btLog"></div>
 
       <div style="text-align:center; margin-top:var(--sp-2);">
-        <button id="btNextStepBtn" onclick="btNextStep()">▶ NÄCHSTE PHASE</button>
-        <button id="btAutoBtn" onclick="btAutoResolve()">⏩ AUTOMATISCH BEENDEN</button>
+        <button id="btNextStepBtn" class="btn-ghost" onclick="btNextStep()">▶ NÄCHSTE PHASE</button>
+        <button id="btAutoBtn" class="btn-ghost" onclick="btAutoResolve()">⏩ AUTOMATISCH BEENDEN</button>
       </div>
     </div>
 
-    <div id="btReport" style="display:none;">
-      <div id="btReportBanner" style="text-align:center; font-size:var(--fs-lg); color:var(--gold); text-shadow:2px 2px 0 #0a0c11; padding:var(--sp-3) 0;"></div>
-      <table>
-        <tr><th></th><th id="btRepNameA"></th><th id="btRepNameB"></th></tr>
-        <tr><td>Soldaten zu Beginn</td><td id="btRepStartA"></td><td id="btRepStartB"></td></tr>
-        <tr><td>Soldaten am Ende</td><td id="btRepEndA"></td><td id="btRepEndB"></td></tr>
-        <tr><td>Verluste gesamt</td><td id="btRepCasA"></td><td id="btRepCasB"></td></tr>
-        <tr><td>Moral am Ende</td><td id="btRepMoraleA"></td><td id="btRepMoraleB"></td></tr>
-      </table>
-      <div id="btWhyLost" style="margin-top:var(--sp-3);"></div>
-      <div style="text-align:center; margin-top:var(--sp-3);"><button onclick="btCloseReport()">ZURÜCK ZUM SPIEL</button></div>
-    </div>
+    <div id="btReport" style="display:none;"></div>
   </div>
 </div>
 
-<!-- Kriegskarte: Risiko-artige Gebietseroberung (§Original-Vertiefung) -->
+<!-- Kriegskarte: Risiko-artige Gebietseroberung, jetzt als "Kriegsmodus"
+     der echten Reichskarte (§Phase-8G-Punkt 4-8) -->
 <div id="warMapOverlay">
   <div id="warMapFrame">
     <h2 class="title">⚔ KRIEGSKARTE: <span id="wm-title"></span> ⚔</h2>
     <div id="warMapBoard">
-      <svg id="warMapSvg" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <g id="warMapLines"></g>
+      <svg id="warMapSvg" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="marchArrowhead" markerWidth="12" markerHeight="12" refX="8" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z"/>
+          </marker>
+        </defs>
+        <g id="warMapFront"></g>
+        <g id="warMapTerritories"></g>
+        <g id="warMapBanners"></g>
+        <g id="warMapRoute"></g>
       </svg>
-      <div id="warMapNodes"></div>
     </div>
     <div id="warMapDetail" class="diploBlock"></div>
-    <div style="text-align:center; margin-top:var(--sp-2);"><button onclick="closeWarMap()">Kriegskarte schließen</button></div>
+    <div style="text-align:center; margin-top:var(--sp-2);"><button class="btn-ghost" onclick="closeWarMap()">Kriegskarte schließen</button></div>
   </div>
 </div>
 
@@ -11640,6 +11748,184 @@ function getStoryViewViewModel(state) {
   return { activeThreads: activeCards, recentlyResolved: resolved, hasAny: activeCards.length > 0 };
 }
 
+// ============================================================
+// Phase 8G: WAR + BATTLE PRESENTATION -- "Krieg als strategisches
+// Brettspiel, Schlacht als taktischer Höhepunkt". Liest ausschließlich
+// bereits vorhandene Engine-/State-Daten (battle-engine/*.js, state.
+// territories, state.warState) -- keine Kampfmathematik, keine neuen
+// Truppenwerte, keine neuen rnd()-Aufrufe (§66/69/70).
+// ============================================================
+
+// ---------- §9-11: Army Card für ein eigenes Gebiet ----------
+function getArmyCardViewModel(state, territoryId) {
+  const terr = state.territories[territoryId];
+  if (!terr || terr.owner !== "player") return null;
+  const t = territoryById(territoryId);
+  const troops = Object.entries(terr.deployment).filter(([, v]) => v > 0)
+    .map(([type, count]) => ({ type, label: TROOP_TYPES[type] ? TROOP_TYPES[type].name : type, count: Math.round(count) }));
+  const total = troops.reduce((s, x) => s + x.count, 0);
+  const ruler = state.characters[state.rulerId];
+  return {
+    territoryId, territoryName: t.name, terrain: t.terrain, capital: !!t.capital,
+    total, troops, hasForces: total > 0,
+    commanderName: ruler ? `${ruler.name} ${ruler.surname || ""}`.trim() : null,
+  };
+}
+
+// ---------- §14/16: geschätzte gegnerische Garnison -- exakt dieselbe
+// Zahl, die die bestehende Kriegskarte bereits als "geschätzt" zeigt
+// (keine neue Unschärfe erfunden, keine bestehende entfernt). ----------
+function getEnemyGarrisonViewModel(state, territoryId) {
+  const terr = state.territories[territoryId];
+  if (!terr) return null;
+  const t = territoryById(territoryId);
+  const region = state.regions[terr.owner];
+  return {
+    territoryId, territoryName: t.name, terrain: t.terrain, capital: !!t.capital,
+    ownerId: terr.owner, ownerName: region.name,
+    estimatedGarrison: Math.round(terr.garrison),
+    commanderName: region.commander ? region.commander.name.replace(/\s*\(.*\)$/, "") : null,
+  };
+}
+
+// ---------- §12/13: Marschroute -- nur bestehende Adjazenz, keine neue
+// Pfadfindung. Liefert lediglich "gültig ja/nein", die Geometrie der
+// Pfeillinie bleibt Sache der Render-Schicht (MAP_GEOMETRY-Zentren). ----------
+function getMarchRouteViewModel(fromTerritoryId, toTerritoryId) {
+  if (!fromTerritoryId || !toTerritoryId || fromTerritoryId === toTerritoryId) return null;
+  const from = territoryById(fromTerritoryId);
+  if (!from || !from.adjacent.includes(toTerritoryId)) return null;
+  return { fromId: fromTerritoryId, toId: toTerritoryId };
+}
+
+// ---------- §61-63: Kriegsübersicht (War Card) ----------
+// Keine Warscore-Mechanik erfunden (§63) -- nur echte Gebietszahlen und
+// die bereits aus 8E bestehende Kriegsstatus-/Story-ViewModel-Bausteine.
+function getWarCardViewModel(state, aiId) {
+  if (!state.warState || !state.warState[aiId]) return null;
+  const war = getWarStatusViewModel(state, aiId);
+  const homeTerritories = TERRITORIES.filter(t => t.region === aiId);
+  const ownedByPlayer = homeTerritories.filter(t => state.territories[t.id].owner === "player").length;
+  const frontTerritories = homeTerritories
+    .filter(t => state.territories[t.id].owner === aiId && t.adjacent.some(adjId => state.territories[adjId].owner === "player"))
+    .map(t => t.name);
+  return {
+    aiId, name: state.regions[aiId].name.replace(/\s*\(.*\)$/, ""), sinceYear: war.sinceYear,
+    ownedByPlayer, ownedByEnemy: homeTerritories.length - ownedByPlayer, totalTerritories: homeTerritories.length,
+    frontTerritories, story: getDiplomaticStoryViewModel(state, aiId),
+  };
+}
+function getActiveWarsViewModel(state) {
+  return Object.keys(state.warState || {}).filter(id => state.warState[id]).map(id => getWarCardViewModel(state, id)).filter(Boolean);
+}
+
+// ---------- §22-39: taktisches Schlachtfeld ----------
+const BATTLE_PHASE_LABEL = {
+  aufstellung: "Aufstellung", fernkampf: "Fernkampf", annaeherung: "Annäherung",
+  hauptkampf: "Hauptkampf", moralpruefung: "Moralprüfung", entscheidung: "Entscheidung",
+};
+const UNIT_ICON_BY_TYPE = {
+  infanterie: "inf", bogenschuetzen: "bow", kavallerie: "cav", artillerie: "art",
+  miliz: "mil", pikeniere: "pike", schwere_kavallerie: "heavycav",
+};
+function getBattleUnitViewModel(stack) {
+  const info = UNIT_TYPES[stack.unitType];
+  return {
+    id: stack.id, unitType: stack.unitType, label: info ? info.name : stack.unitType,
+    icon: UNIT_ICON_BY_TYPE[stack.unitType] || "inf",
+    soldiers: Math.max(0, Math.round(stack.soldiers)), maxSoldiers: stack.maxSoldiers,
+    morale: Math.round(stack.morale), moraleTier: moraleTierName(stack.morale),
+    routed: !!stack.routed, alive: stack.soldiers > 0 && !stack.routed,
+  };
+}
+function getBattleArmySideViewModel(army) {
+  const morale = overallMorale(army);
+  return {
+    name: army.name, commanderName: army.commander.name, commanderAlive: army.commander.alive,
+    formation: army.formation, formationLabel: BATTLE_FORMATIONS[army.formation] ? BATTLE_FORMATIONS[army.formation].name : army.formation,
+    tactic: army.tactic, tacticLabel: TACTICS[army.tactic] ? TACTICS[army.tactic].name : army.tactic,
+    morale: Math.round(morale), moraleTier: moraleTierName(morale),
+    units: army.stacks.map(getBattleUnitViewModel),
+    totalSoldiers: Math.round(totalSoldiers(army)),
+  };
+}
+function getBattlePhaseViewModel(battleState) {
+  return BATTLE_PHASES.map((p, i) => ({
+    id: p, label: BATTLE_PHASE_LABEL[p] || p, current: i === battleState.phaseIndex, done: i < battleState.phaseIndex,
+  }));
+}
+// §37/38: das bestehende Log wortgleich als "Feldbericht" -- keine neuen Meldungen.
+function getBattleLogViewModel(battleState) {
+  return battleState.log.map(l => ({ time: l.time, text: l.text }));
+}
+function getBattlePresentationViewModel(battleState) {
+  return {
+    terrain: battleState.terrain, terrainLabel: TERRAIN_TYPES[battleState.terrain] ? TERRAIN_TYPES[battleState.terrain].name : battleState.terrain,
+    weather: battleState.weather, weatherLabel: WEATHER_TYPES[battleState.weather] ? WEATHER_TYPES[battleState.weather].name : battleState.weather,
+    phase: getBattlePhaseViewModel(battleState),
+    armyA: getBattleArmySideViewModel(battleState.armyA), armyB: getBattleArmySideViewModel(battleState.armyB),
+    log: getBattleLogViewModel(battleState),
+    pendingDecision: battleState.pendingDecision,
+    finished: battleState.finished,
+  };
+}
+
+// ---------- §49-60: Schlachtergebnis ----------
+// §50/51: Titel ausschließlich aus der bereits real klassifizierten
+// result.outcome (7 Werte, siehe battle-state-machine.js runEntscheidung())
+// -- nur aus Sieger-Perspektive umbenannt, keine neue Klassifikationslogik.
+function getBattleResultTitle(outcome, playerWon) {
+  if (outcome === "knapperSieg") return playerWon ? "KNAPPER SIEG" : "KNAPPE NIEDERLAGE";
+  if (outcome.indexOf("vernichtendeNiederlage") === 0) return playerWon ? "GLORREICHER SIEG" : "SCHWERE NIEDERLAGE";
+  if (outcome.indexOf("geordneterRueckzug") === 0) return playerWon ? "DER GEGNER ZIEHT SICH ZURÜCK" : "GEORDNETER RÜCKZUG";
+  return playerWon ? "SIEG" : "NIEDERLAGE";
+}
+// §53: dieselbe "Warum verloren"-Herleitung, die zuvor direkt in
+// btShowBattleReport() stand -- unverändert in die ViewModel-Schicht
+// verschoben (reine Anzeige-Logik auf echten Feldern: Formation/Moral/
+// Kommandant/Gelände), keine neuen Gründe erfunden.
+function getBattleOutcomeReasons(battleState, loserArmy) {
+  const reasons = [];
+  if (loserArmy.formation === "aggressiv" || loserArmy.formation === "kavallerieflanke") reasons.push("die gewählte Formation war riskant und bot wenig Verteidigung");
+  if (overallMorale(loserArmy) < 40) reasons.push("die Moral der Truppen brach im Kampfverlauf ein");
+  if (!loserArmy.commander.alive) reasons.push("der Verlust des Kommandanten erschütterte die Truppen");
+  if (battleState.terrain === "burg" && loserArmy === battleState.armyA) reasons.push("die feindliche Befestigung (Stadtmauer) gab dem Verteidiger einen enormen Vorteil");
+  if (!reasons.length) reasons.push("die gegnerische Armee war in dieser Schlacht schlicht überlegen");
+  return reasons;
+}
+function getBattleResultViewModel(battleState, playerSide) {
+  const r = battleState.result;
+  const playerWon = r.winner === playerSide;
+  const playerResult = playerSide === "A" ? r.armyA : r.armyB;
+  const enemyResult = playerSide === "A" ? r.armyB : r.armyA;
+  const loserArmy = r.winner === "A" ? battleState.armyB : battleState.armyA;
+  const sideSummary = (res) => ({
+    name: res.name, startStrength: res.startStrength, endStrength: res.endStrength,
+    casualties: res.casualties, casualtyPct: res.startStrength ? Math.round(res.casualties / res.startStrength * 100) : 0,
+    dead: res.dead, wounded: res.wounded, missing: res.missing, moraleEnd: res.moraleEnd,
+  });
+  return {
+    title: getBattleResultTitle(r.outcome, playerWon), playerWon,
+    player: sideSummary(playerResult), enemy: sideSummary(enemyResult),
+    reasons: getBattleOutcomeReasons(battleState, loserArmy),
+    terrain: battleState.terrain, terrainLabel: TERRAIN_TYPES[battleState.terrain] ? TERRAIN_TYPES[battleState.terrain].name : battleState.terrain,
+    rounds: r.rounds,
+  };
+}
+
+// ---------- §55: Chronik-Hinweis nur bei echter Chronicle-Eligibility ----------
+// Sucht die soeben (im selben Jahr) real erzeugte MAJOR_BATTLE_WON/LOST-
+// Memory statt eine hypothetische zu konstruieren -- applyBattleResultToGame()/
+// applyTerritoryBattleResult() legen sie unverändert an.
+function getBattleChronicleHintViewModel(state, aiId) {
+  const mems = Object.values(state.memories.byId).filter(m =>
+    (m.type === "MAJOR_BATTLE_WON" || m.type === "MAJOR_BATTLE_LOST") &&
+    m.regionIds && m.regionIds.includes(aiId) && m.year === state.year);
+  if (!mems.length) return null;
+  const mem = mems[mems.length - 1];
+  return isChronicleWorthy(state, mem).worthy ? { worthy: true } : null;
+}
+
 </script>
 <script>
 let state = null; // erst nach Charaktererstellung bzw. Laden gesetzt (§8/§89)
@@ -13083,6 +13369,23 @@ function renderEconomicRisks() {
   el.innerHTML = risks.map(r => `<div class="alertItem ${r.kind === 'shortfall' ? 'crit' : 'important'}"><span class="alertDot"></span>${r.text}</div>`).join('');
 }
 
+// §61-63: optionale Kriegsübersicht -- nur echte Gebietszahlen, keine
+// erfundene Kriegsscore-Mechanik. Erscheint nur, wenn wirklich Krieg besteht.
+function renderActiveWarsSection() {
+  const el = document.getElementById('activeWarsSection');
+  const wars = getActiveWarsViewModel(state);
+  if (!wars.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<h2 class="title">AKTUELLE KRIEGE</h2><div id="warCardList">` + wars.map(w => `
+    <div class="warCard">
+      <div class="warCardName">${w.name} <span class="warCardSince">seit ${w.sinceYear ?? '?'}</span></div>
+      <div class="warCardRow"><span class="label">Eigene Gebiete erobert</span><span>${w.ownedByPlayer} / ${w.totalTerritories}</span></div>
+      <div class="warCardRow"><span class="label">Gegnerische Gebiete verblieben</span><span>${w.ownedByEnemy}</span></div>
+      ${w.frontTerritories.length ? `<div class="warCardRow"><span class="label">Front</span><span>${w.frontTerritories.join(', ')}</span></div>` : ''}
+      ${w.story ? `<div class="warCardStory">Teil der Geschichte: <i>${w.story.title}</i></div>` : ''}
+      <button class="btn-ghost" onclick="openWarMap('${w.aiId}')">🗺 Kriegskarte öffnen</button>
+    </div>`).join('') + `</div>`;
+}
+
 function renderMilitary() {
   const selectedFormation = document.getElementById('formationSelect') ? document.getElementById('formationSelect').value : 'gleichmaessig';
   const strength = armyStrength(state, selectedFormation);
@@ -13117,6 +13420,8 @@ function renderMilitary() {
   }
   formationHtml += '</select>';
   document.getElementById('formationMenu').innerHTML = formationHtml;
+
+  renderActiveWarsSection();
 
   let warHtml = '';
   for (const aiId in state.diplomacy) {
@@ -13259,26 +13564,32 @@ function openTerritoryBattleSetup(attackerTerritoryId, defenderTerritoryId, play
   const tacOptions = Object.entries(TACTICS).map(([k,v]) => `<option value="${k}">${v.name}</option>`).join('');
   document.getElementById('btFormation').innerHTML = formOptions;
   document.getElementById('btTactic').innerHTML = tacOptions;
+  btRenderFormationDiagram();
   const targetTerritoryId = defenderTerritoryId; // das Gebiet, um das gekämpft wird (Besitzer wechselt bei Sieg des Angreifers)
   const targetLabel = territoryById(targetTerritoryId).name;
   document.getElementById('btTitleBar').textContent = playerIsAttacker
     ? `⚔ ANGRIFF AUF ${targetLabel.toUpperCase()} ⚔`
     : `⚔ VERTEIDIGUNG VON ${targetLabel.toUpperCase()} ⚔`;
+  btSetEyebrow();
   document.getElementById('btSetup').style.display = 'block';
   document.getElementById('btBattleUi').style.display = 'none';
   document.getElementById('btReport').style.display = 'none';
   document.getElementById('btOverlay').style.display = 'flex';
 }
 
-// ---------- Kriegskarte: Karten-UI (Truppen stationieren/verlegen/angreifen) ----------
+// ---------- Kriegskarte: dieselbe historische Karte wie die Reichsseite,
+// nur im "Kriegsmodus" (§Phase-8G-Punkt 4-8) -- keine zweite billige Karte,
+// keine Kreise/Kartenpins (§8), Armeen als Banner/Wappen statt Zahlenkreise. ----------
 let wmFocusAiId = null;
 let wmSelectedTerritory = null;
-const WM_OWNER_COLOR = { player: '#f0a83c', ai1: '#d64a3a', ai2: '#4a86c8', ai3: '#3f8b5c' };
+let wmAttackTarget = null; // §14/15: gewähltes Angriffsziel für Marschroute + Angriffszusammenfassung
 
 function openWarMap(aiId) {
   wmFocusAiId = aiId;
   wmSelectedTerritory = null;
+  wmAttackTarget = null;
   document.getElementById('wm-title').textContent = state.regions[aiId].name;
+  document.getElementById('warMapSvg').setAttribute('viewBox', MAP_VIEWBOX);
   renderWarMap();
   document.getElementById('warMapOverlay').style.display = 'flex';
 }
@@ -13289,86 +13600,174 @@ function closeWarMap() {
 }
 
 function wmSelectTerritory(id) {
+  const terr = state.territories[id];
+  // §14/15: ein eigenes Gebiet mit Truppen ist bereits gewählt und ein
+  // angrenzendes fremdes Gebiet wird angeklickt -> als Angriffsziel
+  // markieren (dieselbe bestehende Angriffs-Adjazenz wie zuvor), statt die
+  // Kartenauswahl zu wechseln.
+  if (wmSelectedTerritory && wmSelectedTerritory !== id) {
+    const fromTerr = state.territories[wmSelectedTerritory];
+    const from = territoryById(wmSelectedTerritory);
+    if (fromTerr.owner === 'player' && terr.owner !== 'player' && from.adjacent.includes(id) &&
+        Object.values(fromTerr.deployment).some(v => v > 0)) {
+      wmAttackTarget = (wmAttackTarget === id) ? null : id;
+      renderWarMap();
+      return;
+    }
+  }
   wmSelectedTerritory = id;
+  wmAttackTarget = null;
   renderWarMap();
 }
 
 function renderWarMap() {
-  let linesHtml = '';
-  const drawn = new Set();
-  for (const t of TERRITORIES) {
-    for (const adjId of t.adjacent) {
-      const key = [t.id, adjId].sort().join('|');
-      if (drawn.has(key)) continue;
-      drawn.add(key);
-      const other = territoryById(adjId);
-      linesHtml += `<line x1="${t.x}" y1="${t.y}" x2="${other.x}" y2="${other.y}" stroke="rgba(255,246,226,0.4)" stroke-width="0.6" />`;
-    }
-  }
-  document.getElementById('warMapLines').innerHTML = linesHtml;
+  const vm = getWorldMapViewModel(state);
 
-  let nodesHtml = '';
+  // §6: Frontlinie -- echte Nachbarschaft zwischen Spieler- und
+  // Kriegsgegner-Gebiet, nur wenn tatsächlich Krieg besteht (state.warState).
+  // Keine neue Frontmechanik, nur die bestehende Grenze visuell hervorgehoben.
+  let frontHtml = '';
+  const drawnFront = new Set();
   for (const t of TERRITORIES) {
     const terr = state.territories[t.id];
-    const color = WM_OWNER_COLOR[terr.owner] || '#888';
-    const strengthLabel = terr.owner === 'player'
-      ? Object.values(terr.deployment).reduce((a, b) => a + b, 0)
-      : Math.round(terr.garrison);
-    nodesHtml += `<div class="wmNode${t.capital ? ' capital' : ''}${wmSelectedTerritory === t.id ? ' selected' : ''}"
-      style="left:${t.x}%; top:${t.y}%; background:${color};"
-      onclick="wmSelectTerritory('${t.id}')" data-tip="${t.name} (${state.regions[terr.owner].name})">
-      <div class="wmNodeLabel">${strengthLabel}</div>
-    </div>`;
+    if (terr.owner !== 'player') continue;
+    for (const adjId of t.adjacent) {
+      const adjTerr = state.territories[adjId];
+      if (adjTerr.owner === 'player' || !state.warState[adjTerr.owner]) continue;
+      const key = [t.id, adjId].sort().join('|');
+      if (drawnFront.has(key)) continue;
+      drawnFront.add(key);
+      const g1 = MAP_GEOMETRY[t.id], g2 = MAP_GEOMETRY[adjId];
+      if (!g1 || !g2) continue;
+      frontHtml += `<line class="frontLine" x1="${g1.centroidX}" y1="${g1.centroidY}" x2="${g2.centroidX}" y2="${g2.centroidY}"/>`;
+    }
   }
-  document.getElementById('warMapNodes').innerHTML = nodesHtml;
+  document.getElementById('warMapFront').innerHTML = frontHtml;
+
+  let territoriesHtml = '';
+  let bannersHtml = '';
+  for (const terr of vm.territories) {
+    const geo = MAP_GEOMETRY[terr.id];
+    if (!geo) continue;
+    const color = REICH_OWNER_COLOR[terr.ownerId] || '#888';
+    const isSelected = wmSelectedTerritory === terr.id;
+    const isTarget = wmAttackTarget === terr.id;
+    const cls = ['territoryNode',
+      terr.capital ? 'capital' : '', terr.isPlayerOwned ? 'isPlayer' : '',
+      isSelected ? 'selected' : '', isTarget ? 'attackTarget' : '',
+      terr.attackable ? 'attackable' : '', terr.ally ? 'ally' : ''].filter(Boolean).join(' ');
+    const tip = `${terr.name} (${terr.ownerName})
+Gelände: ${TERRAIN_TYPES[terr.terrain].name}${terr.hasForces ? '\nTruppen: ' + terr.strength : ''}`;
+
+    territoriesHtml += `<g class="${cls}" data-tip="${tip}" onclick="wmSelectTerritory('${terr.id}')">
+      <path class="territoryFill" d="${geo.path}" style="fill:${color};"/>`;
+    const terrainIcon = !terr.capital ? TERRAIN_ICON[terr.terrain] : null;
+    if (terrainIcon) {
+      territoriesHtml += `<use href="#${terrainIcon}" class="territoryIcon" x="${geo.centroidX - 9}" y="${geo.centroidY - 42}" width="18" height="18"/>`;
+    }
+    if (terr.attackable) {
+      territoriesHtml += `<use href="#icon-sword" class="territoryIcon attackIcon" x="${geo.centroidX + 24}" y="${geo.centroidY - 46}" width="16" height="16"/>`;
+    }
+    if (terr.capital) {
+      territoriesHtml += `<use href="#icon-burg" class="territoryIcon" x="${geo.capitalX - 12}" y="${geo.capitalY - 24}" width="24" height="24"/>`;
+      if (terr.isPlayerOwned) territoriesHtml += `<circle class="capitalRing" cx="${geo.capitalX}" cy="${geo.capitalY - 12}" r="17"/>`;
+    }
+    territoriesHtml += `<text class="territoryLabel${terr.capital ? ' capitalLabel' : ''}" x="${geo.labelX}" y="${geo.labelY}">${terr.name}</text>`;
+    territoriesHtml += `</g>`;
+
+    // §9-11/18-20: Armeen als Banner/Wappen statt Zahlenkreis -- nutzt
+    // ausschließlich die bereits vorhandene terr.strength.
+    if (terr.hasForces) {
+      const bx = geo.capitalX + 30, by = geo.capitalY + 6;
+      bannersHtml += `<g class="armyBanner">
+        <use href="#icon-banner" class="bannerIcon" x="${bx - 8}" y="${by - 4}" width="20" height="27" style="color:${color};"/>
+        <text x="${bx + 5}" y="${by + 11}">${terr.strength}</text>
+      </g>`;
+    }
+  }
+  document.getElementById('warMapTerritories').innerHTML = territoriesHtml;
+  document.getElementById('warMapBanners').innerHTML = bannersHtml;
+
+  // §12/13: Marschroute -- handgezeichnete Tuschelinie mit Pfeilspitze, nur
+  // bei realer Adjazenz (getMarchRouteViewModel), keine neue Pfadfindung.
+  let routeHtml = '';
+  if (wmSelectedTerritory && wmAttackTarget) {
+    const route = getMarchRouteViewModel(wmSelectedTerritory, wmAttackTarget);
+    if (route) {
+      const g1 = MAP_GEOMETRY[route.fromId], g2 = MAP_GEOMETRY[route.toId];
+      if (g1 && g2) {
+        routeHtml = `<line class="marchRoute" x1="${g1.centroidX}" y1="${g1.centroidY}" x2="${g2.centroidX}" y2="${g2.centroidY}" marker-end="url(#marchArrowhead)"/>`;
+      }
+    }
+  }
+  document.getElementById('warMapRoute').innerHTML = routeHtml;
+
   renderWarMapDetail();
 }
 
+// §9-11: Army Card (eigenes Gebiet) / geschätzte Garnison (fremdes Gebiet)
+// statt reinem Text+Select-Block -- nur echte Felder, nichts erfunden.
 function renderWarMapDetail() {
   const detailEl = document.getElementById('warMapDetail');
-  if (!wmSelectedTerritory) { detailEl.innerHTML = '<i>Wähle ein Gebiet auf der Karte, um Truppen zu stationieren oder anzugreifen.</i>'; return; }
+  if (!wmSelectedTerritory) { detailEl.innerHTML = '<i>Wähle ein eigenes Gebiet auf der Karte, um Truppen zu stationieren oder einen Angriff vorzubereiten.</i>'; return; }
   const t = territoryById(wmSelectedTerritory);
   const terr = state.territories[t.id];
-  const ownerName = state.regions[terr.owner].name;
-  let html = `<b>${t.name}</b> (${ownerName}) — Gelände: ${TERRAIN_TYPES[t.terrain].name}${t.capital ? ' · Hauptstadt (starke Verteidigung)' : ''}<br>`;
 
   if (terr.owner === 'player') {
-    const troopsHere = Object.entries(terr.deployment).filter(([,v]) => v > 0);
-    html += `Garnison: ${troopsHere.length ? troopsHere.map(([k,v]) => `${TROOP_TYPES[k].name} ${v}`).join(', ') : 'keine Truppen'}<br>`;
+    const card = getArmyCardViewModel(state, t.id);
+    let html = `<div class="armyCardRow"><b>${card.territoryName}</b>${card.capital ? ' · Hauptstadt' : ''}</div>
+      <div class="armyCardRow"><span class="label">Gelände</span><span>${TERRAIN_TYPES[card.terrain].name}</span></div>
+      <div class="armyCardRow"><span class="label">Gesamtstärke</span><span>${card.total}</span></div>`;
+    if (card.commanderName) html += `<div class="armyCardRow"><span class="label">Befehlshaber</span><span>${card.commanderName}</span></div>`;
+    html += card.troops.length
+      ? `<div class="armyCardTroopList">${card.troops.map(x => `${x.label} ${x.count}`).join(' · ')}</div>`
+      : `<div class="armyCardTroopList"><i>keine Truppen stationiert</i></div>`;
 
     html += `<div class="subhead">Truppen aus der Reserve stationieren</div>`;
     const reserveOptions = Object.keys(TROOP_TYPES).map(tt => `<option value="${tt}">${TROOP_TYPES[tt].name} (Reserve: ${reserveCountOfType(state, tt)})</option>`).join('');
-    html += `<select id="wmDeployType">${reserveOptions}</select> <input type="number" id="wmDeployCount" value="10" min="1" style="width:60px;"> <button onclick="wmDoDeploy()">Stationieren</button><br>`;
+    html += `<select id="wmDeployType">${reserveOptions}</select> <input type="number" id="wmDeployCount" value="10" min="1" style="width:60px;"> <button class="btn-ghost" onclick="wmDoDeploy()">Stationieren</button><br>`;
 
     const ownedAdjacent = t.adjacent.filter(id => state.territories[id].owner === 'player');
-    if (ownedAdjacent.length && troopsHere.length) {
+    if (ownedAdjacent.length && card.troops.length) {
       html += `<div class="subhead">Truppen verlegen</div>`;
       const targetOptions = ownedAdjacent.map(id => `<option value="${id}">${territoryById(id).name}</option>`).join('');
-      const typeOptions = troopsHere.map(([k,v]) => `<option value="${k}">${TROOP_TYPES[k].name} (${v})</option>`).join('');
-      html += `Nach: <select id="wmMoveTarget">${targetOptions}</select> <select id="wmMoveType">${typeOptions}</select> <input type="number" id="wmMoveCount" value="10" min="1" style="width:60px;"> <button onclick="wmDoMove()">Verlegen</button><br>`;
+      const typeOptions = card.troops.map(x => `<option value="${x.type}">${x.label} (${x.count})</option>`).join('');
+      html += `Nach: <select id="wmMoveTarget">${targetOptions}</select> <select id="wmMoveType">${typeOptions}</select> <input type="number" id="wmMoveCount" value="10" min="1" style="width:60px;"> <button class="btn-ghost" onclick="wmDoMove()">Verlegen</button><br>`;
     }
 
-    const attackable = t.adjacent.filter(id => state.territories[id].owner !== 'player');
-    if (attackable.length && troopsHere.length) {
-      html += `<div class="subhead">Von hier aus angreifen</div>`;
-      attackable.forEach(id => {
-        html += `<button onclick="wmDoAttack('${t.id}','${id}')">${territoryById(id).name} angreifen</button> `;
-      });
+    if (wmAttackTarget) {
+      // §15: klarer Rahmen (attackTarget-CSS) + Marschlinie + kurze
+      // Zusammenfassung "ANGRIFF AUF X" mit eigener Stärke/geschätztem
+      // Gegner/Gelände -- §16: Unschärfe respektiert, nur estimatedGarrison.
+      const enemy = getEnemyGarrisonViewModel(state, wmAttackTarget);
+      html += `<div class="attackSummaryBox">
+        <div class="asTitle">ANGRIFF AUF ${enemy.territoryName.toUpperCase()}</div>
+        <div class="armyCardRow"><span class="label">Eigene Stärke</span><span>${card.total}</span></div>
+        <div class="armyCardRow"><span class="label">Geschätzte Garnison</span><span>${enemy.estimatedGarrison}</span></div>
+        <div class="armyCardRow"><span class="label">Gelände</span><span>${TERRAIN_TYPES[enemy.terrain].name}${enemy.capital ? ' (Hauptstadt)' : ''}</span></div>
+        ${enemy.commanderName ? `<div class="armyCardRow"><span class="label">Feindlicher Befehlshaber</span><span>${enemy.commanderName}</span></div>` : ''}
+        <div style="text-align:center; margin-top:var(--sp-2);"><button class="btn-danger" onclick="wmDoAttack('${wmSelectedTerritory}','${wmAttackTarget}')">⚔ Angriff beginnen</button></div>
+      </div>`;
+    } else {
+      const attackable = t.adjacent.filter(id => state.territories[id].owner !== 'player');
+      if (attackable.length && card.troops.length) {
+        html += `<div class="subhead">Angriffsziel wählen</div><i>Klicke ein angrenzendes fremdes Gebiet auf der Karte an, um es als Angriffsziel zu markieren.</i>`;
+      }
     }
+    detailEl.innerHTML = html;
   } else {
-    html += `Geschätzte Garnison: ${Math.round(terr.garrison)}<br>`;
+    const enemy = getEnemyGarrisonViewModel(state, t.id);
+    let html = `<div class="armyCardRow"><b>${enemy.territoryName}</b> (${state.regions[enemy.ownerId].name})${enemy.capital ? ' · Hauptstadt' : ''}</div>
+      <div class="armyCardRow"><span class="label">Gelände</span><span>${TERRAIN_TYPES[enemy.terrain].name}</span></div>
+      <div class="armyCardRow"><span class="label">Geschätzte Garnison</span><span>${enemy.estimatedGarrison}</span></div>`;
+    if (enemy.commanderName) html += `<div class="armyCardRow"><span class="label">Befehlshaber</span><span>${enemy.commanderName}</span></div>`;
     const attackFrom = t.adjacent.filter(id => state.territories[id].owner === 'player' &&
       Object.values(state.territories[id].deployment).some(v => v > 0));
-    if (attackFrom.length) {
-      html += `<div class="subhead">Von hier aus angreifen</div>`;
-      attackFrom.forEach(id => {
-        html += `<button onclick="wmDoAttack('${id}','${t.id}')">Angriff von ${territoryById(id).name}</button> `;
-      });
-    } else {
-      html += `<i>Kein angrenzendes eigenes Gebiet mit stationierten Truppen — verlege zuerst Truppen an die Grenze.</i>`;
-    }
+    html += attackFrom.length
+      ? `<div class="subhead">Angriff vorbereiten</div><i>Wähle zuerst dein angrenzendes eigenes Gebiet auf der Karte, dann klicke dieses Gebiet als Angriffsziel an.</i>`
+      : `<i>Kein angrenzendes eigenes Gebiet mit stationierten Truppen — verlege zuerst Truppen an die Grenze.</i>`;
+    detailEl.innerHTML = html;
   }
-  detailEl.innerHTML = html;
 }
 
 function wmDoDeploy() {
@@ -13401,13 +13800,46 @@ function openBattleSetup(aiId, defending) {
   const tacOptions = Object.entries(TACTICS).map(([k,v]) => `<option value="${k}">${v.name}</option>`).join('');
   document.getElementById('btFormation').innerHTML = formOptions;
   document.getElementById('btTactic').innerHTML = tacOptions;
+  btRenderFormationDiagram();
   document.getElementById('btTitleBar').textContent = btPlayerIsDefender
     ? `⚔ VERTEIDIGUNG GEGEN ${state.regions[aiId].name.toUpperCase()} ⚔`
     : `⚔ SCHLACHT GEGEN ${state.regions[aiId].name.toUpperCase()} ⚔`;
+  btSetEyebrow();
   document.getElementById('btSetup').style.display = 'block';
   document.getElementById('btBattleUi').style.display = 'none';
   document.getElementById('btReport').style.display = 'none';
   document.getElementById('btOverlay').style.display = 'flex';
+}
+
+// §36: Formation als kleines Konzeptdiagramm -- rein dekorativ (deterministisch,
+// kein rnd()), keine neue Formationsmechanik, bestehende Formationsnamen bleiben.
+const BATTLE_FORMATION_DIAGRAM = {
+  ausgewogen: [[1,1,1],[1,1,1]],
+  defensiv: [[1,1,1,1],[0,1,1,0]],
+  aggressiv: [[0,1,1,0],[1,1,1,1]],
+  kavallerieflanke: [[1,0,0,1],[0,1,1,0]],
+  fernkampfstellung: [[0,1,1,0],[1,1,1,1],[0,1,1,0]],
+};
+function btRenderFormationDiagram() {
+  const key = document.getElementById('btFormation').value;
+  const grid = BATTLE_FORMATION_DIAGRAM[key] || BATTLE_FORMATION_DIAGRAM.ausgewogen;
+  document.getElementById('btFormationDiagram').innerHTML = grid.map(row =>
+    `<div class="btFormRow">${row.map(cell => `<div class="btFormBlock${cell ? '' : ' gap'}"></div>`).join('')}</div>`).join('');
+}
+
+// §19: kurzer Kontext -- "SCHLACHT BEI X · ANNO Y" statt eines nackten Titels.
+function btSetEyebrow() {
+  let locationName = null;
+  if (btTerritoryContext) {
+    locationName = territoryById(btTerritoryContext.defenderTerritoryId).name;
+  } else if (btWarTargetId) {
+    const regionId = btPlayerIsDefender ? 'player' : btWarTargetId;
+    const capitalTerr = TERRITORIES.find(t => t.region === regionId && t.capital);
+    locationName = capitalTerr ? capitalTerr.name : null;
+  }
+  document.getElementById('btEyebrow').textContent = (locationName
+    ? `Schlacht bei ${locationName} · Anno ${state.year}`
+    : `Anno ${state.year}`).toUpperCase();
 }
 
 // doSiegeAction() (rief siegeStarve()/siegeBribe() auf) wurde in Phase 2
@@ -13440,33 +13872,99 @@ function btStartBattle() {
   btRenderBattle();
 }
 
-function btUnitBlockHtml(stack) {
-  const abbr = { infanterie:'INF', bogenschuetzen:'BOG', kavallerie:'KAV', artillerie:'ART', miliz:'MIL', pikeniere:'PIK', schwere_kavallerie:'SKV' }[stack.unitType];
-  const dead = stack.soldiers <= 0 || stack.routed;
-  return `<div class="btUnitBlock" style="${dead ? 'opacity:0.3;' : ''}">
-    [${abbr}]<br><span class="cnt">${Math.max(0, Math.round(stack.soldiers))}</span>
-    <div class="btMoraleBar"><div style="width:${Math.round(stack.morale)}%;"></div></div>
+// §26/31-33: Formationstoken -- kleine illustrierte Silhouetten je
+// Einheitentyp (Brettspiel-Miniatur-Stil), keine Einzelsoldaten-Simulation.
+// Rein deterministische, statische Pfade -- kein rnd().
+const BATTLE_UNIT_GLYPH = {
+  inf: '<svg viewBox="0 0 32 32"><path d="M16 4 L24 10 V20 Q24 27 16 29 Q8 27 8 20 V10 Z" fill="currentColor" stroke="#1a1208" stroke-width="1.5"/></svg>',
+  mil: '<svg viewBox="0 0 32 32"><path d="M16 5 L23 10 V19 Q23 26 16 28 Q9 26 9 19 V10 Z" fill="currentColor" stroke="#1a1208" stroke-width="1.5" opacity="0.85"/></svg>',
+  pike: '<svg viewBox="0 0 32 32"><line x1="8" y1="30" x2="12" y2="3" stroke="currentColor" stroke-width="2.5"/><line x1="16" y1="30" x2="18" y2="2" stroke="currentColor" stroke-width="2.5"/><line x1="24" y1="30" x2="22" y2="3" stroke="currentColor" stroke-width="2.5"/><path d="M12 3 L10 7 L14 7 Z M18 2 L15.5 6 L20 6 Z M22 3 L19 7.5 L24.5 7.5 Z" fill="currentColor"/></svg>',
+  bow: '<svg viewBox="0 0 32 32"><path d="M10 4 Q22 16 10 28" fill="none" stroke="currentColor" stroke-width="2.5"/><line x1="10" y1="6" x2="10" y2="26" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2"/><line x1="6" y1="16" x2="24" y2="16" stroke="currentColor" stroke-width="1.5"/></svg>',
+  cav: '<svg viewBox="0 0 32 32"><path d="M6 26 Q6 18 12 16 L12 10 Q12 6 17 6 Q22 6 23 11 L26 12 L24 15 L21 14 V22 Q21 26 26 26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  heavycav: '<svg viewBox="0 0 32 32"><path d="M6 26 Q6 18 12 16 L12 10 Q12 6 17 6 Q22 6 23 11 L26 12 L24 15 L21 14 V22 Q21 26 26 26" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.4" fill="currentColor"/></svg>',
+  art: '<svg viewBox="0 0 32 32"><rect x="6" y="20" width="20" height="6" rx="2" fill="currentColor"/><circle cx="10" cy="23" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="22" cy="23" r="4" fill="none" stroke="currentColor" stroke-width="2"/><rect x="10" y="8" width="14" height="8" rx="3" fill="currentColor"/></svg>',
+};
+
+// §29: Gelände sichtbar machen -- Wald=Baumgruppen, Hügel=Hügellinie usw.
+// Nutzt dieselben SVG-Symbole wie die Reichskarte (<use>, dokumentweit
+// gültige IDs), keine neuen Terrain-Werte.
+const BATTLE_TERRAIN_DECO = {
+  wald: '<svg class="btTerrainDeco" style="left:6%;top:58%;" width="70" height="35" viewBox="0 0 70 35"><use href="#icon-tree" width="35" height="35"/><use href="#icon-tree" width="28" height="28" x="34" y="4"/></svg>'
+      + '<svg class="btTerrainDeco" style="right:8%;top:14%;" width="40" height="40" viewBox="0 0 40 40"><use href="#icon-tree" width="40" height="40"/></svg>',
+  huegel: '<svg class="btTerrainDeco" style="left:10%;top:52%;" width="90" height="45" viewBox="0 0 90 45"><use href="#icon-hill" width="90" height="45"/></svg>',
+  sumpf: '<svg class="btTerrainDeco" style="left:14%;top:60%;" width="60" height="30" viewBox="0 0 60 30"><use href="#icon-hill" width="60" height="30" opacity="0.4"/></svg>',
+  burg: '<svg class="btTerrainDeco" style="left:42%;top:8%;" width="48" height="48" viewBox="0 0 48 48"><use href="#icon-burg" width="48" height="48"/></svg>',
+  stadt: '<svg class="btTerrainDeco" style="left:42%;top:8%;" width="48" height="48" viewBox="0 0 48 48"><use href="#icon-burg" width="48" height="48"/></svg>',
+};
+function btTerrainDecoHtml(terrain) { return BATTLE_TERRAIN_DECO[terrain] || ''; }
+
+// §33: Verluste kompakt während des Kampfes, z.B. "Pikeniere 1.084 / 1.200
+// (-116)" -- nutzt die bereits vorhandenen soldiers/maxSoldiers-Felder,
+// keine permanente Dauer-Animation jeder Zahl.
+function btUnitTokenHtml(stack, color) {
+  const vm = getBattleUnitViewModel(stack);
+  const casualties = Math.max(0, vm.maxSoldiers - vm.soldiers);
+  const tip = `${vm.label}: ${vm.soldiers.toLocaleString('de-DE')} / ${vm.maxSoldiers.toLocaleString('de-DE')} Soldaten${vm.routed ? ' (fliehend)' : ''}\nMoral: ${vm.morale}% — ${vm.moraleTier}`;
+  return `<div class="btUnitToken${vm.alive ? '' : ' dead'}" data-tip="${tip}" tabindex="0">
+    <div class="btUnitGlyph" style="color:${color};">${BATTLE_UNIT_GLYPH[vm.icon] || BATTLE_UNIT_GLYPH.inf}</div>
+    <div class="btUnitTextCol">
+      <div class="btUnitLabel">${vm.label}${vm.routed ? ' (flieht)' : ''}</div>
+      <div class="btUnitCount">${vm.soldiers.toLocaleString('de-DE')} / ${vm.maxSoldiers.toLocaleString('de-DE')}${casualties > 0 ? ` <span class="cas">-${casualties.toLocaleString('de-DE')}</span>` : ''}</div>
+      <div class="btMoraleBar"><div style="width:${vm.morale}%;"></div></div>
+    </div>
   </div>`;
+}
+
+// §25/34: Moral historisch wichtig -- Balken plus reale Klassifikation
+// (moraleTierName, s. MORALE_TIERS), keine neuen Stufen erfunden.
+function btArmyPanelHtml(army, color) {
+  const vm = getBattleArmySideViewModel(army);
+  return `<div class="btArmyName">${vm.name}</div>
+    <div class="btArmyCommander">${vm.commanderName}${vm.commanderAlive ? '' : ' † gefallen'} — ${vm.formationLabel || '–'}</div>
+    <div class="btArmyMoraleLabel">Moral: ${vm.morale}% — ${vm.moraleTier}</div>
+    <div class="btArmyMoraleBar"><div style="width:${vm.morale}%;"></div></div>
+    <div class="btUnitList">${army.stacks.map(s => btUnitTokenHtml(s, color)).join('')}</div>`;
 }
 
 function btRenderBattle() {
   const s = btState;
-  document.getElementById('btLabelA').innerHTML = `<b>${s.armyA.name}</b> (${s.armyA.commander.name})<br>Moral: ${Math.round(overallMorale(s.armyA))}% — ${moraleTierName(overallMorale(s.armyA))}`;
-  document.getElementById('btLabelB').innerHTML = `<b>${s.armyB.name}</b> (${s.armyB.commander.name})<br>Moral: ${Math.round(overallMorale(s.armyB))}% — ${moraleTierName(overallMorale(s.armyB))}`;
-  document.getElementById('btUnitsA').innerHTML = s.armyA.stacks.map(btUnitBlockHtml).join('');
-  document.getElementById('btUnitsB').innerHTML = s.armyB.stacks.map(btUnitBlockHtml).join('');
+  const playerSide = btTerritoryContext ? (btTerritoryContext.playerIsAttacker ? 'A' : 'B') : 'A';
+  const playerArmy = playerSide === 'A' ? s.armyA : s.armyB;
+  const enemyArmy = playerSide === 'A' ? s.armyB : s.armyA;
+  document.getElementById('btPanelA').innerHTML = btArmyPanelHtml(playerArmy, 'var(--gold)');
+  document.getElementById('btPanelB').innerHTML = btArmyPanelHtml(enemyArmy, '#c65b4a');
+
+  // §28/29: Gelände sichtbar, kein reiner grüner Kasten mehr.
+  const visual = document.getElementById('btBattlefieldVisual');
+  const phase = currentPhase(s);
+  const beatPhases = { fernkampf: 1, hauptkampf: 1, moralpruefung: 1 };
+  visual.className = 'terrain-' + s.terrain;
+  visual.innerHTML = btTerrainDecoHtml(s.terrain);
+  // §46: kurzer CSS-only "Beat" passend zur aktuellen Phase, per
+  // prefers-reduced-motion abschaltbar (s. CSS).
+  if (beatPhases[phase]) {
+    void visual.offsetWidth;
+    visual.classList.add('btBeat-' + phase);
+  }
+
+  // §35: echte Phasen (BATTLE_PHASES) als segmentierte Leiste.
+  document.getElementById('btPhaseBar').innerHTML = getBattlePhaseViewModel(s).map(p =>
+    `<div class="btPhaseSeg${p.current ? ' current' : ''}${p.done ? ' done' : ''}">${p.label}</div>`).join('');
 
   const lastMsg = s.log.length ? s.log[s.log.length-1].text : 'Die Armeen stehen sich gegenüber...';
   document.getElementById('btMessageBanner').textContent = lastMsg.toUpperCase();
+  // §37/38: bestehendes Log wortgleich als "Feldbericht".
   document.getElementById('btLog').innerHTML = s.log.map(l => `<div><span style="color:var(--accent2); margin-right:var(--sp-2);">${l.time}</span>${l.text}</div>`).join('');
   document.getElementById('btLog').scrollTop = 999999;
 
+  // §39: taktische Entscheidungen als Decision Cards (wie 8F), nur reale
+  // Optionen des pendingDecision -- keine erfundenen Chancen/Konsequenzen.
   const decisionBox = document.getElementById('btDecisionBox');
   if (s.pendingDecision) {
     decisionBox.style.display = 'block';
     document.getElementById('btDecisionText').textContent = s.pendingDecision.text;
     document.getElementById('btDecisionOptions').innerHTML = s.pendingDecision.options.map(o =>
-      `<button onclick="btDoDecision('${o.id}')">${o.label}</button>`).join('');
+      `<button class="decisionCard" onclick="btDoDecision('${o.id}')"><div class="decisionTitle">${o.label}</div></button>`).join('');
     document.getElementById('btNextStepBtn').disabled = true;
   } else {
     decisionBox.style.display = 'none';
@@ -13489,46 +13987,72 @@ function btAutoResolve() {
   btRenderBattle();
 }
 
+// §49-60: großer Ergebnisbildschirm -- historischer Moment statt
+// Datentabelle. Titel/Verlustgründe ausschließlich aus bereits real
+// klassifizierten Feldern (getBattleResultViewModel), Chronik-/Story-
+// Hinweise nur bei echter Eligibility.
 function btShowBattleReport() {
-  const r = btState.result;
+  const s = btState;
   document.getElementById('btBattleUi').style.display = 'none';
   document.getElementById('btReport').style.display = 'block';
 
-  const outcomeLabel = {
-    siegA: `SIEG ${r.armyA.name.toUpperCase()}`, siegB: `SIEG ${r.armyB.name.toUpperCase()}`,
-    knapperSieg: `KNAPPER SIEG ${(r.winner==='A'?r.armyA.name:r.armyB.name).toUpperCase()}`,
-    vernichtendeNiederlageA: `VERNICHTENDE NIEDERLAGE FÜR ${r.armyA.name.toUpperCase()}`,
-    vernichtendeNiederlageB: `VERNICHTENDE NIEDERLAGE FÜR ${r.armyB.name.toUpperCase()}`,
-    geordneterRueckzugA: `${r.armyA.name.toUpperCase()} ZOG SICH ZURÜCK`,
-    geordneterRueckzugB: `${r.armyB.name.toUpperCase()} ZOG SICH ZURÜCK`,
-  }[r.outcome];
-  document.getElementById('btReportBanner').textContent = outcomeLabel;
-  document.getElementById('btRepNameA').textContent = r.armyA.name;
-  document.getElementById('btRepNameB').textContent = r.armyB.name;
-  document.getElementById('btRepStartA').textContent = r.armyA.startStrength;
-  document.getElementById('btRepStartB').textContent = r.armyB.startStrength;
-  document.getElementById('btRepEndA').textContent = r.armyA.endStrength;
-  document.getElementById('btRepEndB').textContent = r.armyB.endStrength;
-  document.getElementById('btRepCasA').textContent = r.armyA.casualties + ` (${Math.round(r.armyA.casualties/r.armyA.startStrength*100)}%)`;
-  document.getElementById('btRepCasB').textContent = r.armyB.casualties + ` (${Math.round(r.armyB.casualties/r.armyB.startStrength*100)}%)`;
-  document.getElementById('btRepMoraleA').textContent = r.armyA.moraleEnd + '%';
-  document.getElementById('btRepMoraleB').textContent = r.armyB.moraleEnd + '%';
+  const playerSide = btTerritoryContext ? (btTerritoryContext.playerIsAttacker ? 'A' : 'B') : 'A';
+  const result = getBattleResultViewModel(s, playerSide);
+  const playerArmy = playerSide === 'A' ? s.armyA : s.armyB;
+  const enemyArmy = playerSide === 'A' ? s.armyB : s.armyA;
 
-  const loserArmy = r.winner === 'A' ? btState.armyB : btState.armyA;
-  const reasons = [];
-  if (loserArmy.formation === 'aggressiv' || loserArmy.formation === 'kavallerieflanke') reasons.push('die gewählte Formation war riskant und bot wenig Verteidigung');
-  if (overallMorale(loserArmy) < 40) reasons.push('die Moral der Truppen brach im Kampfverlauf ein');
-  if (!loserArmy.commander.alive) reasons.push('der Verlust des Kommandanten erschütterte die Truppen');
-  if (btState.terrain === 'burg' && loserArmy === btState.armyA) reasons.push('die feindliche Befestigung (Stadtmauer) gab dem Verteidiger einen enormen Vorteil');
-  if (!reasons.length) reasons.push('die gegnerische Armee war in dieser Schlacht schlicht überlegen');
-  document.getElementById('btWhyLost').innerHTML = `<b>Warum ${loserArmy.name} verlor:</b><br>` + reasons.map(x=>'– '+x).join('<br>');
+  const opponentAiId = btTerritoryContext
+    ? (btTerritoryContext.playerIsAttacker ? territoryById(btTerritoryContext.defenderTerritoryId).region : territoryById(btTerritoryContext.attackerTerritoryId).region)
+    : btWarTargetId;
+  const prevOwner = btTerritoryContext ? state.territories[btTerritoryContext.defenderTerritoryId].owner : null;
+
+  const sideBlock = (label, side) => `<div class="btResultSide">
+      <div class="rsName">${side.name}</div>
+      <div class="rsRow"><span class="label">Soldaten zu Beginn</span><span>${side.startStrength.toLocaleString('de-DE')}</span></div>
+      <div class="rsRow"><span class="label">Soldaten am Ende</span><span>${side.endStrength.toLocaleString('de-DE')}</span></div>
+      <div class="rsRow"><span class="label">Verluste</span><span>${side.casualties.toLocaleString('de-DE')} (${side.casualtyPct}%)</span></div>
+      ${side.dead !== undefined ? `<div class="rsRow"><span class="label">Gefallen</span><span>${side.dead.toLocaleString('de-DE')}</span></div>` : ''}
+      ${side.wounded !== undefined ? `<div class="rsRow"><span class="label">Verwundet</span><span>${side.wounded.toLocaleString('de-DE')}</span></div>` : ''}
+      <div class="rsRow"><span class="label">Moral am Ende</span><span>${side.moraleEnd}%</span></div>
+    </div>`;
+
+  let html = `<div class="btResultTitle">${result.title}</div>
+    <div class="btResultGrid">${sideBlock('Eigene Armee', result.player)}${sideBlock('Gegner', result.enemy)}</div>
+    <div class="btResultWhy"><b>Warum ${result.playerWon ? result.enemy.name : result.player.name} verlor:</b><br>${result.reasons.map(x => '– ' + x).join('<br>')}</div>`;
+
+  // §54: Kommandanten-Konsequenz nur, wenn die Engine sie real kennt
+  // (commander.alive) -- Portrait nur für die Spielerseite (dort ist der
+  // Kommandant real der Herrscher, 8D-Portraitsystem).
+  if (!playerArmy.commander.alive) {
+    html += `<div class="btResultHint">${buildCharCardHtml(getCharacterCardViewModel(state, state.rulerId), { sizeClass: 'size-small' })} Euer Feldherr ${playerArmy.commander.name} ist in dieser Schlacht gefallen.</div>`;
+  }
+  if (!enemyArmy.commander.alive) {
+    html += `<div class="btResultHint">Der gegnerische Befehlshaber ${enemyArmy.commander.name} ist gefallen.</div>`;
+  }
+
+  document.getElementById('btReport').innerHTML = html;
 
   if (btTerritoryContext) {
     const { attackerTerritoryId, defenderTerritoryId, playerIsAttacker } = btTerritoryContext;
-    applyTerritoryBattleResult(state, attackerTerritoryId, defenderTerritoryId, btState, playerIsAttacker);
+    applyTerritoryBattleResult(state, attackerTerritoryId, defenderTerritoryId, s, playerIsAttacker);
   } else {
-    applyBattleResultToGame(state, btWarTargetId, btState);
+    applyBattleResultToGame(state, btWarTargetId, s);
   }
+
+  // §55/56: Chronik-/Story-Hinweis erst NACH der Anwendung des Ergebnisses
+  // (die reale Memory entsteht erst dort) -- nur bei echter Eligibility.
+  let hintsHtml = '';
+  if (opponentAiId && opponentAiId !== 'player') {
+    if (getBattleChronicleHintViewModel(state, opponentAiId)) hintsHtml += `<div class="btResultHint">📜 Diese Schlacht wird in der Chronik festgehalten.</div>`;
+    const story = getDiplomaticStoryViewModel(state, opponentAiId);
+    if (story) hintsHtml += `<div class="btResultHint">Teil der Geschichte: <i>${story.title}</i></div>`;
+  }
+  // §60: Besitzerwechsel dezent vermerkt, keine Konfetti-Animation.
+  if (btTerritoryContext && state.territories[btTerritoryContext.defenderTerritoryId].owner !== prevOwner) {
+    hintsHtml += `<div class="btOwnershipNote">${territoryById(btTerritoryContext.defenderTerritoryId).name} wechselt den Besitzer.</div>`;
+  }
+  hintsHtml += `<div style="text-align:center; margin-top:var(--sp-3);"><button class="btn-imperial" onclick="btCloseReport()">ZURÜCK ZUM FELDZUG</button></div>`;
+  document.getElementById('btReport').innerHTML += hintsHtml;
 }
 
 function btCloseReport() {
