@@ -186,16 +186,24 @@ function getRegionSummaryViewModel(state, territoryId) {
 // Bewusst NUR natürlichsprachliche Stufenbeschreibungen — keine
 // Debug-Werte (Tension/Momentum/Director-Score bleiben im Debug-Panel,
 // §14/53/145).
+// §Phase-8F-Punkt 39: alle 6 Status natürlichsprachlich (vorher fehlten
+// DORMANT/RESOLVED -- fielen auf den generischen Fallback-Text zurück).
 const THREAD_STAGE_TEXT = {
+  DORMANT: "Der Konflikt ruht.",
   BUILDING: "Die Spannungen wachsen.",
-  ACTIVE: "Die Lage bleibt angespannt.",
-  CLIMAX: "Der Konflikt erreicht einen Höhepunkt.",
-  AFTERMATH: "Die Lage beruhigt sich.",
+  ACTIVE: "Der Konflikt bestimmt den Hof.",
+  CLIMAX: "Die Lage spitzt sich zu.",
+  AFTERMATH: "Die Folgen wirken nach.",
+  RESOLVED: "Die Geschichte ist beendet.",
 };
+// §Phase-8F-Fund: RELIGIOUS_CONFLICT ist der reale Thread-Typ (siehe
+// STORY_THREAD_TYPES/CHAIN_THREAD_TYPE in js/story-threads.js) -- der
+// bisherige Schlüssel "RELIGIOUS_TENSION" war ein Tippfehler aus 8B, der
+// seit Einführung des Typs in Phase 6 stumm auf den "⚜"-Fallback zurückfiel.
 const THREAD_ICON_BY_TYPE = {
   SUCCESSION_CONFLICT: "⚜", PERSONAL_RIVALRY: "⚔", DYNASTIC_ALLIANCE: "💍",
   FOOD_CRISIS: "🌾", FOREIGN_CONFLICT: "🛡", IMPERIAL_AMBITION: "👑",
-  RELIGIOUS_TENSION: "✝", ECONOMIC_CRISIS: "💰",
+  RELIGIOUS_CONFLICT: "✝", ECONOMIC_CRISIS: "💰",
 };
 
 function getPrimaryStoryViewModel(state) {
@@ -1126,4 +1134,182 @@ function getForeignPowerDetailViewModel(state, aiId) {
     relationship: getDiplomaticRelationshipViewModel(state, aiId),
     story: getDiplomaticStoryViewModel(state, aiId),
   };
+}
+
+// ============================================================
+// Phase 8F: EVENTS + STORY THREADS -- "aus Textboxen werden historische
+// Szenen". Nur bereits vorhandene Daten (Event-/Chain-/Thread-/Memory-
+// Felder) angezeigt -- keine neue Gameplaylogik, keine Fake-Vorhersagen,
+// keine invented Folgen (§17/26/27/42/61/77).
+// ============================================================
+
+// ---------- §2: Event-Hierarchie (rein visuelle Klassifikation) ----------
+// Random-Events tragen keine Wichtigkeits-Zahl -- die einzige bereits
+// reale Signifikanz-Markierung ist das bestehende disastersCount-Flag
+// (js/advance-year.js finalizeYear(): genau diese drei IDs). Chain-
+// Entscheidungen sind laut Spieldesign (Phase 5/6) grundsätzlich
+// bedeutender als Flavour-Events; innerhalb einer Chain hebt die reale
+// Thread-Importance/CLIMAX-Phase eine Entscheidung auf CRITICAL.
+const DISASTER_EVENT_IDS = ["seuche", "rebellion", "brand_in_der_stadt"];
+function getEventSeverity(state, ev) {
+  if (!ev) return { level: "MINOR", label: "" };
+  if (ev.source === "SUCCESSION") return { level: "CRITICAL", label: "ENTSCHEIDENDER MOMENT" };
+  if (ev.source === "EVENT_CHAIN") {
+    const thread = ev.chainId ? getThreadForChain(state, ev.chainId) : null;
+    if (thread && (thread.status === "CLIMAX" || thread.importance >= 70)) return { level: "CRITICAL", label: "ENTSCHEIDENDER MOMENT" };
+    return { level: "MAJOR", label: "BEDEUTSAM" };
+  }
+  if (ev.id && DISASTER_EVENT_IDS.includes(ev.id)) return { level: "IMPORTANT", label: "WICHTIG" };
+  return { level: "MINOR", label: "" };
+}
+
+// ---------- §8/45/46: Illustrationskategorie + Domäne + Farbe + Symbol ----------
+// EIN Tabelle statt drei getrennter -- Kategorie, Unterzeilen-Domäne,
+// Akzentfarbe (auf bereits vorhandene Design-Tokens gemappt) und
+// Symbolname gehören inhaltlich zusammen.
+const EVENT_CATEGORY_INFO = {
+  dynasty:    { domainLabel: "DYNASTIE",   accentVar: "--accent",     icon: "crown" },
+  succession: { domainLabel: "DYNASTIE",   accentVar: "--accent",     icon: "crown" },
+  marriage:   { domainLabel: "DYNASTIE",   accentVar: "--accent",     icon: "rings" },
+  death:      { domainLabel: "DYNASTIE",   accentVar: "--panel-dark", icon: "candle" },
+  rivalry:    { domainLabel: "HOF",        accentVar: "--accent",     icon: "seal" },
+  advisor:    { domainLabel: "HOF",        accentVar: "--accent",     icon: "seal" },
+  corruption: { domainLabel: "HOF",        accentVar: "--accent",     icon: "coin" },
+  famine:     { domainLabel: "WIRTSCHAFT", accentVar: "--ochre",      icon: "wheat" },
+  trade:      { domainLabel: "WIRTSCHAFT", accentVar: "--ochre",      icon: "scale" },
+  diplomacy:  { domainLabel: "DIPLOMATIE", accentVar: "--blue",       icon: "scroll" },
+  border:     { domainLabel: "DIPLOMATIE", accentVar: "--blue",       icon: "boundary" },
+  religion:   { domainLabel: "GLAUBE",     accentVar: "--purple",     icon: "chapel" },
+  war:        { domainLabel: "KRIEG",      accentVar: "--red-muted",  icon: "sword" },
+  imperial:   { domainLabel: "POLITIK",    accentVar: "--gold",       icon: "crown" },
+};
+// §8/9: bestehende Eventtypen auf die Kategorien abgebildet -- keine
+// Kategorie ohne reales Vorbild erfunden; ohne sauberen Treffer bleibt es
+// bewusst ohne Eintrag (Fallback-Rahmen, §56), statt eine Kategorie zu
+// erzwingen, die nicht passt.
+const RANDOM_EVENT_CATEGORY = {
+  kornspeicher_leer: "famine", gute_ernte: "trade", haendler_beschwerde: "trade",
+  seuche: "death", adel_fordert_amt: "advisor", handwerker_innovation: "trade",
+  raeuberbanden: "trade", kirche_spende: "religion", handelsroute_eroeffnet: "trade",
+  wildererbande: "border", brand_in_der_stadt: "death", bettlerplage: "famine",
+  handwerkerstreik: "trade", wunderheiler: "religion", fremder_gesandter: "diplomacy",
+  erbstreit_adel: "succession", steuerhinterziehung: "corruption", rebellion: "war",
+  ketzerei_entdeckt: "religion", wallfahrt: "religion",
+};
+const CHAIN_EVENT_CATEGORY = {
+  passed_over_heir: "succession", grieved_advisor: "advisor", corrupt_treasurer: "corruption",
+  famine_crisis: "famine", trade_conflict: "trade", border_conflict: "border",
+  dynastic_marriage: "marriage", church_conflict: "religion", rising_rival: "rivalry",
+  imperial_ambition: "imperial",
+};
+function getEventCategory(state, ev) {
+  if (!ev) return null;
+  if (ev.source === "SUCCESSION") return "succession";
+  if (ev.source === "EVENT_CHAIN") {
+    // §62/63: queueChainDecision() speichert nur chainId auf pendingEvent
+    // (chainId/threadId bleiben intern, §63) -- die templateId (und damit
+    // die reale Kategorie aus CHAIN_TEMPLATES) kommt aus der noch aktiven
+    // Chain selbst.
+    const chain = ev.chainId && state.eventChains.active[ev.chainId];
+    return chain ? (CHAIN_EVENT_CATEGORY[chain.templateId] || null) : null;
+  }
+  if (ev.id) return RANDOM_EVENT_CATEGORY[ev.id] || null;
+  return null;
+}
+
+// ---------- §13: beteiligte Charaktere (nur story-relevante Fakten,
+// keine Skills) ----------
+function getEventParticipantsViewModel(state, ev) {
+  if (!ev) return [];
+  let ids = [];
+  if (ev.source === "SUCCESSION") {
+    ids = [ev.oldRulerId, ev.newRulerId].filter(Boolean);
+  } else if (ev.source === "EVENT_CHAIN" && ev.chainId) {
+    const chain = state.eventChains.active[ev.chainId];
+    if (chain) ids = chain.actorIds.concat(chain.targetIds);
+  }
+  const seen = new Set();
+  return ids.filter(id => state.characters[id] && !seen.has(id) && seen.add(id))
+    .map(id => getCharacterCardViewModel(state, id));
+}
+
+// ---------- §18/20/21: Story-/Vorgeschichte-Kontext ----------
+// Nur wenn das Ereignis wirklich Teil einer Chain/eines Threads ist --
+// kein Fake-Drama ohne echten Thread (§44).
+function getStoryContextViewModel(state, ev) {
+  if (!ev || ev.source !== "EVENT_CHAIN" || !ev.chainId) return null;
+  const chain = state.eventChains.active[ev.chainId];
+  if (!chain) return null;
+  const thread = getThreadForChain(state, ev.chainId);
+  const originMemoryId = chain.originatingMemoryIds && chain.originatingMemoryIds[0];
+  const originMemory = originMemoryId ? state.memories.byId[originMemoryId] : null;
+  return {
+    threadTitle: thread ? thread.title : chain.name,
+    stageText: thread ? (THREAD_STAGE_TEXT[thread.status] || "Die Geschichte entwickelt sich weiter.") : null,
+    // §20: max. 3-4 relevante Beats aus der echten Chain-Historie.
+    timeline: chain.history.slice(-4).map(h => ({ year: h.year, note: h.note || h.choice || h.event })),
+    originText: originMemory ? originMemory.description : null,
+  };
+}
+
+// ---------- §23/24/26/27: Entscheidungskarten ----------
+// Optionen kennen nur label/outcome/apply -- keine deklarierten Folgen
+// (effect ist eine Blackbox-Funktion). Ein "(-NNN Taler)"-Hinweis, der
+// bereits WÖRTLICH im echten label steht (z.B. "Getreide importieren
+// (-800 Taler)"), wird als eigene Kosten-Zeile herausgelöst -- keine neue
+// Zahl, nur andere Darstellung derselben bereits vorhandenen Textinfo.
+function getDecisionCardViewModel(option, index) {
+  const label = option.label || "";
+  const costMatch = label.match(/\(([+\-−]?\s?\d[\d.,]*\s*Taler[^)]*)\)\s*$/);
+  const title = costMatch ? label.slice(0, costMatch.index).trim() : label;
+  return {
+    index, title: title || label, sentence: label,
+    costText: costMatch ? costMatch[1].trim() : null,
+  };
+}
+
+// ---------- §60: Gesamt-Präsentations-ViewModel für das Event-Modal ----------
+function getEventPresentationViewModel(state, ev) {
+  if (!ev) return null;
+  const severity = getEventSeverity(state, ev);
+  const category = getEventCategory(state, ev);
+  const categoryInfo = category ? EVENT_CATEGORY_INFO[category] : null;
+  const participants = getEventParticipantsViewModel(state, ev);
+  const storyContext = getStoryContextViewModel(state, ev);
+  const decisionCards = (ev.options || []).map((opt, i) => getDecisionCardViewModel(opt, i));
+  return {
+    title: ev.title, storyText: ev.text,
+    subtitleDomain: categoryInfo ? categoryInfo.domainLabel : null,
+    year: state.year,
+    severity, category, categoryInfo,
+    participants, storyContext, decisionCards,
+    isSuccession: ev.source === "SUCCESSION",
+    oldRulerId: ev.oldRulerId || null, newRulerId: ev.newRulerId || null,
+  };
+}
+
+// ---------- §35-41: Story-Ansicht (Spieler-UI, keine Debug-Zahlen) ----------
+// Maximal 2-4 aktuell relevante Threads (§40): DORMANT-Threads sind für
+// den Spieler noch nichts Sichtbares (kein Signal ist noch zu keiner
+// Geschichte geworden) -- gleiche Filterung wie getPrimaryStoryViewModel().
+function getStoryViewViewModel(state) {
+  const active = getActiveStoryThreads(state).filter(t => t.status !== "DORMANT")
+    .sort((a, b) => b.importance - a.importance).slice(0, 4);
+  const activeCards = active.map(t => ({
+    id: t.id, title: t.title, icon: THREAD_ICON_BY_TYPE[t.type] || "⚜",
+    years: `${t.startedYear}–`, stageText: THREAD_STAGE_TEXT[t.status] || "Die Geschichte entwickelt sich weiter.",
+    participants: t.actorIds.filter(id => state.characters[id]).map(id => {
+      const c = state.characters[id];
+      return `${c.name} ${c.surname || ""}`.trim();
+    }),
+    lastEvent: t.history.length ? t.history[t.history.length - 1].note : null,
+    timeline: t.history.slice(-4).map(h => ({ year: h.year, note: h.note })),
+  }));
+  // §41: abgeschlossene Geschichten -- nur ein kurzer Link, keine volle
+  // Archivierung (das übernimmt 8H/Chronik).
+  const resolved = Object.values(state.storyThreads.resolved)
+    .sort((a, b) => (b.history[b.history.length - 1]?.year || 0) - (a.history[a.history.length - 1]?.year || 0))
+    .slice(0, 3)
+    .map(t => ({ id: t.id, title: t.title, endedYear: t.history.length ? t.history[t.history.length - 1].year : null }));
+  return { activeThreads: activeCards, recentlyResolved: resolved, hasAny: activeCards.length > 0 };
 }
