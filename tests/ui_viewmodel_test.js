@@ -459,6 +459,93 @@ console.log('--- Phase 8D: Verstorbene bleiben im Stammbaum sichtbar (kein Versc
   check('verstorbener Elternteil erscheint weiterhin im Stammbaum-ViewModel', flatIds.includes('"' + parentId + '"'));
 })();
 
+// ---------- §Phase-8E: Diplomatie ViewModels ----------
+console.log('--- Phase 8E: foreign rulers sind echte Character-Core-Charaktere ---');
+(function() {
+  const state = newGame({ seed: 200 });
+  const aiIds = Object.keys(state.diplomacy);
+  check('genau 3 diplomatisch erreichbare Regionen (ai1-3)', aiIds.length === 3);
+  for (const aiId of aiIds) {
+    const region = state.regions[aiId];
+    check(aiId + ' hat eine echte rulerId', !!region.rulerId && !!state.characters[region.rulerId]);
+    const portrait = getPortraitViewModel(state, region.rulerId);
+    check(aiId + '-Herrscher hat Portrait-Rang "herrscher" (Krone, keine gewöhnliche Adels-Karte)', portrait.rank === 'herrscher');
+  }
+})();
+
+console.log('--- Phase 8E: RNG-Neutralitaet der Diplomatie-ViewModels ---');
+(function() {
+  const state = newGame({ seed: 201 });
+  for (let y = 0; y < 10; y++) { for (let m = 0; m < 12; m++) advanceMonth(state); resolvePendingEventWithPolicy(state, 'FIRST_OPTION'); }
+  const before = __rngCalls;
+  getDiplomacyOverviewViewModel(state);
+  for (const aiId in state.diplomacy) getForeignPowerDetailViewModel(state, aiId);
+  check('kein einziger rnd()-Aufruf durch die Diplomatie-ViewModels', __rngCalls === before);
+})();
+
+console.log('--- Phase 8E: Beziehungs-Tier ist reine UI-Klassifikation (keine Gameplaywirkung) ---');
+(function() {
+  const state = newGame({ seed: 202 });
+  state.diplomacy.ai1.relation = 80;
+  const before = state.diplomacy.ai1.relation;
+  const vm = getDiplomaticRelationshipViewModel(state, 'ai1');
+  check('Tier-Label korrekt klassifiziert (80 -> ENG VERBÜNDET)', vm.tierLabel === 'ENG VERBÜNDET');
+  check('die echte Beziehungszahl bleibt durch die Anzeige unveraendert', state.diplomacy.ai1.relation === before);
+})();
+
+console.log('--- Phase 8E: Verträge/Kriegsstatus nur aus echten state-Feldern ---');
+(function() {
+  const state = newGame({ seed: 203 });
+  check('ohne Verträge: leere Vertragsliste (nichts erfunden)', getTreatyViewModel(state, 'ai1').length === 0);
+  state.diplomacy.ai1.treaties.allianz = true;
+  const treaties = getTreatyViewModel(state, 'ai1');
+  check('echtes Bündnis erscheint als Vertrag', treaties.some(t => t.id === 'allianz'));
+  check('kein Krieg ohne echtes state.warState', getWarStatusViewModel(state, 'ai1').atWar === false);
+  state.warState.ai1 = true;
+  check('echter Kriegszustand wird erkannt', getWarStatusViewModel(state, 'ai1').atWar === true);
+})();
+
+console.log('--- Phase 8E: diplomatische Memory-Timeline nutzt echte regionIds-Memories ---');
+(function() {
+  const state = newGame({ seed: 204 });
+  check('vor jedem Ereignis: leere Zeitleiste', getDiplomaticMemoryTimeline(state, 'ai1').length === 0);
+  recordWorldEvent(state, {
+    type: 'ALLIANCE_FORMED', actorIds: [state.rulerId], regionIds: ['ai1'],
+    emotionalWeight: 30, description: 'Test-Bündnis mit Mainau.',
+  });
+  const timeline = getDiplomaticMemoryTimeline(state, 'ai1');
+  check('echtes regionIds-Ereignis erscheint in der Zeitleiste', timeline.some(m => m.text === 'Test-Bündnis mit Mainau.'));
+  check('ai2 bleibt unberührt (regionIds-Filterung korrekt)', getDiplomaticMemoryTimeline(state, 'ai2').length === 0);
+})();
+
+console.log('--- Phase 8E: Sondertest Herrscherwechsel im Ausland ---');
+(function() {
+  const state = newGame({ seed: 205 });
+  const oldRulerId = state.regions.ai1.rulerId;
+  let tries = 0;
+  while (state.regions.ai1.rulerId === oldRulerId && tries < 5000) {
+    state.characters[state.regions.ai1.rulerId].health = 1;
+    state.characters[state.regions.ai1.rulerId].age = 95;
+    checkForeignRulerDeaths(state);
+    tries++;
+  }
+  check('Herrscher von ai1 stirbt irgendwann bei konstant kritischer Gesundheit', state.regions.ai1.rulerId !== oldRulerId);
+  check('alter Herrscher bleibt als Charakter erhalten (alive=false), verschwindet nicht', state.characters[oldRulerId] && state.characters[oldRulerId].alive === false);
+  check('neuer Herrscher ist ein eigenstaendiger, lebender Charakter', state.characters[state.regions.ai1.rulerId].alive === true);
+  const timeline = getDiplomaticMemoryTimeline(state, 'ai1');
+  check('Tod und Nachfolge hinterlassen echte, auffindbare Memories', timeline.some(m => m.type === 'FOREIGN_RULER_DIED') && timeline.some(m => m.type === 'FOREIGN_RULER_SUCCEEDED'));
+})();
+
+console.log('--- Phase 8E: fremder Herrscher hat keine Loyalitaet/persoenliche Beziehung zum Spieler-Thron ---');
+(function() {
+  const state = newGame({ seed: 206 });
+  const card = getCharacterCardViewModel(state, state.regions.ai1.rulerId);
+  check('Character Card zeigt keine Loyalität für einen fremden Herrscher', card.loyalty === null);
+  const detail = getCharacterDetailViewModel(state, state.regions.ai1.rulerId);
+  check('Character Detail zeigt keine Loyalitäts-Aufschlüsselung für einen fremden Herrscher', detail.loyaltyBreakdown === null);
+  check('Character Detail zeigt keine Beziehungs-Aufschlüsselung für einen fremden Herrscher', detail.relationship === null);
+})();
+
 console.log('');
 if (failures > 0) { console.log(failures + ' Test(s) fehlgeschlagen.'); process.exit(1); }
 console.log('Alle UI-ViewModel-Tests bestanden.');
