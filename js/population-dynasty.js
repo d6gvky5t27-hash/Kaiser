@@ -262,6 +262,25 @@ function handleSuccession(state) {
       adv.advisorRole = null;
     }
   }
+
+  // §Phase-8F-Punkt 47-49/73: Herrschertod + Erbfolge sind der bedeutsamste
+  // Moment des Spiels, bisher aber unsichtbar (nur eine Chronik-Zeile).
+  // Nutzt das bereits vorhandene pendingEvent-Fenster (§48 "bestehender
+  // Tod-/Succession-Ablauf bleibt" -- hier wird NICHTS neu berechnet, nur
+  // ein bereits abgeschlossenes Ergebnis sichtbar gemacht, reine
+  // Bestätigung statt einer echten Entscheidung). state.pendingEvent ist an
+  // dieser Stelle im Jahresablauf garantiert leer (advanceYear() setzt es
+  // zu Beginn zurück, updateDynasty() läuft vor jeder anderen Event-Quelle)
+  // -- der Guard bleibt trotzdem als Sicherheitsnetz.
+  if (!state.pendingEvent) {
+    const oldRuler = state.characters[oldRulerId];
+    state.pendingEvent = {
+      title: `${heir.name} ${heir.surname || ""} folgt auf den Thron`.replace(/\s+/g, " "),
+      text: `${oldRuler ? (oldRuler.name + " " + (oldRuler.surname || "")).trim() : "Der Herrscher"} ist tot. ${heir.name} ${heir.surname || ""} besteigt im Alter von ${heir.age} Jahren den Thron.`.replace(/\s+/g, " "),
+      source: "SUCCESSION", oldRulerId, newRulerId: heirId,
+      options: [{ label: "Die Herrschaft antreten", apply: () => {} }],
+    };
+  }
 }
 
 // ---------- Diplomatie (§29/§30) ----------
