@@ -345,6 +345,120 @@ console.log('--- Wirtschaftliche Risiken ---');
   })());
 })();
 
+// ---------- §Phase-8D: Hof + Dynastie + Charaktere ViewModels ----------
+console.log('--- Phase 8D: RNG-Neutralitaet ---');
+(function() {
+  const state = newGame({ seed: 140 });
+  for (let y = 0; y < 8; y++) { for (let m = 0; m < 12; m++) advanceMonth(state); resolvePendingEventWithPolicy(state, 'FIRST_OPTION'); }
+  const before = __rngCalls;
+  getCourtViewModel(state);
+  getDynastyTreeViewModel(state);
+  getSuccessionViewModel(state);
+  getAdvisorCandidateViewModel(state);
+  for (const id in state.characters) {
+    getPortraitViewModel(state, id);
+    getCharacterCardViewModel(state, id);
+    getCharacterDetailViewModel(state, id);
+  }
+  getHeraldryViewModel(state.dynastyName);
+  check('kein einziger rnd()-Aufruf durch die Phase-8D-ViewModels', __rngCalls === before);
+})();
+
+console.log('--- Phase 8D: Determinismus (Hash statt rnd) ---');
+(function() {
+  const state = newGame({ seed: 141 });
+  const p1 = JSON.stringify(getPortraitViewModel(state, state.rulerId));
+  const p2 = JSON.stringify(getPortraitViewModel(state, state.rulerId));
+  check('getPortraitViewModel liefert bei wiederholtem Aufruf ein identisches Ergebnis', p1 === p2);
+  const h1 = JSON.stringify(getHeraldryViewModel(state.dynastyName));
+  const h2 = JSON.stringify(getHeraldryViewModel(state.dynastyName));
+  check('getHeraldryViewModel liefert bei wiederholtem Aufruf ein identisches Ergebnis', h1 === h2);
+  const otherState = newGame({ seed: 142 });
+  check('unterschiedlicher dynastyName kann eine andere Heraldik liefern (kein globaler Konstantwert)',
+    state.dynastyName === otherState.dynastyName || JSON.stringify(getHeraldryViewModel(state.dynastyName)) !== JSON.stringify(getHeraldryViewModel(otherState.dynastyName)));
+})();
+
+console.log('--- Phase 8D: Claims nie erfunden ---');
+(function() {
+  const state = newGame({ seed: 143 });
+  const ruler = state.characters[state.rulerId];
+  ruler.claims = [];
+  const card = getCharacterCardViewModel(state, state.rulerId);
+  check('Charakter ohne echten Claim zeigt kein Claim-Badge', !card.warnings.some(w => w.type === 'claim'));
+  const detail = getCharacterDetailViewModel(state, state.rulerId);
+  check('Detailansicht erfindet ebenfalls keinen Claim', detail.claims.length === 0);
+})();
+
+console.log('--- Phase 8D: Loyalitaets-Anzeige stimmt mit echter computeLoyalty() ueberein ---');
+(function() {
+  const state = newGame({ seed: 144 });
+  const ruler = state.characters[state.rulerId];
+  const childId = nextCharId();
+  const child = createCharacter('m', 22, ruler.surname);
+  child.parentId = state.rulerId;
+  state.characters[childId] = child;
+  ruler.childrenIds.push(childId);
+  updateClaims(state);
+  const real = computeLoyalty(state, childId);
+  const vm = getLoyaltyDisplayViewModel(state, childId);
+  const sum = Math.round(Math.max(0, Math.min(100, vm.components.reduce((s, c) => s + c.value, 0))));
+  check('Summe der angezeigten Loyalitaets-Komponenten entspricht dem echten computeLoyalty()-Wert', sum === Math.round(real));
+  check('vm.total entspricht ebenfalls dem echten Wert', vm.total === Math.round(real));
+})();
+
+console.log('--- Phase 8D: Beziehungs-Aufschluesselung nutzt echte Memory-Texte, keine erfundenen Labels ---');
+(function() {
+  const state = newGame({ seed: 145 });
+  const ruler = state.characters[state.rulerId];
+  const childId = nextCharId();
+  const child = createCharacter('m', 20, ruler.surname);
+  child.parentId = state.rulerId;
+  state.characters[childId] = child;
+  ruler.childrenIds.push(childId);
+  addRivalry(state, childId, state.rulerId);
+  refreshRelationship(state, childId, state.rulerId);
+  const vm = getRelationshipDisplayViewModel(state, childId, state.rulerId);
+  const originId = child.rivalryOrigin && child.rivalryOrigin[state.rulerId];
+  const realText = originId ? state.memories.byId[originId].description : null;
+  check('eine echte Memory zur Rivalitaet wurde angelegt', !!realText);
+  const memoryModifier = vm.components.find(c => c.label === realText);
+  check('der angezeigte Beziehungs-Grund ist wortgleich mit der echten Memory-description (kein erfundenes Label)', !!memoryModifier);
+})();
+
+console.log('--- Phase 8D: Succession spiegelt echte Erb-Reihenfolge (Alter absteigend) ---');
+(function() {
+  const state = newGame({ seed: 146 });
+  const ruler = state.characters[state.rulerId];
+  ruler.childrenIds = [];
+  const youngId = nextCharId();
+  const young = createCharacter('m', 15, ruler.surname);
+  young.parentId = state.rulerId;
+  state.characters[youngId] = young;
+  ruler.childrenIds.push(youngId);
+  const oldId = nextCharId();
+  const old = createCharacter('m', 25, ruler.surname);
+  old.parentId = state.rulerId;
+  state.characters[oldId] = old;
+  ruler.childrenIds.push(oldId);
+  const vm = getSuccessionViewModel(state);
+  check('aeltestes lebendes Kind steht an erster Stelle der Thronfolge', vm.heirs[0].id === oldId);
+  check('juengeres Kind steht dahinter', vm.heirs[1].id === youngId);
+})();
+
+console.log('--- Phase 8D: Verstorbene bleiben im Stammbaum sichtbar (kein Verschwinden) ---');
+(function() {
+  const state = newGame({ seed: 147 });
+  const ruler = state.characters[state.rulerId];
+  const parentId = nextCharId();
+  const parent = createCharacter(ruler.gender === 'm' ? 'f' : 'm', 60, ruler.surname);
+  parent.alive = false;
+  state.characters[parentId] = parent;
+  ruler.parentId = parentId;
+  const vm = getDynastyTreeViewModel(state);
+  const flatIds = JSON.stringify(vm);
+  check('verstorbener Elternteil erscheint weiterhin im Stammbaum-ViewModel', flatIds.includes('"' + parentId + '"'));
+})();
+
 console.log('');
 if (failures > 0) { console.log(failures + ' Test(s) fehlgeschlagen.'); process.exit(1); }
 console.log('Alle UI-ViewModel-Tests bestanden.');
