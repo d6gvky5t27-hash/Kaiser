@@ -120,7 +120,11 @@ console.log('--- Weltkarte + Kontextpanel ---');
   // renderWorldMap() ein Gebiet stillschweigend ueberspringen.
   check('MAP_GEOMETRY enthaelt alle 16 Territorien', TERRITORIES.every(t => !!MAP_GEOMETRY[t.id]));
   check('jeder MAP_GEOMETRY-Eintrag hat einen nicht-leeren SVG-Pfad', Object.values(MAP_GEOMETRY).every(g => typeof g.path === 'string' && g.path.startsWith('M')));
-  check('MAP_WILD_GEOMETRY enthaelt die 4 dekorativen Fuellflaechen', ['wild_nw','wild_ne','wild_se','wild_sw'].every(id => !!MAP_WILD_GEOMETRY[id]));
+  // §Phase-8C.2: die frueheren 4 Voronoi-Fuellflaechen (wild_nw/ne/se/sw)
+  // weichen einer einzigen, echten benannten Landschaft ("Westmark").
+  check('MAP_WILD_GEOMETRY enthaelt die Westmark-Wildnisflaeche', !!MAP_WILD_GEOMETRY.westmark && typeof MAP_WILD_GEOMETRY.westmark.path === 'string');
+  check('MAP_RIVER_PATH ist ein nicht-leerer SVG-Pfad', typeof MAP_RIVER_PATH === 'string' && MAP_RIVER_PATH.startsWith('M'));
+  check('MAP_MOUNTAIN_ANCHORS enthaelt Ankerpunkte', Array.isArray(MAP_MOUNTAIN_ANCHORS) && MAP_MOUNTAIN_ANCHORS.length > 0);
 
   // frisches Spiel: noch kein Jahr vergangen -- keine erfundenen Produktions-/Wachstumsdaten
   check('frisches Spiel: topProduction ist leer (kein Jahr vergangen)', own.topProduction.length === 0);
