@@ -1313,3 +1313,181 @@ function getStoryViewViewModel(state) {
     .map(t => ({ id: t.id, title: t.title, endedYear: t.history.length ? t.history[t.history.length - 1].year : null }));
   return { activeThreads: activeCards, recentlyResolved: resolved, hasAny: activeCards.length > 0 };
 }
+
+// ============================================================
+// Phase 8G: WAR + BATTLE PRESENTATION -- "Krieg als strategisches
+// Brettspiel, Schlacht als taktischer Höhepunkt". Liest ausschließlich
+// bereits vorhandene Engine-/State-Daten (battle-engine/*.js, state.
+// territories, state.warState) -- keine Kampfmathematik, keine neuen
+// Truppenwerte, keine neuen rnd()-Aufrufe (§66/69/70).
+// ============================================================
+
+// ---------- §9-11: Army Card für ein eigenes Gebiet ----------
+function getArmyCardViewModel(state, territoryId) {
+  const terr = state.territories[territoryId];
+  if (!terr || terr.owner !== "player") return null;
+  const t = territoryById(territoryId);
+  const troops = Object.entries(terr.deployment).filter(([, v]) => v > 0)
+    .map(([type, count]) => ({ type, label: TROOP_TYPES[type] ? TROOP_TYPES[type].name : type, count: Math.round(count) }));
+  const total = troops.reduce((s, x) => s + x.count, 0);
+  const ruler = state.characters[state.rulerId];
+  return {
+    territoryId, territoryName: t.name, terrain: t.terrain, capital: !!t.capital,
+    total, troops, hasForces: total > 0,
+    commanderName: ruler ? `${ruler.name} ${ruler.surname || ""}`.trim() : null,
+  };
+}
+
+// ---------- §14/16: geschätzte gegnerische Garnison -- exakt dieselbe
+// Zahl, die die bestehende Kriegskarte bereits als "geschätzt" zeigt
+// (keine neue Unschärfe erfunden, keine bestehende entfernt). ----------
+function getEnemyGarrisonViewModel(state, territoryId) {
+  const terr = state.territories[territoryId];
+  if (!terr) return null;
+  const t = territoryById(territoryId);
+  const region = state.regions[terr.owner];
+  return {
+    territoryId, territoryName: t.name, terrain: t.terrain, capital: !!t.capital,
+    ownerId: terr.owner, ownerName: region.name,
+    estimatedGarrison: Math.round(terr.garrison),
+    commanderName: region.commander ? region.commander.name.replace(/\s*\(.*\)$/, "") : null,
+  };
+}
+
+// ---------- §12/13: Marschroute -- nur bestehende Adjazenz, keine neue
+// Pfadfindung. Liefert lediglich "gültig ja/nein", die Geometrie der
+// Pfeillinie bleibt Sache der Render-Schicht (MAP_GEOMETRY-Zentren). ----------
+function getMarchRouteViewModel(fromTerritoryId, toTerritoryId) {
+  if (!fromTerritoryId || !toTerritoryId || fromTerritoryId === toTerritoryId) return null;
+  const from = territoryById(fromTerritoryId);
+  if (!from || !from.adjacent.includes(toTerritoryId)) return null;
+  return { fromId: fromTerritoryId, toId: toTerritoryId };
+}
+
+// ---------- §61-63: Kriegsübersicht (War Card) ----------
+// Keine Warscore-Mechanik erfunden (§63) -- nur echte Gebietszahlen und
+// die bereits aus 8E bestehende Kriegsstatus-/Story-ViewModel-Bausteine.
+function getWarCardViewModel(state, aiId) {
+  if (!state.warState || !state.warState[aiId]) return null;
+  const war = getWarStatusViewModel(state, aiId);
+  const homeTerritories = TERRITORIES.filter(t => t.region === aiId);
+  const ownedByPlayer = homeTerritories.filter(t => state.territories[t.id].owner === "player").length;
+  const frontTerritories = homeTerritories
+    .filter(t => state.territories[t.id].owner === aiId && t.adjacent.some(adjId => state.territories[adjId].owner === "player"))
+    .map(t => t.name);
+  return {
+    aiId, name: state.regions[aiId].name.replace(/\s*\(.*\)$/, ""), sinceYear: war.sinceYear,
+    ownedByPlayer, ownedByEnemy: homeTerritories.length - ownedByPlayer, totalTerritories: homeTerritories.length,
+    frontTerritories, story: getDiplomaticStoryViewModel(state, aiId),
+  };
+}
+function getActiveWarsViewModel(state) {
+  return Object.keys(state.warState || {}).filter(id => state.warState[id]).map(id => getWarCardViewModel(state, id)).filter(Boolean);
+}
+
+// ---------- §22-39: taktisches Schlachtfeld ----------
+const BATTLE_PHASE_LABEL = {
+  aufstellung: "Aufstellung", fernkampf: "Fernkampf", annaeherung: "Annäherung",
+  hauptkampf: "Hauptkampf", moralpruefung: "Moralprüfung", entscheidung: "Entscheidung",
+};
+const UNIT_ICON_BY_TYPE = {
+  infanterie: "inf", bogenschuetzen: "bow", kavallerie: "cav", artillerie: "art",
+  miliz: "mil", pikeniere: "pike", schwere_kavallerie: "heavycav",
+};
+function getBattleUnitViewModel(stack) {
+  const info = UNIT_TYPES[stack.unitType];
+  return {
+    id: stack.id, unitType: stack.unitType, label: info ? info.name : stack.unitType,
+    icon: UNIT_ICON_BY_TYPE[stack.unitType] || "inf",
+    soldiers: Math.max(0, Math.round(stack.soldiers)), maxSoldiers: stack.maxSoldiers,
+    morale: Math.round(stack.morale), moraleTier: moraleTierName(stack.morale),
+    routed: !!stack.routed, alive: stack.soldiers > 0 && !stack.routed,
+  };
+}
+function getBattleArmySideViewModel(army) {
+  const morale = overallMorale(army);
+  return {
+    name: army.name, commanderName: army.commander.name, commanderAlive: army.commander.alive,
+    formation: army.formation, formationLabel: BATTLE_FORMATIONS[army.formation] ? BATTLE_FORMATIONS[army.formation].name : army.formation,
+    tactic: army.tactic, tacticLabel: TACTICS[army.tactic] ? TACTICS[army.tactic].name : army.tactic,
+    morale: Math.round(morale), moraleTier: moraleTierName(morale),
+    units: army.stacks.map(getBattleUnitViewModel),
+    totalSoldiers: Math.round(totalSoldiers(army)),
+  };
+}
+function getBattlePhaseViewModel(battleState) {
+  return BATTLE_PHASES.map((p, i) => ({
+    id: p, label: BATTLE_PHASE_LABEL[p] || p, current: i === battleState.phaseIndex, done: i < battleState.phaseIndex,
+  }));
+}
+// §37/38: das bestehende Log wortgleich als "Feldbericht" -- keine neuen Meldungen.
+function getBattleLogViewModel(battleState) {
+  return battleState.log.map(l => ({ time: l.time, text: l.text }));
+}
+function getBattlePresentationViewModel(battleState) {
+  return {
+    terrain: battleState.terrain, terrainLabel: TERRAIN_TYPES[battleState.terrain] ? TERRAIN_TYPES[battleState.terrain].name : battleState.terrain,
+    weather: battleState.weather, weatherLabel: WEATHER_TYPES[battleState.weather] ? WEATHER_TYPES[battleState.weather].name : battleState.weather,
+    phase: getBattlePhaseViewModel(battleState),
+    armyA: getBattleArmySideViewModel(battleState.armyA), armyB: getBattleArmySideViewModel(battleState.armyB),
+    log: getBattleLogViewModel(battleState),
+    pendingDecision: battleState.pendingDecision,
+    finished: battleState.finished,
+  };
+}
+
+// ---------- §49-60: Schlachtergebnis ----------
+// §50/51: Titel ausschließlich aus der bereits real klassifizierten
+// result.outcome (7 Werte, siehe battle-state-machine.js runEntscheidung())
+// -- nur aus Sieger-Perspektive umbenannt, keine neue Klassifikationslogik.
+function getBattleResultTitle(outcome, playerWon) {
+  if (outcome === "knapperSieg") return playerWon ? "KNAPPER SIEG" : "KNAPPE NIEDERLAGE";
+  if (outcome.indexOf("vernichtendeNiederlage") === 0) return playerWon ? "GLORREICHER SIEG" : "SCHWERE NIEDERLAGE";
+  if (outcome.indexOf("geordneterRueckzug") === 0) return playerWon ? "DER GEGNER ZIEHT SICH ZURÜCK" : "GEORDNETER RÜCKZUG";
+  return playerWon ? "SIEG" : "NIEDERLAGE";
+}
+// §53: dieselbe "Warum verloren"-Herleitung, die zuvor direkt in
+// btShowBattleReport() stand -- unverändert in die ViewModel-Schicht
+// verschoben (reine Anzeige-Logik auf echten Feldern: Formation/Moral/
+// Kommandant/Gelände), keine neuen Gründe erfunden.
+function getBattleOutcomeReasons(battleState, loserArmy) {
+  const reasons = [];
+  if (loserArmy.formation === "aggressiv" || loserArmy.formation === "kavallerieflanke") reasons.push("die gewählte Formation war riskant und bot wenig Verteidigung");
+  if (overallMorale(loserArmy) < 40) reasons.push("die Moral der Truppen brach im Kampfverlauf ein");
+  if (!loserArmy.commander.alive) reasons.push("der Verlust des Kommandanten erschütterte die Truppen");
+  if (battleState.terrain === "burg" && loserArmy === battleState.armyA) reasons.push("die feindliche Befestigung (Stadtmauer) gab dem Verteidiger einen enormen Vorteil");
+  if (!reasons.length) reasons.push("die gegnerische Armee war in dieser Schlacht schlicht überlegen");
+  return reasons;
+}
+function getBattleResultViewModel(battleState, playerSide) {
+  const r = battleState.result;
+  const playerWon = r.winner === playerSide;
+  const playerResult = playerSide === "A" ? r.armyA : r.armyB;
+  const enemyResult = playerSide === "A" ? r.armyB : r.armyA;
+  const loserArmy = r.winner === "A" ? battleState.armyB : battleState.armyA;
+  const sideSummary = (res) => ({
+    name: res.name, startStrength: res.startStrength, endStrength: res.endStrength,
+    casualties: res.casualties, casualtyPct: res.startStrength ? Math.round(res.casualties / res.startStrength * 100) : 0,
+    dead: res.dead, wounded: res.wounded, missing: res.missing, moraleEnd: res.moraleEnd,
+  });
+  return {
+    title: getBattleResultTitle(r.outcome, playerWon), playerWon,
+    player: sideSummary(playerResult), enemy: sideSummary(enemyResult),
+    reasons: getBattleOutcomeReasons(battleState, loserArmy),
+    terrain: battleState.terrain, terrainLabel: TERRAIN_TYPES[battleState.terrain] ? TERRAIN_TYPES[battleState.terrain].name : battleState.terrain,
+    rounds: r.rounds,
+  };
+}
+
+// ---------- §55: Chronik-Hinweis nur bei echter Chronicle-Eligibility ----------
+// Sucht die soeben (im selben Jahr) real erzeugte MAJOR_BATTLE_WON/LOST-
+// Memory statt eine hypothetische zu konstruieren -- applyBattleResultToGame()/
+// applyTerritoryBattleResult() legen sie unverändert an.
+function getBattleChronicleHintViewModel(state, aiId) {
+  const mems = Object.values(state.memories.byId).filter(m =>
+    (m.type === "MAJOR_BATTLE_WON" || m.type === "MAJOR_BATTLE_LOST") &&
+    m.regionIds && m.regionIds.includes(aiId) && m.year === state.year);
+  if (!mems.length) return null;
+  const mem = mems[mems.length - 1];
+  return isChronicleWorthy(state, mem).worthy ? { worthy: true } : null;
+}
