@@ -1033,7 +1033,151 @@ Story-/Drama-Director-Mechanik (weiterhin 8G/8H). Bundle-Größe 756.621
 unverändert, keine neue SAVE_VERSION, 0 neue `rnd()`-Aufrufe in
 irgendeinem ViewModel.
 
-## 11. Screen Inventory (Status nach Phase 8A + 8B + 8C + 8C.1 + 8C.2 + 8D + 8E + 8F)
+## 11. Phase 8G: War + Battle Presentation Redesign
+
+"Krieg als strategisches Brettspiel — Schlacht als taktischer Höhepunkt."
+Die zugrundeliegende Mechanik (`battle-engine/*.js`, `js/battle-bridge.js`,
+`js/war-map.js`) bleibt vollständig unverändert — keine Kampfmathematik,
+keine neuen Truppenwerte, kein neuer `rnd()`-Aufruf in der Simulation
+(§1/66). `git diff --stat -- battle-engine/` ist leer; die
+Battle-Engine-Dateien sind byte-identisch zum Stand vor dieser Phase.
+
+**Strategische Kriegskarte (§4-8):** die alte, separate `#warMapOverlay`
+mit farbigen `.wmNode`-Kreisen und schlichten Linien wurde verworfen.
+`renderWarMap()` nutzt jetzt exakt dieselbe handgezeichnete politische
+Karte wie die REICH-Seite (`MAP_GEOMETRY`-Pfade, `REICH_OWNER_COLOR`,
+`TERRAIN_ICON`, dieselben `<symbol>`-Defs `icon-burg`/`icon-sword`/
+`icon-banner`/`icon-hill`, dieselben `.territoryNode`/`.territoryFill`/
+`.attackable`/`.capitalRing`-CSS-Klassen) — "Kriegsmodus" derselben
+Karte statt einer zweiten, billigen Kriegskarte (§4). Armeen erscheinen
+als Banner mit Stärkezahl (`.armyBanner`), keine Kreise/Kartenpins (§8).
+Eine dünne, gestrichelte Konfliktlinie (`.frontLine`) markiert die echte
+Nachbarschaft zwischen eigenen und Kriegsgegner-Gebieten (§6) — keine
+neue Frontmechanik, nur eine visuelle Hervorhebung von `state.warState`
+plus bestehender Adjazenz.
+
+**Army Card / Angriffsziel (§9-16):** `getArmyCardViewModel`/
+`getEnemyGarrisonViewModel` (neu in `js/ui-viewmodels.js`) ersetzen den
+alten Text+Select-Block im Kartenpanel — nur echte Felder (Gesamtstärke,
+Truppentypen, Kommandant [= der Herrscher, 8D-Wiederverwendung],
+geschätzte Garnison aus dem bereits vorhandenen `terr.garrison`), nichts
+erfunden, fehlende Angaben werden weggelassen statt geraten (§16). Ein
+angrenzendes fremdes Gebiet anzuklicken markiert es als Angriffsziel
+(`.attackTarget`, §15) statt die Kartenauswahl zu wechseln. Die
+Marschroute (§12/13, `getMarchRouteViewModel`) ist eine handgezeichnete
+Tuschelinie mit Pfeilspitze in Bannerfarbe — nur bei echter Adjazenz,
+keine neue Pfadfindung. Eine Angriffszusammenfassung ("ANGRIFF AUF X")
+zeigt eigene Stärke, geschätzten Gegner und Gelände, bevor der Angriff
+bestätigt wird.
+
+**Kampfbildschirm komplett neu strukturiert (§20-48):** dieselbe
+`btState`/`advanceBattle()`/`createBattle()`-Logik, aber visuell
+vollständig neu aufgebaut — Kopfzeile mit "SCHLACHT BEI X · ANNO Y"
+(§19), drei Spalten (eigene Armee | Schlachtfeld | Gegner) statt fünf
+Zahlenkästchen. Formationstoken (`getBattleUnitViewModel`) zeigen kleine
+handgezeichnete SVG-Silhouetten je Einheitentyp (Pikeniere/Bogenschützen/
+Kavallerie/Artillerie/Infanterie/Miliz/Schwere Kavallerie) statt
+`[PIK]`-Zahlenboxen — Brettspiel-Miniatur-Stil, keine
+Einzelsoldaten-Simulation (§26/31-33). Verluste kompakt als
+"1.200 / 1.084 (-116)" aus den bereits vorhandenen `soldiers`/
+`maxSoldiers`-Feldern. Gelände sichtbar (Terrain-Hintergrund + Wald-/
+Hügel-Deko aus denselben SVG-Symbolen wie die Karte, §29). Die 6 echten
+`BATTLE_PHASES` erscheinen als segmentierte Phasenleiste (§35). Moral
+zeigt Balken + reale Klassifikation (`moraleTierName`, aus den
+bestehenden `MORALE_TIERS` — keine neuen Stufen erfunden, §25/34). Das
+bestehende Kampf-Log erscheint wortgleich als "Feldbericht" (§37/38).
+Taktische Entscheidungen (`pendingDecision`) werden als Decision Cards
+wie in 8F dargestellt (§39), nur reale Optionen, keine erfundenen
+Erfolgsaussichten. Kurze CSS-only "Beats" (Aufblitzen/leichte
+Verschiebung, §46) begleiten Fernkampf-/Hauptkampf-/Moralprüfungsphasen,
+`prefers-reduced-motion` schaltet sie ab — kein Canvas, keine
+Dauerschleife. Formation zusätzlich als kleines statisches
+Konzeptdiagramm (§36), rein dekorativ.
+
+**Übergang (§18/19):** ein kurzer, `prefers-reduced-motion`-respektierter
+Fade/Scale-Übergang (`btFrameIn`, 0.45s) beim Öffnen des
+Kampfbildschirms statt eines abrupten Wechsels.
+
+**Ergebnisbildschirm (§49-60):** Titel ausschließlich aus der bereits
+real klassifizierten `result.outcome` (7 Werte aus
+`battle-state-machine.js`, reine Umbenennung in `getBattleResultTitle`,
+keine neue Klassifikationslogik). Beide Seiten mit Start-/Endstärke,
+Verlusten, Gefallenen/Verwundeten (nur falls die Engine sie liefert),
+Moral am Ende. Die "Warum verloren"-Begründung (`getBattleOutcomeReasons`)
+ist dieselbe Logik, die zuvor direkt in `btShowBattleReport()` stand, nur
+in die ViewModel-Schicht verschoben. Ein Kommandanten-Hinweis erscheint
+nur, wenn `commander.alive === false` bereits real ist — Portrait nur
+für die Spielerseite (der Kommandant ist dort real der Herrscher, 8D).
+Ein "Diese Schlacht wird in der Chronik festgehalten"-Hinweis erscheint
+nur bei echter `isChronicleWorthy`-Eligibility auf der soeben real
+erzeugten `MAJOR_BATTLE_WON/LOST`-Memory (`getBattleChronicleHintViewModel`,
+sucht die Memory statt eine hypothetische zu konstruieren — `battle-bridge.js`
+bleibt dazu vollständig unangetastet). Ein Story-Kontext-Hinweis
+("Teil der Geschichte: ...") erscheint nur bei einem echten, dem
+Kriegsgegner zugeordneten Thread — Wiederverwendung von 8E's
+`getDiplomaticStoryViewModel`, keine neue Funktion, keine neue Mechanik.
+Ein dezenter Hinweis markiert einen echten Besitzerwechsel nach
+Gebietseroberung (§60, keine Konfetti-Animation). "ZURÜCK ZUM FELDZUG"
+kehrt zur Kriegskarte zurück, fokussiert auf das betroffene Gebiet.
+
+**Kriegsübersicht (§61-63, optional):** ein neuer "AKTUELLE KRIEGE"-
+Abschnitt auf dem Militär-Tab (`renderActiveWarsSection`,
+`getActiveWarsViewModel`/`getWarCardViewModel`) zeigt pro aktivem Krieg
+Kriegspartner, Jahr der Kriegserklärung (aus der echten
+`WAR_DECLARED`-Memory, 8E-Wiederverwendung), eigene/gegnerische
+Gebietszahlen, Frontgebiete und Story-Link — bewusst keine
+Kriegsscore-Zahl erfunden (§63, existiert im Datenmodell nicht).
+
+**ViewModel-Schicht (§68/69, neu in `js/ui-viewmodels.js`):**
+`getArmyCardViewModel`, `getEnemyGarrisonViewModel`,
+`getMarchRouteViewModel`, `getWarCardViewModel`, `getActiveWarsViewModel`,
+`getBattleUnitViewModel`, `getBattleArmySideViewModel`,
+`getBattlePhaseViewModel`, `getBattleLogViewModel`,
+`getBattlePresentationViewModel`, `getBattleResultTitle`,
+`getBattleOutcomeReasons`, `getBattleResultViewModel`,
+`getBattleChronicleHintViewModel` — reine Transformation bereits
+vorhandener Engine-/State-Daten, keine Gameplay-Logik, 0 neue
+`rnd()`/`Math.random()`-Aufrufe (per Node-Test verifiziert, RNG-Delta 0).
+
+**Golden Determinism (§95, Pflichtbeweis):** fixe Battle-Seeds liefern
+vor und nach dieser Phase bit-identische `simulateBattle()`-Ergebnisse
+(zweifacher Lauf verglichen, zusätzlich die drei `battle-engine/*.js`-
+Dateien byte-für-byte gegen den letzten Commit verglichen — identisch).
+
+**Getestet:** komplette bestehende Node-Testsuite weiterhin grün,
+`battle_test.js` unverändert grün (Kampfmathematik unangetastet).
+`tests/ui_viewmodel_test.js` um Phase-8G-Prüfungen ergänzt (Army Card/
+Enemy Garrison nur echte Felder, Marschroute nur bei echter Adjazenz,
+War Card ohne erfundene Warscore-Mechanik, volle simulierte Schlacht
+mit korrekten Phasen-/Unit-/Log-Feldern, alle 7×2 Battle-Result-Titel-
+Kombinationen, Chronik-Hinweis nur bei echter Memory, RNG-Neutralität).
+Playwright (`phase8g_playwright.js`, 33 Prüfungen): Militär-Tab mit
+Kriegsübersicht, Kriegskarte öffnen, keine `.wmNode`-Kreise mehr,
+Polygon-/Banner-Rendering, eigenes Grenzgebiet auswählen (Army Card),
+Angriffsziel markieren (Marschroute + Zusammenfassung), Angriff
+auslösen, Kampfbildschirm-Setup (Eyebrow + Formationsdiagramm),
+laufende Schlacht (Phasenleiste, Formationstoken, Gelände), Tastatur-
+Fokussierbarkeit, automatische Auflösung, Ergebnisbildschirm, Rückkehr
+zur Kriegskarte inkl. real geprüftem Besitzerwechsel (ai1 → player nach
+Sieg). Sondertests: kontrollierter Sieg (weit überlegene Streitmacht
+gewinnt zuverlässig), kontrollierte Niederlage (krasse Unterzahl),
+niedrige Moral korrekt angezeigt (reale `moraleTierName`, keine
+Engine-Änderung), echter `FOREIGN_CONFLICT`-Thread zeigt korrekten
+Story-Kontext im Ergebnisbildschirm. Responsive bei 1920×1080/1440×900/
+1366×768 geprüft — bei 1366×768 kein horizontaler Overflow (Armeepanels
+stapeln sich einspaltig, Schlachtfeld bleibt zentral).
+
+**Bewusst NICHT Teil dieser Teilphase:** Chronik-Buchansicht,
+Kaiserwahl 2.0, neue Kriegs-/Frieden-Mechanik, Gebietseroberungs-/
+Vasallisierungslogik (unverändert), Retreat-Sondertest nicht separat
+über die UI erzwungen (das reale `geordneterRueckzugA/B`-Outcome wird
+aber durch die vollständige `getBattleResultTitle`-Abdeckung aller 7
+Outcomes im Node-Test mitgeprüft). Bundle-Größe 785.147 → 818.576 Bytes
+(+4,3 %). Battle Engine unverändert (`git diff --stat -- battle-engine/`
+leer), Kriegskarten-Mechanik (`js/war-map.js`) unverändert, keine neue
+SAVE_VERSION, 0 neue `rnd()`-Aufrufe in irgendeinem ViewModel.
+
+## 12. Screen Inventory (Status nach Phase 8A + 8B + 8C + 8C.1 + 8C.2 + 8D + 8E + 8F + 8G)
 
 | Screen/Bereich | Status | Anmerkung |
 |---|---|---|
@@ -1048,13 +1192,13 @@ irgendeinem ViewModel.
 | Kontextpanel WIRTSCHAFT/BEVÖLKERUNG-Tabs | **REDESIGNED** | 8C — echte Top-Produktion/Engpässe/Jahreswachstum, für Spieler- UND KI-Regionen |
 | Hof-Panel (Seiteninhalt) | **REDESIGNED** | 8D — Portraitwand (Herrscher/Gemahl/Thronfolger + 6 Hofämter) statt 6-Text-Slot-Grid, siehe Abschnitt 8 |
 | Diplomatie-Panel (Seiteninhalt) | **REDESIGNED** | 8E — Machtkarten-Liste + Detailansicht statt Beziehungstabelle, siehe Abschnitt 9 |
-| Militär-Panel (Seiteninhalt) | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | weiterhin über die Navigation erreichbar, Informationsarchitektur unverändert (das ist 8G) |
+| Militär-Panel (Seiteninhalt) | **REDESIGNED** | 8G — neuer "AKTUELLE KRIEGE"-Abschnitt (War Cards), Rest der Rekrutierungs-/Intrigen-Informationsarchitektur unverändert |
 | Gebäude/Land/Schulden-Panels | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | unverändert, kein Baufortschritt (keine Datenbasis, §Abschnitt 5) |
 | Event-Modal (Titel/Illustration/Story/Beteiligte/Entscheidungskarten) | **REDESIGNED** | 8F — Event-Hierarchie, deterministisches Illustrationssystem, Story-Kontext, siehe Abschnitt 10 |
 | Geburt-/Heirat-Modals | **REDESIGNED** | 8F — Portraits ergänzt (Kind bzw. Herrscher+Gemahl(in) mit Ring-Siegel), Ablauf unverändert |
 | Kassenbuch-Modal | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | unverändert, kein Scope dieser Phase |
-| Kampf-Overlay | **REDESIGNED** (Tokens) | Battle Engine unverändert (§61 bestätigt), Strukturaufwertung ist 8G |
-| Kriegskarte-Overlay | **REDESIGNED** (Tokens) | Kartenstil (handgezeichnete Landkarte) weiterhin nicht vertieft, bleibt als reines Kriegs-Overlay bestehen |
+| Kampf-Overlay (Schlacht) | **REDESIGNED** | 8G — drei-Spalten-Layout, Formationstoken statt Zahlenboxen, Geländehintergrund, Phasenleiste, Feldbericht, Decision Cards, siehe Abschnitt 11. Battle Engine unverändert |
+| Kriegskarte-Overlay (strategische Kriegskarte) | **REDESIGNED** | 8G — dieselbe handgezeichnete politische Karte wie REICH statt `.wmNode`-Kreisen, Army Card/Marschroute/Frontlinie, siehe Abschnitt 11 |
 | Welt-/Regionskarte als Hauptbildschirm-Zentrum | **REDESIGNED** | 8B (Layout/HUD/Kontextpanel) + 8C.1 (Node-Grafik → politische Flächenkarte) + 8C.2 (Voronoi → handgestaltete Landschaftskarte mit Fluss/Wildnis, Abschnitt 7) |
 | Charakterportraits/Placeholder-System | **REDESIGNED** | 8D — deterministisches Inline-SVG-Bust-System (Hash statt `rnd()`), rangbasierte Rahmen, siehe Abschnitt 8. Topbar-Portrait bleibt bewusst der einfache Emoji-Platzhalter (kein Scope dieser Phase) |
 | Character Card / Character Detail | **REDESIGNED** | 8D — neue `#characterDetailModal`, Skills als Grid, Traits als Badges mit echtem Effekttext, echte Beziehungs-/Loyalitäts-Aufschlüsselung, Erinnerungs-Zeitleiste, siehe Abschnitt 8 |

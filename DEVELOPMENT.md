@@ -3490,3 +3490,92 @@ Story-/Drama-Director-Mechanik (weiterhin 8G/8H). Bundle-Größe 756.621
 → 785.147 Bytes (+3,8 %). Battle Engine unverändert, Kartenwerk aus
 8C.2 unverändert, keine neue SAVE_VERSION, 0 neue `rnd()`-Aufrufe in
 irgendeinem ViewModel.
+
+## 2026-08-26 – Phase 8G (KAISERREICH-Zwischenprompt): War + Battle Presentation Redesign
+
+"Krieg als strategisches Brettspiel — Schlacht als taktischer
+Höhepunkt." `battle-engine/*.js` bleibt vollständig unangetastet
+(`git diff --stat -- battle-engine/` leer, zusätzlich byte-für-byte
+gegen den letzten Commit verglichen) — keine Kampfmathematik, keine
+neuen Truppenwerte, kein neuer `rnd()`-Aufruf in der Simulation.
+
+**Strategische Kriegskarte:** die alte, separate `#warMapOverlay` mit
+farbigen `.wmNode`-Kreisen wurde verworfen. `renderWarMap()` nutzt jetzt
+dieselbe handgezeichnete politische Karte wie die REICH-Seite
+(`MAP_GEOMETRY`, `REICH_OWNER_COLOR`, dieselben SVG-`<symbol>`-Defs und
+`.territoryNode`-CSS) — "Kriegsmodus" derselben Karte statt einer
+zweiten billigen Kriegskarte. Armeen als Banner statt Kreise. Eine
+dünne, gestrichelte Konfliktlinie markiert die echte Nachbarschaft
+zwischen Kriegsparteien (`state.warState` + bestehende Adjazenz, keine
+neue Frontmechanik). Army Card / geschätzte Enemy Garrison
+(`getArmyCardViewModel`/`getEnemyGarrisonViewModel`, neu in
+`js/ui-viewmodels.js`) ersetzen den alten Text+Select-Block — nur echte
+Felder. Marschroute als handgezeichnete Tuschelinie mit Pfeilspitze
+(`getMarchRouteViewModel`, nur bei echter Adjazenz, keine neue
+Pfadfindung), Angriffszusammenfassung "ANGRIFF AUF X" vor Bestätigung.
+
+**Kampfbildschirm komplett neu strukturiert:** dieselbe `btState`/
+`advanceBattle()`-Logik, aber drei Spalten (eigene Armee |
+Schlachtfeld | Gegner) statt fünf Zahlenkästchen. Formationstoken
+(`getBattleUnitViewModel`) mit kleinen handgezeichneten SVG-
+Silhouetten je Einheitentyp statt `[PIK]`-Zahlenboxen. Verluste
+kompakt als "1.200 / 1.084 (-116)" aus den bestehenden `soldiers`/
+`maxSoldiers`-Feldern. Geländehintergrund + Deko aus denselben
+SVG-Symbolen wie die Karte. Die 6 echten `BATTLE_PHASES` als
+segmentierte Phasenleiste. Moral als Balken + reale Klassifikation
+(`moraleTierName`, bestehende `MORALE_TIERS`, keine neuen Stufen). Das
+bestehende Kampf-Log erscheint wortgleich als "Feldbericht". Taktische
+Entscheidungen als Decision Cards wie in 8F. Kurze CSS-only "Beats"
+(kein Canvas) begleiten Fernkampf-/Hauptkampf-/Moralprüfungsphasen,
+`prefers-reduced-motion` schaltet sie ab. Formation zusätzlich als
+kleines statisches Konzeptdiagramm. Ein kurzer, reduced-motion-
+respektierter Übergang beim Öffnen statt eines abrupten Wechsels.
+
+**Ergebnisbildschirm:** Titel ausschließlich aus der real
+klassifizierten `result.outcome` (7 Werte, reine Umbenennung in
+`getBattleResultTitle`, keine neue Klassifikationslogik). Beide Seiten
+mit Start-/Endstärke, Verlusten, Gefallenen/Verwundeten (nur falls
+vorhanden), Moral am Ende. "Warum verloren" ist dieselbe Logik, die
+zuvor direkt in `btShowBattleReport()` stand, nur in die ViewModel-
+Schicht verschoben. Kommandanten-Hinweis nur bei real
+`commander.alive === false`, Portrait nur für die Spielerseite (der
+Kommandant ist dort real der Herrscher, 8D). Chronik-Hinweis nur bei
+echter `isChronicleWorthy`-Eligibility auf der soeben real erzeugten
+`MAJOR_BATTLE_WON/LOST`-Memory (`battle-bridge.js` bleibt dazu
+vollständig unangetastet). Story-Kontext-Hinweis nur bei echtem, dem
+Kriegsgegner zugeordnetem Thread (Wiederverwendung von 8E's
+`getDiplomaticStoryViewModel`). Dezenter Hinweis bei echtem
+Besitzerwechsel, keine Konfetti-Animation. "ZURÜCK ZUM FELDZUG" kehrt
+zur Kriegskarte zurück.
+
+**Kriegsübersicht (optional):** neuer "AKTUELLE KRIEGE"-Abschnitt auf
+dem Militär-Tab (`getActiveWarsViewModel`/`getWarCardViewModel`) —
+Kriegspartner, Jahr der Kriegserklärung (echte `WAR_DECLARED`-Memory),
+eigene/gegnerische Gebietszahlen, Frontgebiete, Story-Link. Bewusst
+keine Kriegsscore-Zahl erfunden.
+
+**Golden Determinism (Pflichtbeweis):** fixe Battle-Seeds liefern vor
+und nach dieser Phase bit-identische `simulateBattle()`-Ergebnisse.
+
+**Getestet:** komplette bestehende Node-Testsuite weiterhin grün,
+`battle_test.js` unverändert grün. `tests/ui_viewmodel_test.js` um
+Phase-8G-Prüfungen ergänzt (Army Card/Enemy Garrison nur echte Felder,
+Marschroute nur bei echter Adjazenz, War Card ohne erfundene
+Warscore-Mechanik, volle simulierte Schlacht mit korrekten Phasen-/
+Unit-/Log-Feldern, alle 7×2 Battle-Result-Titel, Chronik-Hinweis nur
+bei echter Memory, RNG-Neutralität). Playwright (33 Prüfungen):
+Kriegsübersicht, Kriegskarte ohne `.wmNode`-Kreise, Army Card, Angriffs-
+ziel/Marschroute, Kampfbildschirm-Setup, laufende Schlacht, Tastatur-
+Fokussierbarkeit, Ergebnisbildschirm, Rückkehr zur Kriegskarte inkl.
+real geprüftem Besitzerwechsel. Sondertests: kontrollierter Sieg,
+kontrollierte Niederlage, niedrige Moral korrekt angezeigt, echter
+Foreign-Conflict-Thread zeigt korrekten Story-Kontext. Responsive bei
+allen drei Pflichtauflösungen geprüft, kein horizontaler Overflow bei
+1366×768.
+
+**Bewusst NICHT Teil dieser Teilphase:** Chronik-Buchansicht,
+Kaiserwahl 2.0, neue Kriegs-/Frieden-Mechanik, Gebietseroberungs-/
+Vasallisierungslogik (unverändert). Bundle-Größe 785.147 → 818.576
+Bytes (+4,3 %). Battle Engine unverändert, Kriegskarten-Mechanik
+(`js/war-map.js`) unverändert, keine neue SAVE_VERSION, 0 neue
+`rnd()`-Aufrufe in irgendeinem ViewModel.
