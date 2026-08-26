@@ -682,7 +682,120 @@ künftigen Änderungen an der Zeichenreihenfolge.
 
 **Bundle-Größe:** 677.811 → 684.506 Bytes (+0,99 %).
 
-## 8. Screen Inventory (Status nach Phase 8A + 8B + 8C + 8C.1 + 8C.2)
+## 8. Phase 8D: Hof + Dynastie + Charaktere
+
+Erste Phase, die tatsächlich die MENSCHEN in den Mittelpunkt stellt statt
+Regionen/Waren/Karte. Die zugrundeliegenden Systeme (Character Core,
+World Memory, Story Threads, Drama Director, Chronicle 2.0) waren seit
+Phase 3–7 bereits real und getestet — 8D erfindet keine neue
+Spielmechanik, sondern macht Claims/Traits/Loyalität/Beziehungen/
+Rivalitäten/Erinnerungen zum ersten Mal lesbar. Alle neuen ViewModels
+in `js/ui-viewmodels.js` transformieren ausschließlich bereits reale
+`state`-Werte — kein `rnd()`, keine neu erfundenen Zahlen.
+
+**Portrait-Placeholder-System (§5-8):** deterministische Inline-SVG-
+Büsten statt Bild-Assets. Ein `hashStringToInt()` (FNV-1a-artiger
+String-Hash, kein `rnd()`) wählt aus 5 Haar-/Kopfbedeckungs-Varianten
+pro Geschlecht; Alter (`ageGroupOf`) steuert Proportionen/Haarton,
+Rang (`PORTRAIT_RANK`) steuert Rahmenfarbe und ein Krone/Nadel-Symbol
+für Herrscher/Adel. Verstorbene Charaktere erhalten einen Graustufen-
+Filter statt zu verschwinden.
+
+**Heraldik (§49, bewusst klein gehalten — "keine Heraldik-Engine als
+neues Projekt"):** `getHeraldryViewModel(houseName)` hasht den
+Dynastienamen in feste kleine Paletten (6 Feldfarben, 4 Symbolfarben,
+4 Teilungen, 5 Symbole) — ein Wappen-Schild pro Haus, deterministisch,
+keine Engine.
+
+**Character Card (§9-14/30-31/86-89):** WHO/Rolle/2 wichtigste Traits/
+Loyalität/max. 2 priorisierte Warnbadges (Anspruch > Rivale > korrupt >
+niedrige Loyalität) — explizit kein Skill-Dump. `getCharacterRoleLabel`
+leitet die Rollenbezeichnung (Thronfolger/Bruder des Herrschers/
+Gemahl/Hofamt/...) aus echten Verwandtschafts-/Amts-Feldern ab, nie
+erfunden.
+
+**Character Detail (§9-25):** Skills als kompaktes 8er-Grid (keine
+Tabelle), Traits als Badges mit echtem Effekttext aus `TRAITS[].effects`
+(Tooltip), eine echte Beziehungs-Aufschlüsselung (`computeRelationship
+Breakdown` nur mit Anzeige-Labels versehen — memory-basierte
+Modifikatoren zeigen wortgleich `memory.description`) und eine echte
+Loyalitäts-Aufschlüsselung (`getLoyaltyDisplayViewModel` spiegelt
+`computeLoyalty()` rein lesend, Zeile für Zeile, keine zweite
+abweichende Formel), visuell klar getrennt (§16). Eine Erinnerungs-
+Zeitleiste zeigt nur `isChronicleWorthy()`-relevante Memories (Fallback:
+alle, falls keine relevant), begrenzt auf `MEMORY_TIMELINE_LIMIT = 8`,
+als vertikale persönliche Historie statt Debug-Liste. Rivalitäten zeigen
+den echten Ursprungstext via `rivalryOrigin → memoryId → description`.
+Ansprüche werden nie erfunden — nur reale `character.claims`-Einträge
+mit `strength !== "none"` erscheinen.
+
+**Hof-Ansicht (§27-35):** Portraitwand statt 6-Text-Slot-Grid — Herrscher/
+Gemahl/Thronfolger oben (`#courtRulingRow`), 6 Hofämter darunter
+(`#courtOfficesGrid`), jede Karte klickbar → Character Detail.
+
+**Beraterkandidaten-Auswahl (§32-35):** von einer einspaltigen Liste zu
+einem 2-4-Wege-Nebeneinander-Vergleich (Portrait/Alter/relevanter Skill/
+Traits/Loyalität/Gehaltsforderung) umgebaut — `showAdvisorCandidates()`
+komplett ersetzt, `generateAdvisorCandidate(s)`/`confirmAdvisorSelection`/
+alle gameplay-wirksamen Funktionen unverändert, nur die Anzeige wurde
+neu gebaut.
+
+**Dynastie-/Stammbaum-Ansicht (§36-49, komplett neu):** genealogisch
+korrekte Generationenreihen (Eltern/Geschwister → Herrscher+Gemahl →
+Kinder) mit einem einzigen zentrierten `.treeConnector`-Balken zwischen
+den Generationen statt Node-Graph-Optik (§40) — dieselbe Lehre aus
+8C.1/8C.2 (keine algorithmisch wirkende Diagramm-Optik) hier bewusst
+auf die Familienstruktur angewendet. Verstorbene bleiben sichtbar,
+desaturiert, mit †-Markierung, statt zu verschwinden (§42). Eine
+kompakte nummerierte Thronfolgeliste (`getSuccessionViewModel`) spiegelt
+exakt die reale Erbenermittlung aus `handleSuccession()` (lebende Kinder,
+Alter absteigend) — kein Würfeln, das passiert weiterhin ausschließlich
+beim tatsächlichen Herrschertod — plus ein rein datenbasiertes
+Streit-Risiko-Flag aus `CONFIG.succession.disputeAgeClosenessYears`.
+Frühere Herrscher (`getRulerEras`/`buildRulerBiography`, bereits aus
+Chronicle 2.0 real vorhanden) erscheinen in einer eigenen "FRÜHERE
+HERRSCHER"-Sektion.
+
+**Story-Thread-Integration (§?, "AKTUELLE GESCHICHTE"):** wenn ein
+Charakter Teil eines aktiven Story Threads ist, zeigt sein Detail den
+bereits vorhandenen `THREAD_STAGE_TEXT`/`THREAD_ICON_BY_TYPE` (aus 8B)
+wieder — keine neue Text-Tabelle.
+
+**Getestet:** alle bestehenden Node-Testsuiten (`character_core_test.js`,
+`world_memory_test.js`, `story_thread_test.js`, `chronicle_test.js`,
+`drama_director_test.js`, `event_chain_test.js`, `economy_test.js`,
+`battle_test.js`) weiterhin grün, keine Regression. `ui_viewmodel_test.js`
+um einen neuen Block ergänzt: RNG-Neutralität aller 8D-ViewModels über
+einen simulierten 8-Jahres-Zustand, Hash-Determinismus von Portrait/
+Heraldik, "Claims nie erfunden" (Charakter ohne echten Claim zeigt
+weder Badge noch Detail-Claim), Loyalitäts-Anzeige stimmt exakt mit
+`computeLoyalty()` überein, Beziehungs-Aufschlüsselung nutzt wortgleich
+echte Memory-Texte, Thronfolge spiegelt echte Alters-Reihenfolge,
+Verstorbene bleiben im Stammbaum sichtbar. Zusätzlich umfangreiche
+Playwright-Klicktests (Herrscher/Ehepartner/Berater/Kind/Geschwister/
+Thronfolger/Verstorbenen öffnen, Kandidat auswählen+ernennen, Jahr
+weiter mit Hofansicht-Refresh, Tastatur-Fokus + Enter öffnet Detail,
+Save/Load-Rundlauf über die echten `serializeSave()`/`deserializeSave()`)
+sowie die vier Sonderfälle aus dem Auftrag: Tod eines Beraters (Amt
+zeigt danach korrekt `filled:false`), echte Erbfolge über
+`handleSuccession()` (neuer Herrscher = designierter Erbe, alter
+Herrscher bleibt als Vorgänger im Stammbaum und in "FRÜHERE HERRSCHER"
+sichtbar), Rivale (Status-Badge + erreichbarer Ursprungstext bestätigt),
+Claim (reale starke Ansprüche sichtbar, niemals erfunden). Performance:
+150 zusätzliche Charaktere direkt in den State injiziert, Hof-/Dynastie-
+Rendering blieb bei 87–95 ms pro Seitenwechsel, 0 Laufzeitfehler.
+Responsive bei 1920×1080/1440×900/1366×768 geprüft, kein horizontales
+Seiten-Overflow, Stammbaum bleibt bei 1366×768 layoutstabil.
+
+**Battle Engine unverändert bestätigt** (`git diff --stat battle-engine/
+js/battle-bridge.js` leer). **Kartenwerk aus 8C.2 funktional unverändert**
+(kein `js/map-*.js` angefasst). **Keine neue Save-Version** — Phase 8D
+liest ausschließlich bereits vorhandene Felder.
+
+**Bundle-Größe:** 684.843 → 729.336 Bytes (+6,5 %; `tools/build-bundle.js`
+meldet 725.270 Zeichen für den generierten ersten Script-Block).
+
+## 9. Screen Inventory (Status nach Phase 8A + 8B + 8C + 8C.1 + 8C.2 + 8D)
 
 | Screen/Bereich | Status | Anmerkung |
 |---|---|---|
@@ -695,14 +808,16 @@ künftigen Änderungen an der Zeichenreihenfolge.
 | PROVINZ-Tab (Bevölkerung/Nahrung/Kassenbuch) | **REDESIGNED** | 8C — Balken statt Tabelle, Detail-auf-Klick, Mini-Kassenbuch; Regierungs-Regler/Kornausgabe/Chronik unverändert |
 | WIRTSCHAFT-Tab (Waren/Steuern/Handel/Risiken) | **REDESIGNED** | 8C — Kategorie-Karten statt 24-Zeilen-Tabelle, Preiserklärung + Produktionskette auf Klick; Regionalhandel/Arbitrage-Panel unverändert |
 | Kontextpanel WIRTSCHAFT/BEVÖLKERUNG-Tabs | **REDESIGNED** | 8C — echte Top-Produktion/Engpässe/Jahreswachstum, für Spieler- UND KI-Regionen |
-| Hof/Diplomatie/Militär-Panels (Seiteninhalt) | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | weiterhin über die Navigation erreichbar, Informationsarchitektur innerhalb der einzelnen Seiten unverändert (das ist 8D/8E/8G) |
+| Hof-Panel (Seiteninhalt) | **REDESIGNED** | 8D — Portraitwand (Herrscher/Gemahl/Thronfolger + 6 Hofämter) statt 6-Text-Slot-Grid, siehe Abschnitt 8 |
+| Diplomatie/Militär-Panels (Seiteninhalt) | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | weiterhin über die Navigation erreichbar, Informationsarchitektur innerhalb der einzelnen Seiten unverändert (das ist 8E/8G) |
 | Gebäude/Land/Schulden-Panels | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | unverändert, kein Baufortschritt (keine Datenbasis, §Abschnitt 5) |
 | Event-/Geburt-/Heirat-/Kassenbuch-Modals | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | kein Illustrationsbereich (§56-58), das ist 8F |
 | Kampf-Overlay | **REDESIGNED** (Tokens) | Battle Engine unverändert (§61 bestätigt), Strukturaufwertung ist 8G |
 | Kriegskarte-Overlay | **REDESIGNED** (Tokens) | Kartenstil (handgezeichnete Landkarte) weiterhin nicht vertieft, bleibt als reines Kriegs-Overlay bestehen |
 | Welt-/Regionskarte als Hauptbildschirm-Zentrum | **REDESIGNED** | 8B (Layout/HUD/Kontextpanel) + 8C.1 (Node-Grafik → politische Flächenkarte) + 8C.2 (Voronoi → handgestaltete Landschaftskarte mit Fluss/Wildnis, Abschnitt 7) |
-| Charakterportraits/Placeholder-System | **LEGACY** | noch nicht begonnen (8D) — Topbar-Portrait ist bewusst nur ein einfacher Emoji-Platzhalter |
-| Dynastie-/Stammbaum-Ansicht | **LEGACY** | noch nicht begonnen (8D) |
+| Charakterportraits/Placeholder-System | **REDESIGNED** | 8D — deterministisches Inline-SVG-Bust-System (Hash statt `rnd()`), rangbasierte Rahmen, siehe Abschnitt 8. Topbar-Portrait bleibt bewusst der einfache Emoji-Platzhalter (kein Scope dieser Phase) |
+| Character Card / Character Detail | **REDESIGNED** | 8D — neue `#characterDetailModal`, Skills als Grid, Traits als Badges mit echtem Effekttext, echte Beziehungs-/Loyalitäts-Aufschlüsselung, Erinnerungs-Zeitleiste, siehe Abschnitt 8 |
+| Dynastie-/Stammbaum-Ansicht | **REDESIGNED** | 8D — neuer `#dynastiePage`, genealogische Generationenreihen statt Node-Graph, Thronfolgeliste, frühere Herrscher, siehe Abschnitt 8 |
 | Story-Thread-Spieler-UI | **REDESIGNED** (Story Card, Kurzform) / **LEGACY** (volle Ansicht) | 8B liefert nur die kompakte Fokus-Karte auf dem Hauptbildschirm (§12-15/43), eine vollständige Story-Thread-Liste/-Historie im Spieler-UI ist 8F |
 | Chronik-als-Buch-Ansicht | **LEGACY** | noch nicht begonnen (8H, bestehende `#chronicle`-Liste bleibt) |
 | Game Over / Dynastie-Ende-Inszenierung | **REDESIGNED** (Tokens) | Struktur unverändert |
@@ -721,8 +836,10 @@ Voronoi-Diagramm erkennbare Geometrie zugunsten 16 handplatzierter
 Territorien mit einer eigenen Landschaftsidentität (Fluss, Gebirge,
 benannte Wildnis) — fünf Teilphasen zusammen bereits ein klar
 sichtbarer Wechsel weg vom "Dashboard"-Look hin zu "das ist mein Reich".
-Die in §72-73/71/70 explizit aufgeschobenen STRUKTURELLEN
-Neubauten (Hof-Charakterkarten, Stammbaum, Event-Illustrationen,
-Diplomatie-Umbau, Chronik-Buch, Kampf-Neuinszenierung) sind weiterhin
-bewusst NICHT Teil dieser Teilphase — sie sind laut Auftrag selbst als
-8D–8H vorgesehen.
+8D lieferte den in §72-73/71/70 aufgeschobenen ersten der strukturellen
+Neubauten: Hof-Charakterkarten, Character-Detail mit echter Beziehungs-/
+Loyalitäts-/Erinnerungs-Aufschlüsselung und der Stammbaum — der Spieler
+sieht jetzt Menschen mit Rollen/Ansprüchen/Rivalitäten/Geschichte statt
+Zahlenzeilen (§98). Event-Illustrationen, Diplomatie-Umbau, Chronik-Buch
+und Kampf-Neuinszenierung bleiben weiterhin bewusst NICHT Teil dieser
+Teilphase — sie sind laut Auftrag selbst als 8E–8H vorgesehen.

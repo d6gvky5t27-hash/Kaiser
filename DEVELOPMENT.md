@@ -3262,3 +3262,78 @@ vorbereitet, nicht implementiert). Bundle-Größe 677.811 → 684.506 Bytes
 Diff, leerer `git diff --stat` für `battle-engine/` und
 `js/battle-bridge.js`), keine neue SAVE_VERSION, keine neuen
 `rnd()`-Aufrufe.
+
+## 2026-08-26 – Phase 8D (KAISERREICH-Zwischenprompt): Hof + Dynastie + Charaktere
+
+Erste Phase, die die bereits seit Phase 3–7 realen Charakter-Systeme
+(Character Core, World Memory, Story Threads, Drama Director, Chronicle
+2.0) tatsächlich sichtbar macht. Ziel laut Auftrag (§98): der Spieler
+soll am Ende Beziehungen, Ansprüche, Motive und Gefahr sehen — nicht
+mehr "Skill 12 / Skill 8 / Loyalität 47". Keine Spielmechanik verändert
+(Claims/Traits/Loyalität werden ausschließlich angezeigt, nie neu
+berechnet), keine neue SAVE_VERSION, kein neuer `rnd()`-Aufruf.
+
+**Deterministisches Portrait-System statt Bild-Assets:** ein neuer
+`hashStringToInt()`-String-Hash (kein `rnd()`) wählt aus 5 Haar-/
+Kopfbedeckungs-Varianten pro Geschlecht für jede Charakter-ID stabil
+dieselbe Inline-SVG-Büste; Alter steuert Proportionen, Rang (Herrscher/
+Adel/Amt) steuert Rahmenfarbe + Krone/Nadel-Symbol, Verstorbene bekommen
+einen Graustufenfilter statt zu verschwinden. Eine kleine deterministische
+Heraldik (`getHeraldryViewModel`, bewusst ohne eigene Engine — feste
+Paletten aus 6 Feldfarben/4 Symbolfarben/4 Teilungen/5 Symbolen, gehasht
+aus dem Dynastienamen) liefert ein Wappen-Schild pro Haus.
+
+**Character Card/Detail:** Karten zeigen WHO/Rolle/2 Top-Traits/
+Loyalität/max. 2 priorisierte Warnbadges statt eines Skill-Dumps. Das
+neue Detail-Modal zeigt Skills als 8er-Grid, Traits als Badges mit
+echtem Effekttext, eine echte Beziehungs-Aufschlüsselung (memory-
+basierte Zeilen zeigen wortgleich `memory.description`) und eine echte
+Loyalitäts-Aufschlüsselung (`getLoyaltyDisplayViewModel` spiegelt
+`computeLoyalty()` zeilenweise, geprüft bis auf 0,01 exakt gegen den
+echten Wert), eine Erinnerungs-Zeitleiste (nur `isChronicleWorthy()`-
+relevante Memories, max. 8) und Rivalitäten mit echtem Ursprungstext.
+
+**Hof-Ansicht:** von einem 6-Text-Slot-Grid zu einer Portraitwand
+(Herrscher/Gemahl/Thronfolger oben, 6 Hofämter darunter) umgebaut, jede
+Karte öffnet das Character-Detail. Die Beraterkandidaten-Auswahl wurde
+von einer einspaltigen Liste zu einem 2-4-Wege-Nebeneinander-Vergleich
+umgebaut (`showAdvisorCandidates()` neu, alle gameplay-wirksamen
+Funktionen unverändert).
+
+**Neue Dynastie-Ansicht:** genealogisch korrekte Generationenreihen
+(Eltern/Geschwister → Herrscher+Gemahl → Kinder) mit einem einzigen
+zentrierten Verbindungsbalken zwischen den Generationen statt Node-
+Graph-Optik — dieselbe Lehre aus dem Karten-Redesign (8C.1/8C.2) hier
+auf die Familienstruktur angewendet. Verstorbene bleiben desaturiert
+mit †-Markierung sichtbar. Eine Thronfolgeliste spiegelt exakt die
+reale Erbenermittlung aus `handleSuccession()` (kein Würfeln — das
+bleibt ausschließlich beim tatsächlichen Herrschertod) plus ein rein
+datenbasiertes Streit-Risiko-Flag. Frühere Herrscher erscheinen über
+das bereits aus Chronicle 2.0 vorhandene `getRulerEras`/
+`buildRulerBiography` in einer eigenen Sektion.
+
+**Getestet:** komplette bestehende Node-Testsuite weiterhin grün, keine
+Regression. `tests/ui_viewmodel_test.js` um einen neuen Phase-8D-Block
+erweitert (RNG-Neutralität, Hash-Determinismus, "Claims nie erfunden",
+Loyalitäts-/Beziehungs-Formeln exakt gegen die echten Funktionen
+geprüft, Thronfolge-Reihenfolge, Verstorbene bleiben im Baum). Playwright:
+alle geforderten Klicktests (Herrscher/Ehepartner/Berater/Kind/
+Geschwister/Thronfolger/Verstorbenen öffnen, Kandidat auswählen+ernennen,
+Jahr weiter mit Hofansicht-Refresh, Tastatur-Fokus + Enter, Save/Load-
+Rundlauf über die echten Serialisierungsfunktionen) sowie die vier
+Sonderfälle: Tod eines Beraters (Amt korrekt wieder vakant), echte
+Erbfolge über `handleSuccession()` (neuer Herrscher = designierter Erbe,
+alter Herrscher bleibt sichtbar als Vorgänger), Rivale (Status +
+erreichbarer Ursprungstext), Claim (reale starke Ansprüche sichtbar,
+niemals erfunden). 150 zusätzlich injizierte Charaktere blieben bei
+87–95 ms Renderzeit pro Seitenwechsel ohne Fehler. Responsive bei allen
+drei Pflichtauflösungen (1920×1080/1440×900/1366×768) ohne horizontales
+Seiten-Overflow.
+
+**Bewusst NICHT Teil dieser Teilphase:** Events/Diplomatie/Krieg-Battle-
+UI komplett umbauen, Chronik-Buch-Ansicht, Kaiserwahl 2.0 (weiterhin
+8E–8H). Bundle-Größe 684.843 → 729.336 Bytes (+6,5 %). Battle Engine
+unverändert (leerer `git diff --stat` für `battle-engine/` und
+`js/battle-bridge.js`), Kartenwerk aus 8C.2 unverändert (kein
+`js/map-*.js` angefasst), keine neue SAVE_VERSION, keine neuen
+`rnd()`-Aufrufe.
