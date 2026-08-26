@@ -476,7 +476,7 @@
     background: var(--panel-dark); color: #fff6e2; border: 2px solid var(--gold); border-radius: var(--r-sm);
     padding: var(--sp-2) var(--sp-2); font-size: var(--fs-body); white-space: pre-line; width: max-content;
     max-width: 220px; z-index: var(--z-tooltip); box-shadow: var(--shadow-md);
-    font-family: var(--font); line-height: 1.6;
+    font-family: var(--font); line-height: 1.6; pointer-events: none;
   }
   /* ---- Button-System (§160-163): der nackte <button>-Selektor bleibt der
      SICHERE DEFAULT/Secondary-Stil für jede bestehende Instanz ohne
@@ -701,6 +701,57 @@
   .successionRow .succOrder { font-family: var(--font-display); font-weight: 700; width: 22px; text-align: center; }
   .successionRow.primary .succOrder { color: var(--gold); }
   #deceasedRulersSection .charCard { opacity: 0.92; }
+
+  /* ============================================================
+     §Phase-8E "Diplomatie Redesign": aus Beziehungszahlen werden
+     politische Beziehungen. Zwei Ebenen (§3): links/mitte die Mächte als
+     Karten, rechts die Detailansicht der gewählten Macht. Renaissance-
+     Korrespondenz-Motive (Siegel/Dokument/Wappen, §33/34) bewusst nur an
+     wenigen Stellen, dunkle UI aus 8A bleibt die Grundlage (§35).
+     ============================================================ */
+  #diplomatiePage .diploLayout { display: flex; gap: var(--sp-3); align-items: flex-start; }
+  #diploPowerList { flex: 0 0 300px; display: flex; flex-direction: column; gap: var(--sp-2); }
+  #diploDetailPanel { flex: 1; min-width: 0; }
+  .diploFilterBar { display: flex; flex-wrap: wrap; gap: var(--sp-1); align-items: center; margin-bottom: var(--sp-2); }
+  .diploFilterBar button { font-size: var(--fs-micro); padding: 5px 10px; }
+  .diploFilterBar button.active { background: var(--gold); color: var(--ink); }
+  .diploFilterBar select { font-family: inherit; font-size: var(--fs-micro); padding: 4px; margin-left: var(--sp-2); }
+  /* §4: kompakte Machtkarte für die linke Liste -- eigenes, schlankeres
+     Layout als .charCard (dessen ganze Fläche bereits Character-Detail
+     öffnet, §11 -- hier soll ein Klick stattdessen die Macht AUSWÄHLEN). */
+  .diploPowerRow {
+    display: flex; gap: var(--sp-2); align-items: center; cursor: pointer;
+    background: rgba(242,230,201,0.5); border: 2px solid var(--ink); border-radius: var(--r-sm);
+    padding: var(--sp-2); transition: background 0.15s ease, box-shadow 0.15s ease;
+  }
+  .diploPowerRow:hover, .diploPowerRow:focus-visible, .diploPowerRow.selected { background: rgba(242,230,201,0.85); box-shadow: var(--shadow-sm); outline: 2px solid var(--gold); outline-offset: 1px; }
+  .diploPowerRow .charPortrait { width: 48px; height: 48px; flex-shrink: 0; }
+  .diploPowerRow .diploPowerBody { flex: 1; min-width: 0; }
+  .diploPowerRow .diploPowerName { font-family: var(--font-display); font-weight: 600; font-size: var(--fs-body); }
+  .diploPowerRow .diploPowerHouse { font-size: var(--fs-micro); color: var(--umber); margin-bottom: 3px; }
+  /* §6: Beziehung als natürlicher Zustand -- Text zuerst, Farbe nur sekundär (§36). */
+  .relTierTag { display: inline-block; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--ink); font-weight: 600; font-size: var(--fs-micro); }
+  .relTierTag.tier-pos { background: rgba(90,140,90,0.28); }
+  .relTierTag.tier-neg { background: rgba(160,60,50,0.22); }
+  .relTierTag.tier-neutral { background: rgba(120,110,90,0.18); }
+  /* §13/14/34: Verträge als kleine Siegel-/Dokumentkarten statt Checkboxen. */
+  .treatySeal { display: inline-flex; align-items: center; gap: 6px; border: 2px solid var(--gold); border-radius: var(--r-sm); padding: 4px 10px; margin: 2px 6px 4px 0; background: var(--panel-dark); color: #f2e6c9; font-size: var(--fs-body); font-weight: 600; }
+  .treatySeal .sealDot { width: 10px; height: 10px; border-radius: 50%; background: var(--gold); border: 1px solid var(--ink); flex-shrink: 0; }
+  /* §15: Kriegsstatus als rotes Wachssiegel statt Vollbildwarnung. */
+  .warSeal { display: inline-flex; align-items: center; gap: var(--sp-2); border: 3px solid var(--c-danger); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); background: rgba(122,34,34,0.12); margin: var(--sp-2) 0; }
+  .warSeal .sealWax { width: 24px; height: 24px; border-radius: 50%; background: var(--c-danger); border: 2px solid var(--ink); flex-shrink: 0; }
+  .warSeal .warSealBody .warSealTitle { font-family: var(--font-display); font-weight: 700; color: var(--c-danger); font-size: var(--fs-lg); line-height: 1.1; }
+  .warSeal .warSealBody .warSealSub { font-size: var(--fs-micro); color: var(--umber); }
+  .diploDetailHead { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+  .diploDetailHead .heraldryShield { width: 46px; height: 56px; flex-shrink: 0; }
+  .diploDetailHead .diploHouseName { font-family: var(--font-display); font-size: var(--fs-h1); font-weight: 600; }
+  .diploDetailHead .diploHouseSub { font-size: var(--fs-body); color: var(--umber); }
+  .diploSection { margin-top: var(--sp-3); }
+  .diploSection h4 { font-family: var(--font-display); font-size: var(--fs-md); font-weight: 600; border-bottom: 1px dotted var(--umber); margin-bottom: var(--sp-1); }
+  .electorSeal { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-body); color: var(--gold); margin-top: 4px; }
+  .diploActionsGroup { margin-top: var(--sp-2); }
+  .diploActionsGroup .groupLabel { font-size: var(--fs-micro); color: var(--umber); text-transform: uppercase; letter-spacing: 0.5px; margin: var(--sp-2) 0 3px 0; }
+  .diploActionsGroup button { margin: 2px 4px 2px 0; }
 
   .slider-row { display:flex; align-items:center; gap: var(--sp-2); margin: var(--sp-2) 0; }
   input[type=range] { width: 120px; accent-color: var(--accent2); }
@@ -1094,7 +1145,11 @@
   <div id="diplomatiePage" style="display:none;">
     <div class="panel">
       <h2 class="title">DIPLOMATIE</h2>
-      <div id="diplomacyPanel"></div>
+      <div class="diploFilterBar" id="diploFilterBar"></div>
+      <div class="diploLayout">
+        <div id="diploPowerList"></div>
+        <div id="diploDetailPanel"></div>
+      </div>
     </div>
   </div>
 
@@ -3230,6 +3285,14 @@ const MEMORY_TYPES = {
   // ein Chronik-String, keine Memory — ohne Memory hätte Dynasty
   // Chronicle 2.0 dieses zentrale Schlussereignis nicht finden können.
   DYNASTY_ENDED:             { importance: 100, decayRate: 0, direction: "none", tags: ["dynasty", "ending"] },
+  // --- neu in Phase 8E (§10/§50): die drei diplomatisch erreichbaren
+  // KI-Regionen bekommen jetzt einen echten Herrscher-Charakter
+  // (state.regions[aiId].rulerId, siehe js/core.js/js/diplomacy.js) statt
+  // gar keinem — ohne diese zwei Typen wäre sein Tod/seine Nachfolge für
+  // die diplomatische Memory-Timeline unsichtbar geblieben, genau das
+  // gleiche Argument wie DYNASTY_ENDED in Phase 7.
+  FOREIGN_RULER_DIED:        { importance: 55, decayRate: 0.02, direction: "none", tags: ["diplomacy", "death"] },
+  FOREIGN_RULER_SUCCEEDED:   { importance: 45, decayRate: 0.02, direction: "none", tags: ["diplomacy", "succession"] },
 };
 
 // Event-System: TRIGGER/BEDINGUNGEN/TEXT/ENTSCHEIDUNGEN/KONSEQUENZEN (§38)
@@ -3973,6 +4036,28 @@ function newGame(options) {
   state.characters[id] = ruler;
   state.rulerId = id;
   snapshotRulerEraStart(state, id); // §Phase-7-Punkt 74: Ausgangswerte für die spätere Regentschaftszusammenfassung
+
+  // §Phase-8E-Punkt 10/11: die drei diplomatisch erreichbaren KI-Regionen
+  // (state.diplomacy) bekommen jetzt jeweils EINEN echten Character-Core-
+  // Charakter als Herrscher (region.rulerId) -- über dieselbe createCharacter()
+  // wie jeder andere Charakter im Spiel, kein zweites Modell. Bewusst OHNE
+  // Familie (parentId/spouseId/childrenIds bleiben leer) -- das wäre
+  // erfundene Genealogie; ein eigenständiger Charakter ist alles, was
+  // Diplomatie braucht (Portrait/Traits/Skills/Detailansicht). Bleibt
+  // dadurch automatisch außerhalb jeder bestehenden, an die Spielerdynastie
+  // gebundenen Auswahllogik (getImportantCharacterIds/Event-Chain-/Story-
+  // Thread-Kandidaten sind alle über echte Verwandtschaft/Claims/Memories
+  // zum Spieler-Herrscher gated, siehe Analyse vor dieser Phase).
+  for (const aiId in state.diplomacy) {
+    const region = state.regions[aiId];
+    const baseHouseName = region.name.replace(/\s*\(.*\)$/, "");
+    const fGender = rnd() < 0.5 ? "m" : "f";
+    const fAge = 28 + Math.floor(rnd() * 32);
+    const foreignRuler = createCharacter(fGender, fAge, "von " + baseHouseName);
+    const fid = nextCharId();
+    state.characters[fid] = foreignRuler;
+    region.rulerId = fid;
+  }
 
   addChronicle(state, `Im Jahre 1500 übernahm ${ruler.name} ${dynastyName} die Herrschaft über ${state.regions.player.name}.`);
   initTerritories(state); // Kriegskarte (§Original-Vertiefung): Gebietsbesitz/Garnisonen initialisieren
@@ -5374,6 +5459,7 @@ function updateCharacterCore(state) {
   }
   updateRivalries(state);
   checkAdvisorDeaths(state);
+  checkForeignRulerDeaths(state); // §Phase-8E: siehe js/diplomacy.js
 }
 
 // ============================================================
@@ -8000,6 +8086,48 @@ function rollWarAllies(state, targetId) {
     results.push({ aiId, name: state.regions[aiId].name, stance });
   }
   return results;
+}
+
+// ---------- Phase 8E: fremde Herrscher (§10/§50) ----------
+// Altern und Gesundheitsverfall laufen für region.rulerId bereits automatisch
+// über die bestehende, ungefiltert alle state.characters durchlaufende
+// Alterungsschleife in updateDynasty() (js/population-dynasty.js) mit --
+// der einzige fehlende Baustein ist ein Tod. Nutzt exakt dieselbe
+// rollDeathChance()-Formel wie checkAdvisorDeaths() (js/military.js), kein
+// zweites Todesmodell. Kein eigenes Erbfolgesystem für fremde Höfe (das
+// wäre eine neue Diplomatiemechanik, §2 ausdrücklich untersagt) -- ein neuer,
+// unabhängig erzeugter Herrscher genügt, damit ein Herrscherwechsel im
+// Ausland überhaupt sichtbar wird (§50).
+function checkForeignRulerDeaths(state) {
+  for (const aiId in state.diplomacy) {
+    const region = state.regions[aiId];
+    if (!region || !region.rulerId) continue;
+    const ruler = state.characters[region.rulerId];
+    if (!ruler || !ruler.alive) continue;
+    if (rnd() < rollDeathChance(ruler)) {
+      ruler.alive = false;
+      const baseHouseName = region.name.replace(/\s*\(.*\)$/, "");
+      const rulerTitle = ruler.gender === "m" ? "Herrscher" : "Herrscherin";
+      const deathDesc = `${ruler.name} ${ruler.surname}, ${rulerTitle} von ${baseHouseName}, ist verstorben.`;
+      addChronicle(state, deathDesc);
+      recordWorldEvent(state, {
+        type: "FOREIGN_RULER_DIED", actorIds: [region.rulerId], regionIds: [aiId],
+        emotionalWeight: -15, metadata: { age: ruler.age },
+        description: deathDesc,
+      });
+      const successorId = nextCharId();
+      const successor = createCharacter(rnd() < 0.5 ? "m" : "f", 22 + Math.floor(rnd() * 25), "von " + baseHouseName);
+      state.characters[successorId] = successor;
+      region.rulerId = successorId;
+      const succDesc = `${successor.name} ${successor.surname} besteigt den Thron von ${baseHouseName}.`;
+      addChronicle(state, succDesc);
+      recordWorldEvent(state, {
+        type: "FOREIGN_RULER_SUCCEEDED", actorIds: [successorId], regionIds: [aiId],
+        emotionalWeight: 10,
+        description: succDesc,
+      });
+    }
+  }
 }
 
 // ---------- Technologiesystem (§28) ----------
@@ -10709,10 +10837,27 @@ function ageGroupOf(age) {
   return "alt";
 }
 const PORTRAIT_RANK = { herrscher: 4, hoch: 3, amt: 2, adel: 1 };
+// §Phase-8E: ein fremder Herrscher (state.regions[aiId].rulerId) ist kein
+// state.rulerId, soll aber optisch genauso als Herrscher lesbar sein (Krone),
+// nicht als beliebiger Adliger -- dieselbe kleine Prüfung wie überall sonst
+// in diesem Modul, wenn ein fremder Herrscher gemeint sein könnte.
+function isAnyRulerCharacter(state, characterId) {
+  if (characterId === state.rulerId) return true;
+  for (const aiId in state.diplomacy) {
+    if (state.regions[aiId] && state.regions[aiId].rulerId === characterId) return true;
+  }
+  return false;
+}
+function getForeignRulerRegionId(state, characterId) {
+  for (const aiId in state.diplomacy) {
+    if (state.regions[aiId] && state.regions[aiId].rulerId === characterId) return aiId;
+  }
+  return null;
+}
 function getPortraitViewModel(state, characterId) {
   const c = state.characters[characterId];
   if (!c) return null;
-  const isRuler = characterId === state.rulerId;
+  const isRuler = isAnyRulerCharacter(state, characterId);
   const rank = isRuler ? "herrscher" : (c.advisorRole ? "amt" : (c.claims.some(cl => cl.strength === "primary" || cl.strength === "strong") ? "hoch" : "adel"));
   const seed = hashStringToInt(characterId + "|" + c.name + "|" + (c.surname || ""));
   return {
@@ -10820,6 +10965,11 @@ function getCharacterRoleLabel(state, characterId) {
   const ruler = state.characters[state.rulerId];
   if (!c) return "";
   if (characterId === state.rulerId) return c.gender === "m" ? "Herrscher" : "Herrscherin";
+  const foreignRegionId = getForeignRulerRegionId(state, characterId);
+  if (foreignRegionId && c.alive) {
+    const rname = state.regions[foreignRegionId].name.replace(/\s*\(.*\)$/, "");
+    return (c.gender === "m" ? "Herrscher von " : "Herrscherin von ") + rname;
+  }
   if (!c.alive) return "Verstorben";
   if (ruler && characterId === ruler.spouseId) return c.gender === "m" ? "Gemahl" : "Gemahlin";
   if (c.advisorRole && ADVISOR_ROLES[c.advisorRole]) return ADVISOR_ROLES[c.advisorRole].name;
@@ -10853,14 +11003,20 @@ function getCharacterCardViewModel(state, characterId) {
   const c = state.characters[characterId];
   if (!c) return null;
   const topTraits = c.traits.slice(0, 2).map(id => getTraitBadgeViewModel(id)).filter(Boolean);
+  // §Phase-8E: "Loyalität zum Spieler-Thron" ist für einen fremden
+  // Herrscher kein sinnvoller Begriff (er hat keinen) -- null statt eines
+  // technisch berechenbaren, aber bedeutungslosen Werts (vgl. §5-Beispiel
+  // im Auftrag: fremde Karten zeigen "Beziehung", keine Loyalität).
+  const isForeign = !!getForeignRulerRegionId(state, characterId);
   return {
     id: characterId, name: c.name, surname: c.surname || "", fullName: `${c.name} ${c.surname || ""}`.trim(),
     gender: c.gender, age: c.age, alive: c.alive, ageGroup: ageGroupOf(c.age),
     roleLabel: getCharacterRoleLabel(state, characterId),
     portrait: getPortraitViewModel(state, characterId),
-    topTraits, loyalty: c.alive ? (characterId === state.rulerId ? 100 : (c.loyalty !== undefined ? c.loyalty : computeLoyalty(state, characterId))) : null,
+    topTraits,
+    loyalty: (c.alive && !isForeign) ? (characterId === state.rulerId ? 100 : (c.loyalty !== undefined ? c.loyalty : computeLoyalty(state, characterId))) : null,
     warnings: c.alive ? getCharacterWarnings(state, characterId) : [],
-    isRuler: characterId === state.rulerId,
+    isRuler: characterId === state.rulerId, isForeignRuler: isForeign,
   };
 }
 
@@ -10874,6 +11030,12 @@ function getCharacterDetailViewModel(state, characterId) {
   const c = state.characters[characterId];
   if (!c) return null;
   const isRuler = characterId === state.rulerId;
+  // §Phase-8E: ein fremder Herrscher hat keine "Loyalität zum eigenen Thron"
+  // und keine persönliche Beziehung zum Spieler-Herrscher im Character-Core-
+  // Sinn (nur eine SEPARATE diplomatische Beziehung, state.diplomacy[aiId]
+  // -- die zeigt die Diplomatie-Ansicht selbst, nicht dieses Modal). Beides
+  // hier zu zeigen wäre kein Fehler in der Formel, aber irreführend.
+  const isForeignRuler = !!getForeignRulerRegionId(state, characterId);
   const card = getCharacterCardViewModel(state, characterId);
 
   const skills = Object.keys(STAT_LABEL).map(k => ({ id: k, label: STAT_LABEL[k], value: c.stats[k] }));
@@ -10908,10 +11070,10 @@ function getCharacterDetailViewModel(state, characterId) {
     ...card,
     house: c.surname || "", health: c.alive ? Math.round(c.health) : null,
     skills, traits, claims, rivalries,
-    relationship: (!isRuler && c.alive) ? getRelationshipDisplayViewModel(state, characterId, state.rulerId) : null,
-    loyaltyBreakdown: c.alive ? getLoyaltyDisplayViewModel(state, characterId) : null,
+    relationship: (!isRuler && !isForeignRuler && c.alive) ? getRelationshipDisplayViewModel(state, characterId, state.rulerId) : null,
+    loyaltyBreakdown: (!isForeignRuler && c.alive) ? getLoyaltyDisplayViewModel(state, characterId) : null,
     memoryTimeline, hiddenMemoryCount: hiddenCount, totalMemoryCount: allMems.length,
-    currentStory,
+    currentStory, isForeignRuler,
     spouseId: c.spouseId, parentId: c.parentId, childrenIds: c.childrenIds.slice(),
   };
 }
@@ -11012,6 +11174,181 @@ function getAdvisorCandidateViewModel(state) {
   return { role: sel.role, roleName: roleInfo.name, roleDesc: roleInfo.desc, statLabel: STAT_LABEL[roleInfo.statKey], cost: sel.cost, candidates };
 }
 
+// ============================================================
+// Phase 8E: DIPLOMATIE -- "aus Beziehungszahlen werden politische
+// Beziehungen". Nur vorhandene Werte/Funktionen (state.diplomacy,
+// state.warState, state.vassals, region.rulerId, World Memory,
+// Story Threads, Intel-Schätzung) angezeigt -- keine neue
+// Diplomatiemechanik, keine veränderte Formel (§2/§42).
+// ============================================================
+
+// ---------- §6: Beziehung als natürlicher Zustand, nicht nur Zahl ----------
+// Schwellen sind REINE UI-Klassifikation (§6 ausdrücklich), keine
+// Gameplaywirkung -- state.diplomacy[aiId].relation bleibt unverändert die
+// einzige echte Zahl.
+const RELATION_TIERS = [
+  { min: 75, label: "ENG VERBÜNDET" },
+  { min: 40, label: "FREUNDSCHAFTLICH" },
+  { min: 10, label: "POSITIV" },
+  { min: -9, label: "NEUTRAL" },
+  { min: -39, label: "ANGESPANNT" },
+  { min: -69, label: "FEINDSELIG" },
+  { min: -101, label: "ERBITTERTER GEGNER" },
+];
+function relationTierLabel(relation) {
+  for (const tier of RELATION_TIERS) if (relation >= tier.min) return tier.label;
+  return "ERBITTERTER GEGNER";
+}
+
+// ---------- §4/§10/§11: fremder Herrscher als Person ----------
+// region.rulerId ist seit dieser Phase ein echter Character-Core-Charakter
+// (js/core.js newGame()) -- die Karte ist deshalb wortwörtlich dieselbe
+// getCharacterCardViewModel() wie im Hof, kein zweites Modell.
+function getForeignRulerCardViewModel(state, aiId) {
+  const region = state.regions[aiId];
+  if (!region || !region.rulerId) return null;
+  return getCharacterCardViewModel(state, region.rulerId);
+}
+
+// ---------- §13/14: Verträge als Siegel-/Dokumentkarten ----------
+const TREATY_LABELS = {
+  allianz: "BÜNDNIS", handel: "HANDELSVERTRAG", nichtangriff: "NICHTANGRIFFSPAKT",
+  durchmarsch: "DURCHMARSCHRECHT", vassal: "VASALL", guarantee: "GARANTIE", marriage: "DYNASTISCHE VERBINDUNG",
+};
+function getTreatyViewModel(state, aiId) {
+  const dip = state.diplomacy[aiId];
+  if (!dip) return [];
+  const out = [];
+  if (dip.treaties.allianz) out.push({ id: "allianz", label: TREATY_LABELS.allianz });
+  if (dip.treaties.handel) out.push({ id: "handel", label: TREATY_LABELS.handel });
+  if (dip.treaties.nichtangriff) out.push({ id: "nichtangriff", label: TREATY_LABELS.nichtangriff });
+  if (dip.treaties.durchmarsch) out.push({ id: "durchmarsch", label: TREATY_LABELS.durchmarsch });
+  if (state.vassals[aiId]) out.push({ id: "vassal", label: TREATY_LABELS.vassal });
+  if (dip.guaranteeFloor !== undefined) out.push({ id: "guarantee", label: TREATY_LABELS.guarantee });
+  if (dip.dynasticMarriageFloor !== undefined) out.push({ id: "marriage", label: TREATY_LABELS.marriage });
+  return out;
+}
+
+// ---------- §8/9: diplomatische World-Memory-Timeline ----------
+// Dieselbe isChronicleWorthy()-Signifikanzprüfung wie die Charakter-
+// Zeitleiste (js/chronicle.js) -- nur nach regionIds statt actorIds/
+// targetIds gefiltert, da diplomatische Ereignisse (ALLIANCE_FORMED,
+// WAR_DECLARED, PEACE_SIGNED, ...) seit Phase 5/6 bereits regionIds tragen.
+function getDiplomaticMemoryTimeline(state, aiId) {
+  const allMems = Object.values(state.memories.byId).filter(m => m.regionIds && m.regionIds.includes(aiId)).sort((a, b) => a.year - b.year);
+  const relevant = allMems.filter(m => isChronicleWorthy(state, m).worthy);
+  const shown = (relevant.length ? relevant : allMems).slice(-MEMORY_TIMELINE_LIMIT);
+  return shown.map(m => ({ year: m.year, text: m.description, type: m.type }));
+}
+
+// ---------- §17: aktueller Story Thread mit dieser Macht ----------
+function getDiplomaticStoryViewModel(state, aiId) {
+  const thread = getActiveStoryThreads(state).find(t => t.status !== "DORMANT" && t.regionIds && t.regionIds.includes(aiId));
+  if (!thread) return null;
+  return {
+    title: thread.title, icon: THREAD_ICON_BY_TYPE[thread.type] || "⚜",
+    stageText: THREAD_STAGE_TEXT[thread.status] || "Die Geschichte entwickelt sich weiter.",
+  };
+}
+
+// ---------- §15: Kriegsstatus, seit wann (aus der echten WAR_DECLARED-Memory) ----------
+function getWarStatusViewModel(state, aiId) {
+  const atWar = !!(state.warState && state.warState[aiId]);
+  if (!atWar) return { atWar: false, sinceYear: null };
+  const declarations = Object.values(state.memories.byId).filter(m => m.type === "WAR_DECLARED" && m.regionIds && m.regionIds.includes(aiId));
+  const sinceYear = declarations.length ? declarations[declarations.length - 1].year : null;
+  return { atWar: true, sinceYear };
+}
+
+// ---------- §27: militärische Einschätzung -- nur die bereits vorhandene,
+// unsichere Intel-Schätzung (state.intel[aiId].rangeLow/High), keine neue
+// Formel/exakte Zahl. ----------
+function getMilitaryAssessmentLabel(state, aiId) {
+  const intel = state.intel[aiId];
+  if (!intel || intel.rangeLow === undefined) return "UNBEKANNT";
+  const playerStrength = armyStrength(state);
+  if (intel.rangeHigh < playerStrength * 0.85) return "SCHWÄCHER";
+  if (intel.rangeLow > playerStrength * 1.15) return "STÄRKER";
+  return "ETWA GLEICH";
+}
+
+// ---------- §23/24: Kaiserwahl-Informationen -- ausschließlich die reale,
+// bereits in resolveElection()/checkElectionTrigger() verwendete Schwelle
+// gespiegelt, keine neuen Deals/Versprechen. Alle drei state.diplomacy-
+// Regionen sind bereits im bestehenden Wahlcode gleichberechtigte
+// Kurfürsten (siehe resolveElection()), daher hier uniform true. ----------
+function getElectorInfoViewModel(state, aiId) {
+  const cfg = CONFIG.election;
+  const dip = state.diplomacy[aiId];
+  if (!dip) return null;
+  let leaning;
+  if (state.pendingElection) {
+    const bribed = !!state.pendingElection.bribed[aiId];
+    const wouldVote = bribed || dip.relation >= cfg.knownElectorVoteRelationThreshold;
+    leaning = wouldVote ? (bribed ? "Unterstützt aktuell: Spieler (bestochen)" : "Unterstützt aktuell: Spieler") : "Unterstützt aktuell: nicht den Spieler";
+  } else {
+    leaning = dip.relation >= cfg.knownElectorVoteRelationThreshold ? "Würde derzeit den Spieler unterstützen" : "Würde derzeit nicht den Spieler unterstützen";
+  }
+  return { isElector: true, leaning };
+}
+
+// ---------- §7: "Warum stehen wir so zueinander?" -- die diplomatische
+// Beziehung ist (anders als Character-Core-Beziehungen) ein reiner
+// Drift-Akkumulator ohne gespeicherte Einzelkomponenten (js/diplomacy.js
+// updateDiplomacy()) -- eine Zeile-für-Zeile-Zerlegung wie bei Charakteren
+// gäbe es nicht wirklich (§7 "keine Gründe erfinden"). Reale Ersatz-
+// Antwort: aktuelle Verträge/Status + die echte Memory-Zeitleiste
+// (bereits oben) als "jüngste Entwicklungen mit Einfluss". ----------
+function getDiplomaticRelationshipViewModel(state, aiId) {
+  const dip = state.diplomacy[aiId];
+  if (!dip) return null;
+  const relation = Math.round(dip.relation);
+  return {
+    relation, tierLabel: relationTierLabel(relation),
+    war: getWarStatusViewModel(state, aiId),
+    treaties: getTreatyViewModel(state, aiId),
+    militaryAssessment: getMilitaryAssessmentLabel(state, aiId),
+    elector: getElectorInfoViewModel(state, aiId),
+    memoryTimeline: getDiplomaticMemoryTimeline(state, aiId),
+  };
+}
+
+// ---------- Gesamtansicht: eine Karte je Macht (§3/4) ----------
+function getDiplomacyOverviewViewModel(state) {
+  return Object.keys(state.diplomacy).map(aiId => {
+    const region = state.regions[aiId];
+    const dip = state.diplomacy[aiId];
+    const relation = Math.round(dip.relation);
+    const rulerCard = getForeignRulerCardViewModel(state, aiId);
+    const war = getWarStatusViewModel(state, aiId);
+    const warnings = [];
+    if (war.atWar) warnings.push({ id: "war", text: "KRIEG" });
+    if (dip.treaties.allianz) warnings.push({ id: "ally", text: "BÜNDNIS" });
+    if (relation <= -40 && !war.atWar) warnings.push({ id: "hostile", text: "FEINDSELIG" });
+    return {
+      aiId, regionName: region.name.replace(/\s*\(.*\)$/, ""), houseName: "Haus " + region.name.replace(/\s*\(.*\)$/, ""),
+      heraldry: getHeraldryViewModel(region.name), rulerCard,
+      relation, tierLabel: relationTierLabel(relation),
+      atWar: war.atWar, isVassal: !!state.vassals[aiId],
+      treatyCount: getTreatyViewModel(state, aiId).length,
+      warnings: warnings.slice(0, 2),
+    };
+  });
+}
+
+// ---------- Detailansicht für die ausgewählte Macht (§7-12/16-25) ----------
+function getForeignPowerDetailViewModel(state, aiId) {
+  const region = state.regions[aiId];
+  if (!region) return null;
+  return {
+    aiId, regionName: region.name.replace(/\s*\(.*\)$/, ""), houseName: "Haus " + region.name.replace(/\s*\(.*\)$/, ""),
+    heraldry: getHeraldryViewModel(region.name),
+    rulerCard: getForeignRulerCardViewModel(state, aiId),
+    relationship: getDiplomaticRelationshipViewModel(state, aiId),
+    story: getDiplomaticStoryViewModel(state, aiId),
+  };
+}
+
 </script>
 <script>
 let state = null; // erst nach Charaktererstellung bzw. Laden gesetzt (§8/§89)
@@ -11021,6 +11358,11 @@ let soundEnabled = true;
 let selectedTraits = [];
 let selectedTerritoryId = null; // §Phase-8B: aktuell im Kontextpanel gewähltes Gebiet
 let selectedRegionContextTab = 'overview';
+// §Phase-8E: Diplomatie-Ansicht -- gewählte Macht (rechtes Detailpanel),
+// Filter/Sortierung der Machtliste (§30/31), rein UI-seitiger Zustand.
+let selectedDiploPower = null;
+let diploFilter = 'all';
+let diploSort = 'relation';
 
 // ---------- Start-/Charaktererstellungsbildschirm (§8/§89) ----------
 function showTitleScreen() {
@@ -11930,42 +12272,9 @@ function render() {
   `;
   if (currentPage === 'wirtschaft') { renderGoodsCategoryGrid(); renderTaxOverview(); renderTradeOverview(); renderEconomicRisks(); }
 
-  // Diplomatie
-  let dipHtml = '';
-  for (const aiId in state.diplomacy) {
-    const dip = state.diplomacy[aiId];
-    const rel = Math.round(dip.relation);
-    const relColor = rel >= 40 ? 'var(--accent2)' : (rel < 0 ? 'var(--accent)' : 'var(--gold)');
-    const relPct = Math.round((rel + 100) / 2); // -100..100 -> 0..100
-    const treatiesHtml = Object.entries(dip.treaties).filter(([k,v])=>v)
-      .map(([k]) => `<span class="treatyTag">${k === 'nichtangriff' ? 'Nichtangriff' : k === 'handel' ? 'Handel' : k === 'durchmarsch' ? 'Durchmarschrecht' : 'Bündnis'}</span>`).join('')
-      + (state.vassals[aiId] ? '<span class="treatyTag">Vasall</span>' : '')
-      + (dip.guaranteeFloor !== undefined ? '<span class="treatyTag">Garantiert</span>' : '');
-    dipHtml += `<div class="diploBlock">
-      <b>${state.regions[aiId].name}</b> — Beziehung ${rel}
-      <div class="relbar"><div style="width:${relPct}%; background:${relColor};"></div></div>
-      <div>${treatiesHtml || '<i>keine Verträge</i>'}</div>
-      <div>
-        <button class="dipbtn" onclick="doDiplomacy('gift','${aiId}')">Geschenk (${CONFIG.diplomacy.giftCost} Taler)</button>
-        <button class="dipbtn" onclick="doDiplomacy('nonaggr','${aiId}')">Nichtangriffspakt</button>
-        <button class="dipbtn" onclick="doDiplomacy('trade','${aiId}')">Handelsvertrag</button>
-        <button class="dipbtn" onclick="doDiplomacy('alliance','${aiId}')">Bündnis</button>
-      </div>
-      <div>
-        <button class="dipbtn" onclick="doDiplomacy('vassalize','${aiId}')">Vasallisieren</button>
-        <button class="dipbtn" onclick="doDiplomacy('tribute','${aiId}')">Tribut fordern</button>
-        <button class="dipbtn" onclick="doDiplomacy('marriage','${aiId}')">Dynastische Ehe (${CONFIG.diplomacyExtra.dynasticMarriageCost} Taler)</button>
-        <button class="dipbtn" onclick="doDiplomacy('hostage','${aiId}')">Geiselaustausch (${CONFIG.diplomacyExtra.hostageExchangeCost} Taler)</button>
-      </div>
-      <div>
-        <button class="dipbtn" onclick="doDiplomacy('transit','${aiId}')">Durchmarschrecht (${CONFIG.diplomacyExtra.transitRightsCost} Taler)</button>
-        <button class="dipbtn" onclick="doDiplomacy('guarantee','${aiId}')">Garantie (${CONFIG.diplomacyExtra.guaranteeCost} Taler)</button>
-        <button class="dipbtn" onclick="doDiplomacy('peace','${aiId}')">Friedensvertrag</button>
-        <button class="dipbtn" onclick="doDiplomacy('territory','${aiId}')">Gebiet fordern</button>
-      </div>
-    </div>`;
-  }
-  document.getElementById('diplomacyPanel').innerHTML = dipHtml;
+  // Diplomatie (§Phase-8E: eigene Render-Funktion wie Hof/Dynastie, nur bei
+  // Bedarf gerendert -- siehe renderDiplomacyPage() weiter unten).
+  if (currentPage === 'diplomatie') renderDiplomacyPage();
 
   // Chronik
   document.getElementById('chronicle').innerHTML = state.chronicle.slice(0,30).map(l => `<div>${l}</div>`).join('');
@@ -13243,6 +13552,174 @@ function renderDynastyPage() {
     deadHtml += `</div>`;
   }
   document.getElementById('deceasedRulersSection').innerHTML = deadHtml;
+}
+
+// ============================================================
+// §Phase-8E "Diplomatie Redesign": aus Beziehungszahlen werden politische
+// Beziehungen. Reine Anzeige/Bedienung -- keine neue Diplomatiemechanik,
+// keine veränderte Formel (§2/§42), state/doDiplomacy() bleiben unverändert.
+// ============================================================
+const DIPLO_FILTERS = [
+  { id: 'all', label: 'ALLE' },
+  { id: 'allied', label: 'VERBÜNDETE' },
+  { id: 'neutral', label: 'NEUTRAL' },
+  { id: 'rivals', label: 'RIVALEN' },
+  { id: 'war', label: 'KRIEG' },
+];
+const DIPLO_SORTS = [
+  { id: 'relation', label: 'Beziehung' },
+  { id: 'importance', label: 'Bedeutung' },
+  { id: 'alpha', label: 'Alphabetisch' },
+];
+function setDiploFilter(f) { diploFilter = f; render(); }
+function setDiploSort(s) { diploSort = s; render(); }
+function selectDiploPower(aiId) { selectedDiploPower = aiId; render(); }
+
+// §25: "politische Bedeutung ... keine erfundene Machtwertung" -- reale
+// Reichsgröße (Bevölkerung + Land) als ehrlicher Bedeutungs-Proxy statt
+// eines neu erfundenen Machtwerts.
+function diploPowerImportance(aiId) {
+  const region = state.regions[aiId];
+  const totalPop = Object.values(region.population).reduce((s, g) => s + g.count, 0);
+  return totalPop + region.land * 0.01;
+}
+
+function renderDiplomacyPage() {
+  const overview = getDiplomacyOverviewViewModel(state);
+  if (!overview.find(p => p.aiId === selectedDiploPower)) selectedDiploPower = overview.length ? overview[0].aiId : null;
+
+  // §30: Filterleiste
+  let filterHtml = DIPLO_FILTERS.map(f => `<button class="${diploFilter===f.id?'active':''}" onclick="setDiploFilter('${f.id}')">${f.label}</button>`).join('');
+  filterHtml += `<select onchange="setDiploSort(this.value)">${DIPLO_SORTS.map(s => `<option value="${s.id}" ${diploSort===s.id?'selected':''}>Sortieren: ${s.label}</option>`).join('')}</select>`;
+  document.getElementById('diploFilterBar').innerHTML = filterHtml;
+
+  // §30: Filtern
+  let filtered = overview.filter(p => {
+    if (diploFilter === 'allied') return p.treatyCount > 0 || p.relation >= 40;
+    if (diploFilter === 'neutral') return !p.atWar && p.relation > -40 && p.relation < 40 && p.treatyCount === 0;
+    if (diploFilter === 'rivals') return p.relation <= -40 && !p.atWar;
+    if (diploFilter === 'war') return p.atWar;
+    return true;
+  });
+  // §31: Sortieren
+  filtered = filtered.slice().sort((a, b) => {
+    if (diploSort === 'relation') return b.relation - a.relation;
+    if (diploSort === 'importance') return diploPowerImportance(b.aiId) - diploPowerImportance(a.aiId);
+    return a.regionName.localeCompare(b.regionName);
+  });
+
+  // §4: Machtliste
+  let listHtml = filtered.map(p => {
+    const tierCls = p.relation >= 10 ? 'tier-pos' : (p.relation <= -10 ? 'tier-neg' : 'tier-neutral');
+    const warnHtml = p.warnings.map(w => `<span class="warnBadge">${w.text}</span>`).join('');
+    const portraitCls = ['charPortrait', p.rulerCard ? 'rank-' + p.rulerCard.portrait.rank : '', p.rulerCard && !p.rulerCard.alive ? 'dead' : ''].filter(Boolean).join(' ');
+    return `<div class="diploPowerRow${selectedDiploPower===p.aiId?' selected':''}" tabindex="0" role="button"
+        data-tip="${p.rulerCard ? p.rulerCard.fullName : p.houseName} -- ${p.tierLabel}"
+        onclick="selectDiploPower('${p.aiId}')" onkeydown="if(event.key==='Enter')selectDiploPower('${p.aiId}')">
+      <div class="${portraitCls}">${p.rulerCard ? buildPortraitSvg(p.rulerCard.portrait) : ''}</div>
+      <div class="diploPowerBody">
+        <div class="diploPowerName">${p.rulerCard ? p.rulerCard.fullName : p.houseName}</div>
+        <div class="diploPowerHouse">${p.houseName}</div>
+        <span class="relTierTag ${tierCls}">${p.tierLabel}</span> ${warnHtml}
+      </div>
+    </div>`;
+  }).join('') || '<i>Keine Mächte in diesem Filter.</i>';
+  document.getElementById('diploPowerList').innerHTML = listHtml;
+
+  // §7-25: Detailpanel der gewählten Macht
+  if (!selectedDiploPower) { document.getElementById('diploDetailPanel').innerHTML = '<i>Keine Macht ausgewählt.</i>'; return; }
+  const detail = getForeignPowerDetailViewModel(state, selectedDiploPower);
+  document.getElementById('diploDetailPanel').innerHTML = renderDiploDetailHtml(detail);
+}
+
+function renderDiploDetailHtml(vm) {
+  const rel = vm.relationship;
+  let html = `<div class="diploDetailHead">
+    <div class="heraldryShield">${buildHeraldryShieldSvg(vm.heraldry)}</div>
+    <div>
+      <div class="diploHouseName">${vm.houseName}</div>
+      <div class="diploHouseSub">${vm.regionName}</div>
+    </div>
+    <span style="flex:1;"></span>
+    <button class="btn-ghost" onclick="showDiploOnMap('${vm.aiId}')">Auf Karte zeigen</button>
+  </div>`;
+
+  // §10/11: derselbe Charakter-Card-Baustein wie Hof/Dynastie -- Klick
+  // öffnet die vorhandene Character-Detail-Ansicht (§10/11), keine zweite
+  // Detailansicht.
+  html += vm.rulerCard ? buildCharCardHtml(vm.rulerCard, { sizeClass: 'size-large' }) : '<i>Kein Herrscher bekannt.</i>';
+
+  if (rel.elector && rel.elector.isElector) {
+    html += `<div class="electorSeal">👑 Kurfürst — ${rel.elector.leaning}</div>`;
+  }
+
+  // §15: Kriegsstatus als Wachssiegel, kein Vollbild-Alarm.
+  if (rel.war.atWar) {
+    html += `<div class="warSeal"><div class="sealWax"></div><div class="warSealBody"><div class="warSealTitle">IM KRIEG</div><div class="warSealSub">${rel.war.sinceYear ? 'seit ' + rel.war.sinceYear : ''}</div></div>
+      <span style="flex:1;"></span><button class="btn-ghost" onclick="openWarMap('${vm.aiId}')">🗺 Kriegskarte öffnen</button></div>`;
+  }
+
+  // §6/7: Beziehung als natürlicher Zustand + militärische Einschätzung (§27)
+  html += `<div class="diploSection"><h4>Beziehung</h4>
+    <span class="relTierTag ${rel.relation >= 10 ? 'tier-pos' : (rel.relation <= -10 ? 'tier-neg' : 'tier-neutral')}" style="font-size:var(--fs-md);">${rel.tierLabel}</span>
+    <span style="margin-left:8px; color:var(--umber);">(${rel.relation})</span>
+    <div style="margin-top:6px;">Militärische Einschätzung: <b>${rel.militaryAssessment}</b></div>
+  </div>`;
+
+  // §13/14: Verträge als Siegelkarten
+  html += `<div class="diploSection"><h4>Verträge</h4>${rel.treaties.length ? rel.treaties.map(t => `<span class="treatySeal"><span class="sealDot"></span>${t.label}</span>`).join('') : '<i>Keine Verträge.</i>'}</div>`;
+
+  // §17: aktive Story
+  if (vm.story) {
+    html += `<div class="diploSection storyMini"><b>${vm.story.icon} ${vm.story.title}</b><br>${vm.story.stageText}</div>`;
+  }
+
+  // §7/8/9: jüngste Entwicklungen (Beziehungsgrund + Memory-Zeitleiste in einem,
+  // da die diplomatische Beziehung -- anders als bei Charakteren -- kein
+  // gespeichertes Komponenten-Modell besitzt, siehe getDiplomaticRelationshipViewModel()).
+  html += `<div class="diploSection"><h4>Jüngste Entwicklungen</h4>`;
+  html += rel.memoryTimeline.length
+    ? `<div class="memoryTimeline">${rel.memoryTimeline.map(m => `<div class="memoryEntry"><span class="memYear">${m.year}</span>${m.text}</div>`).join('')}</div>`
+    : '<i>Noch keine bedeutsamen Ereignisse.</i>';
+  html += `</div>`;
+
+  // §19-22: bestehende doDiplomacy()-Aktionen, nur neu nach Kategorie
+  // geordnet (Krieg/Intrigen bleiben bewusst auf der Militär-Seite --
+  // Krieg-Redesign ist explizit nicht Teil dieser Phase).
+  html += `<div class="diploSection"><h4>Verhandeln</h4>
+    <div class="diploActionsGroup">
+      <div class="groupLabel">Freundschaft</div>
+      <button class="btn-ghost" onclick="doDiplomacy('gift','${vm.aiId}')">Geschenk (${CONFIG.diplomacy.giftCost} Taler)</button>
+      <button class="btn-ghost" onclick="doDiplomacy('nonaggr','${vm.aiId}')">Nichtangriffspakt</button>
+      <button class="btn-imperial" onclick="doDiplomacy('alliance','${vm.aiId}')">Bündnis</button>
+      <button class="btn-ghost" onclick="doDiplomacy('marriage','${vm.aiId}')">Dynastische Ehe (${CONFIG.diplomacyExtra.dynasticMarriageCost} Taler)</button>
+      <button class="btn-ghost" onclick="doDiplomacy('hostage','${vm.aiId}')">Geiselaustausch (${CONFIG.diplomacyExtra.hostageExchangeCost} Taler)</button>
+    </div>
+    <div class="diploActionsGroup">
+      <div class="groupLabel">Handel</div>
+      <button class="btn-ghost" onclick="doDiplomacy('trade','${vm.aiId}')">Handelsvertrag</button>
+      <button class="btn-ghost" onclick="doDiplomacy('transit','${vm.aiId}')">Durchmarschrecht (${CONFIG.diplomacyExtra.transitRightsCost} Taler)</button>
+    </div>
+    <div class="diploActionsGroup">
+      <div class="groupLabel">Politik</div>
+      <button class="btn-ghost" onclick="doDiplomacy('guarantee','${vm.aiId}')">Garantie (${CONFIG.diplomacyExtra.guaranteeCost} Taler)</button>
+      <button class="btn-ghost" onclick="doDiplomacy('vassalize','${vm.aiId}')">Vasallisieren</button>
+      <button class="btn-ghost" onclick="doDiplomacy('tribute','${vm.aiId}')">Tribut fordern</button>
+      <button class="btn-ghost" onclick="doDiplomacy('territory','${vm.aiId}')">Gebiet fordern</button>
+      <button class="btn-ghost" onclick="doDiplomacy('peace','${vm.aiId}')">Friedensvertrag</button>
+    </div>
+  </div>`;
+
+  return html;
+}
+
+// §28/29: bestehende Kartenauswahl (selectMapTerritory(), aus 8B) für die
+// Hauptstadt der gewählten Macht wiederverwenden -- keine neue Kartenmechanik,
+// 8C.2 bleibt unangetastet.
+function showDiploOnMap(aiId) {
+  const capitalTerr = TERRITORIES.find(t => t.region === aiId && t.capital);
+  if (capitalTerr) selectMapTerritory(capitalTerr.id);
+  switchPage('reich');
 }
 
 function doDiplomacy(action, aiId) {
