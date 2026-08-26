@@ -640,6 +640,121 @@ console.log('--- Phase 8F: Thread-Icon-Tabelle deckt den echten Typ RELIGIOUS_CO
     ['DORMANT','BUILDING','ACTIVE','CLIMAX','AFTERMATH','RESOLVED'].every(s => !!THREAD_STAGE_TEXT[s]));
 })();
 
+// ============================================================
+// Phase 8G: WAR + BATTLE PRESENTATION -- Regressionstests (§Abschlussbericht U)
+// ============================================================
+
+console.log('--- Phase 8G: Army Card / Enemy Garrison zeigen nur echte Felder ---');
+(function() {
+  const state = newGame({ seed: 950 });
+  const homeTerr = TERRITORIES.find(t => t.region === 'player');
+  state.army.miliz = (state.army.miliz || 0) + 50; // echte Reserve, sonst lehnt deployToTerritory ab
+  const deployResult = deployToTerritory(state, homeTerr.id, 'miliz', 50);
+  check('Testaufbau: Stationierung aus der Reserve gelingt', deployResult.ok === true);
+  const card = getArmyCardViewModel(state, homeTerr.id);
+  check('Army Card: Gesamtstärke entspricht der echten Stationierung', card.total === 50);
+  const rulerFullName = (state.characters[state.rulerId].name + ' ' + (state.characters[state.rulerId].surname || '')).trim();
+  check('Army Card: Kommandant ist real der Herrscher (kein erfundenes Feld)',
+    card.commanderName === rulerFullName);
+  check('Army Card auf fremdem Gebiet liefert null (kein Rateergebnis für Nicht-Spieler-Territorien)',
+    getArmyCardViewModel(state, TERRITORIES.find(t => t.region === 'ai1').id) === null);
+
+  const aiTerr = TERRITORIES.find(t => t.region === 'ai1');
+  const garrison = getEnemyGarrisonViewModel(state, aiTerr.id);
+  check('Enemy Garrison: nur gerundete, bereits vorhandene terr.garrison (keine neue Unschärfe)',
+    garrison.estimatedGarrison === Math.round(state.territories[aiTerr.id].garrison));
+  check('Enemy Garrison: Kommandantenname ohne Regionssuffix "(Nachbar)"',
+    garrison.commanderName === null || garrison.commanderName.indexOf('(') === -1);
+})();
+
+console.log('--- Phase 8G: Marschroute nur bei echter Adjazenz (keine neue Pfadfindung) ---');
+(function() {
+  const p = TERRITORIES.find(t => t.region === 'player');
+  const adjId = p.adjacent[0];
+  const route = getMarchRouteViewModel(p.id, adjId);
+  check('gültige Adjazenz liefert {fromId,toId}', route && route.fromId === p.id && route.toId === adjId);
+  check('nicht-adjazente Gebiete liefern null', getMarchRouteViewModel('p_hauptstadt', 'b_west') === null);
+  check('identisches Gebiet liefert null', getMarchRouteViewModel(p.id, p.id) === null);
+})();
+
+console.log('--- Phase 8G: War Card / Active Wars erfinden keine Warscore-Mechanik ---');
+(function() {
+  const state = newGame({ seed: 951 });
+  check('vor jedem Krieg liefert getActiveWarsViewModel []', getActiveWarsViewModel(state).length === 0);
+  declareWar(state, 'ai1');
+  const card = getWarCardViewModel(state, 'ai1');
+  check('War Card: sinceYear kommt aus der echten WAR_DECLARED-Memory', card.sinceYear === state.year);
+  check('War Card: Gebietszahlen sind real (Summe stimmt)', card.ownedByPlayer + card.ownedByEnemy === card.totalTerritories);
+  check('War Card: keine erfundene Warscore-Zahl im ViewModel', !('warScore' in card) && !('score' in card));
+  check('War Card ohne aktiven Krieg liefert null', getWarCardViewModel(state, 'ai2') === null);
+})();
+
+console.log('--- Phase 8G: Battle Presentation / Unit / Phase ViewModels (voll simulierte Schlacht) ---');
+(function() {
+  const state = newGame({ seed: 952 });
+  const armyA = buildPlayerBattleArmy(state, {});
+  const armyB = buildAiBattleArmy(state, 'ai1', 1.0, {});
+  armyA.formation = 'defensiv'; armyA.tactic = 'verteidigen';
+  const bs = createBattle(armyA, armyB, 'huegel', 'klar', 54321);
+  const preStart = getBattlePresentationViewModel(bs);
+  check('vor jedem Schritt ist keine Phase "current" ausser Aufstellung nach erstem advance', preStart.phase[0].id === 'aufstellung');
+  let guard = 0;
+  while (!bs.finished && guard < 200) {
+    if (bs.pendingDecision) advanceBattle(bs, aiDecisionPolicy(bs, bs.pendingDecision));
+    else advanceBattle(bs);
+    guard++;
+  }
+  const pres = getBattlePresentationViewModel(bs);
+  check('nach Schlachtende ist "entscheidung" die aktuelle Phase', pres.phase[5].id === 'entscheidung' && pres.phase[5].current === true);
+  check('alle vorherigen Phasen sind als "done" markiert', pres.phase.slice(0, 5).every(p => p.done === true));
+  check('Feldbericht (log) ist nicht leer und enthält Zeitstempel', pres.log.length > 0 && !!pres.log[0].time);
+  check('Unit-ViewModel liefert nur reale Felder (icon/label aus UNIT_TYPES)',
+    pres.armyA.units.every(u => typeof u.soldiers === 'number' && typeof u.morale === 'number' && !!u.label));
+})();
+
+console.log('--- Phase 8G: Battle Result Title -- reine Umbenennung der echten 7 outcome-Werte ---');
+(function() {
+  const outcomes = ['siegA','siegB','knapperSieg','vernichtendeNiederlageA','vernichtendeNiederlageB','geordneterRueckzugA','geordneterRueckzugB'];
+  const seen = new Set();
+  for (const o of outcomes) {
+    for (const won of [true, false]) {
+      const title = getBattleResultTitle(o, won);
+      check('Titel für ' + o + '/playerWon=' + won + ' ist ein nicht-leerer String', typeof title === 'string' && title.length > 0);
+      seen.add(title);
+    }
+  }
+  check('GLORREICHER SIEG erscheint bei vernichtender Niederlage des Gegners (Spielerperspektive)', seen.has('GLORREICHER SIEG'));
+  check('SCHWERE NIEDERLAGE erscheint bei vernichtender Niederlage des Spielers', seen.has('SCHWERE NIEDERLAGE'));
+  check('KNAPPER SIEG / KNAPPE NIEDERLAGE sind beide vorhanden', seen.has('KNAPPER SIEG') && seen.has('KNAPPE NIEDERLAGE'));
+})();
+
+console.log('--- Phase 8G: Chronik-Hinweis nur bei echter, bereits erzeugter Memory ---');
+(function() {
+  const state = newGame({ seed: 953 });
+  check('vor jeder Schlacht kein Chronik-Hinweis', getBattleChronicleHintViewModel(state, 'ai1') === null);
+  const armyA = buildPlayerBattleArmy(state, {});
+  const armyB = buildAiBattleArmy(state, 'ai1', 1.0, {});
+  armyA.formation = 'aggressiv'; armyA.tactic = 'frontalangriff';
+  const bs = simulateBattle(armyA, armyB, 'ebene', 'klar', 5551);
+  applyBattleResultToGame(state, 'ai1', bs);
+  const hint = getBattleChronicleHintViewModel(state, 'ai1');
+  check('nach echter Schlachtanwendung ist der Hinweis entweder null oder {worthy:true} (nie erfunden)',
+    hint === null || (hint.worthy === true && Object.keys(hint).length === 1));
+})();
+
+console.log('--- Phase 8G: RNG-Neutralitaet aller neuen ViewModels (§66/69/70) ---');
+(function() {
+  const state = newGame({ seed: 954 });
+  declareWar(state, 'ai1');
+  const before = __rngCalls;
+  getActiveWarsViewModel(state);
+  for (const t of TERRITORIES) { getArmyCardViewModel(state, t.id); getEnemyGarrisonViewModel(state, t.id); }
+  getMarchRouteViewModel('p_hauptstadt', 'm_sued');
+  getBattleChronicleHintViewModel(state, 'ai1');
+  for (const o of ['siegA','knapperSieg']) getBattleResultTitle(o, true);
+  check('kein einziger rnd()-Aufruf durch die Phase-8G-ViewModels', __rngCalls === before);
+})();
+
 console.log('');
 if (failures > 0) { console.log(failures + ' Test(s) fehlgeschlagen.'); process.exit(1); }
 console.log('Alle UI-ViewModel-Tests bestanden.');
