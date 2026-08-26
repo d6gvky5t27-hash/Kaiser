@@ -546,6 +546,100 @@ console.log('--- Phase 8E: fremder Herrscher hat keine Loyalitaet/persoenliche B
   check('Character Detail zeigt keine Beziehungs-Aufschlüsselung für einen fremden Herrscher', detail.relationship === null);
 })();
 
+// ---------- §Phase-8F: Events + Story Threads ----------
+console.log('--- Phase 8F: Herrschertod + Erbfolge als CRITICAL pendingEvent ---');
+(function() {
+  const state = newGame({ seed: 300 });
+  const ruler = state.characters[state.rulerId];
+  const oldRulerId = state.rulerId;
+  const heirId = nextCharId();
+  const heir = createCharacter('m', 28, ruler.surname);
+  heir.parentId = state.rulerId;
+  state.characters[heirId] = heir;
+  ruler.childrenIds.push(heirId);
+  ruler.age = 90; ruler.health = 1;
+  let tries = 0;
+  while (!state.pendingEvent && tries < 3000) { updateDynasty(state); tries++; }
+  check('Tod bei konstant kritischer Gesundheit tritt irgendwann ein', !!state.pendingEvent);
+  if (state.pendingEvent) {
+    check('pendingEvent stammt aus der Erbfolge (source SUCCESSION)', state.pendingEvent.source === 'SUCCESSION');
+    const vm = getEventPresentationViewModel(state, state.pendingEvent);
+    check('Severity ist CRITICAL', vm.severity.level === 'CRITICAL');
+    check('beide Figuren (alter + neuer Herrscher) sind Teilnehmer', vm.participants.length === 2 &&
+      vm.participants.some(p => p.id === oldRulerId) && vm.participants.some(p => p.id === heirId));
+    check('alter Herrscher wird als verstorben markiert gezeigt', vm.participants.find(p => p.id === oldRulerId).alive === false);
+  }
+})();
+
+console.log('--- Phase 8F: Event-Hierarchie (Severity) nur aus echten Signalen ---');
+(function() {
+  const state = newGame({ seed: 301 });
+  check('normales Random-Event ohne Disaster-Flag ist MINOR', getEventSeverity(state, EVENTS.find(e => e.id === 'gute_ernte')).level === 'MINOR');
+  check('Seuche (echtes disastersCount-Flag) ist IMPORTANT', getEventSeverity(state, EVENTS.find(e => e.id === 'seuche')).level === 'IMPORTANT');
+  const fakeChainEvent = { source: 'EVENT_CHAIN', chainId: 'ec_missing' };
+  check('Chain-Entscheidung ist mindestens MAJOR', getEventSeverity(state, fakeChainEvent).level === 'MAJOR');
+})();
+
+console.log('--- Phase 8F: Illustrationskategorie nur aus echten Chain-Templates (§62) ---');
+(function() {
+  const state = newGame({ seed: 302 });
+  const ruler = state.characters[state.rulerId];
+  const rivalId = nextCharId();
+  const rival = createCharacter('m', 30, ruler.surname);
+  rival.parentId = state.rulerId;
+  state.characters[rivalId] = rival;
+  ruler.childrenIds.push(rivalId);
+  setClaim(rival, 'player', 'strong', 'succession_passed_over');
+  addRivalry(state, rivalId, state.rulerId);
+  const check1 = canStartRisingRivalChain(state);
+  check('Testaufbau: rising_rival ist eligible', check1.eligible);
+  if (check1.eligible) {
+    const chain = startEventChain(state, 'rising_rival', check1.payload, 'test');
+    const fakeEvent = { source: 'EVENT_CHAIN', chainId: chain.id };
+    check('Kategorie wird über die echte Chain-templateId aufgelöst (nicht über ein nicht vorhandenes ev.templateId)',
+      getEventCategory(state, fakeEvent) === 'rivalry');
+  }
+})();
+
+console.log('--- Phase 8F: Entscheidungskarten erfinden keine Folgen (§26/27) ---');
+(function() {
+  const opt1 = { label: 'Getreide importieren (-800 Taler)', apply: () => {} };
+  const card1 = getDecisionCardViewModel(opt1, 0);
+  check('Kosten werden aus dem echten Label extrahiert, nicht neu erfunden', card1.costText === '-800 Taler');
+  check('Titel ist der Label-Text ohne die Kostenklammer', card1.title === 'Getreide importieren');
+  const opt2 = { label: 'Fordern Sie ihn als Berater an (Amt anbieten).', outcome: 'office_offered', apply: () => {} };
+  const card2 = getDecisionCardViewModel(opt2, 1);
+  check('Ohne echten Kosten-Hinweis im Label wird keine Kostenzeile erfunden', card2.costText === null);
+  check('Titel bleibt der volle, echte Label-Text', card2.title === opt2.label);
+})();
+
+console.log('--- Phase 8F: Story View zeigt keine Debug-Werte, max. 4 Threads ---');
+(function() {
+  const state = newGame({ seed: 303 });
+  const vm = getStoryViewViewModel(state);
+  check('leeres Reich liefert hasAny=false statt erfundenem Drama (§44)', vm.hasAny === false && vm.activeThreads.length === 0);
+  const serialized = JSON.stringify(vm);
+  check('keine Tension-/Momentum-/Importance-Rohwerte im Story-View-ViewModel', !/tension|momentum|"importance"/i.test(serialized));
+})();
+
+console.log('--- Phase 8F: RNG-Neutralitaet der Event-/Story-ViewModels ---');
+(function() {
+  const state = newGame({ seed: 304 });
+  for (let y = 0; y < 8; y++) { for (let m = 0; m < 12; m++) advanceMonth(state); resolvePendingEventWithPolicy(state, 'FIRST_OPTION'); }
+  const before = __rngCalls;
+  getStoryViewViewModel(state);
+  for (const ev of EVENTS) { getEventSeverity(state, ev); getEventCategory(state, ev); }
+  if (state.pendingEvent) getEventPresentationViewModel(state, state.pendingEvent);
+  check('kein einziger rnd()-Aufruf durch die Phase-8F-ViewModels', __rngCalls === before);
+})();
+
+console.log('--- Phase 8F: Thread-Icon-Tabelle deckt den echten Typ RELIGIOUS_CONFLICT ab (Tippfehler-Fix) ---');
+(function() {
+  check('THREAD_ICON_BY_TYPE kennt RELIGIOUS_CONFLICT (den echten Typ aus STORY_THREAD_TYPES)', THREAD_ICON_BY_TYPE.RELIGIOUS_CONFLICT === '✝');
+  check('alle 6 Thread-Status haben natuerlichsprachlichen Text (§39)',
+    ['DORMANT','BUILDING','ACTIVE','CLIMAX','AFTERMATH','RESOLVED'].every(s => !!THREAD_STAGE_TEXT[s]));
+})();
+
 console.log('');
 if (failures > 0) { console.log(failures + ' Test(s) fehlgeschlagen.'); process.exit(1); }
 console.log('Alle UI-ViewModel-Tests bestanden.');
