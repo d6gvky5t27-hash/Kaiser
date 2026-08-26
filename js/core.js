@@ -284,6 +284,28 @@ function newGame(options) {
   state.rulerId = id;
   snapshotRulerEraStart(state, id); // §Phase-7-Punkt 74: Ausgangswerte für die spätere Regentschaftszusammenfassung
 
+  // §Phase-8E-Punkt 10/11: die drei diplomatisch erreichbaren KI-Regionen
+  // (state.diplomacy) bekommen jetzt jeweils EINEN echten Character-Core-
+  // Charakter als Herrscher (region.rulerId) -- über dieselbe createCharacter()
+  // wie jeder andere Charakter im Spiel, kein zweites Modell. Bewusst OHNE
+  // Familie (parentId/spouseId/childrenIds bleiben leer) -- das wäre
+  // erfundene Genealogie; ein eigenständiger Charakter ist alles, was
+  // Diplomatie braucht (Portrait/Traits/Skills/Detailansicht). Bleibt
+  // dadurch automatisch außerhalb jeder bestehenden, an die Spielerdynastie
+  // gebundenen Auswahllogik (getImportantCharacterIds/Event-Chain-/Story-
+  // Thread-Kandidaten sind alle über echte Verwandtschaft/Claims/Memories
+  // zum Spieler-Herrscher gated, siehe Analyse vor dieser Phase).
+  for (const aiId in state.diplomacy) {
+    const region = state.regions[aiId];
+    const baseHouseName = region.name.replace(/\s*\(.*\)$/, "");
+    const fGender = rnd() < 0.5 ? "m" : "f";
+    const fAge = 28 + Math.floor(rnd() * 32);
+    const foreignRuler = createCharacter(fGender, fAge, "von " + baseHouseName);
+    const fid = nextCharId();
+    state.characters[fid] = foreignRuler;
+    region.rulerId = fid;
+  }
+
   addChronicle(state, `Im Jahre 1500 übernahm ${ruler.name} ${dynastyName} die Herrschaft über ${state.regions.player.name}.`);
   initTerritories(state); // Kriegskarte (§Original-Vertiefung): Gebietsbesitz/Garnisonen initialisieren
   return state;

@@ -398,4 +398,46 @@ function rollWarAllies(state, targetId) {
   return results;
 }
 
+// ---------- Phase 8E: fremde Herrscher (§10/§50) ----------
+// Altern und Gesundheitsverfall laufen für region.rulerId bereits automatisch
+// über die bestehende, ungefiltert alle state.characters durchlaufende
+// Alterungsschleife in updateDynasty() (js/population-dynasty.js) mit --
+// der einzige fehlende Baustein ist ein Tod. Nutzt exakt dieselbe
+// rollDeathChance()-Formel wie checkAdvisorDeaths() (js/military.js), kein
+// zweites Todesmodell. Kein eigenes Erbfolgesystem für fremde Höfe (das
+// wäre eine neue Diplomatiemechanik, §2 ausdrücklich untersagt) -- ein neuer,
+// unabhängig erzeugter Herrscher genügt, damit ein Herrscherwechsel im
+// Ausland überhaupt sichtbar wird (§50).
+function checkForeignRulerDeaths(state) {
+  for (const aiId in state.diplomacy) {
+    const region = state.regions[aiId];
+    if (!region || !region.rulerId) continue;
+    const ruler = state.characters[region.rulerId];
+    if (!ruler || !ruler.alive) continue;
+    if (rnd() < rollDeathChance(ruler)) {
+      ruler.alive = false;
+      const baseHouseName = region.name.replace(/\s*\(.*\)$/, "");
+      const rulerTitle = ruler.gender === "m" ? "Herrscher" : "Herrscherin";
+      const deathDesc = `${ruler.name} ${ruler.surname}, ${rulerTitle} von ${baseHouseName}, ist verstorben.`;
+      addChronicle(state, deathDesc);
+      recordWorldEvent(state, {
+        type: "FOREIGN_RULER_DIED", actorIds: [region.rulerId], regionIds: [aiId],
+        emotionalWeight: -15, metadata: { age: ruler.age },
+        description: deathDesc,
+      });
+      const successorId = nextCharId();
+      const successor = createCharacter(rnd() < 0.5 ? "m" : "f", 22 + Math.floor(rnd() * 25), "von " + baseHouseName);
+      state.characters[successorId] = successor;
+      region.rulerId = successorId;
+      const succDesc = `${successor.name} ${successor.surname} besteigt den Thron von ${baseHouseName}.`;
+      addChronicle(state, succDesc);
+      recordWorldEvent(state, {
+        type: "FOREIGN_RULER_SUCCEEDED", actorIds: [successorId], regionIds: [aiId],
+        emotionalWeight: 10,
+        description: succDesc,
+      });
+    }
+  }
+}
+
 // ---------- Technologiesystem (§28) ----------

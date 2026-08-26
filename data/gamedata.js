@@ -1851,6 +1851,14 @@ const MEMORY_TYPES = {
   // ein Chronik-String, keine Memory — ohne Memory hätte Dynasty
   // Chronicle 2.0 dieses zentrale Schlussereignis nicht finden können.
   DYNASTY_ENDED:             { importance: 100, decayRate: 0, direction: "none", tags: ["dynasty", "ending"] },
+  // --- neu in Phase 8E (§10/§50): die drei diplomatisch erreichbaren
+  // KI-Regionen bekommen jetzt einen echten Herrscher-Charakter
+  // (state.regions[aiId].rulerId, siehe js/core.js/js/diplomacy.js) statt
+  // gar keinem — ohne diese zwei Typen wäre sein Tod/seine Nachfolge für
+  // die diplomatische Memory-Timeline unsichtbar geblieben, genau das
+  // gleiche Argument wie DYNASTY_ENDED in Phase 7.
+  FOREIGN_RULER_DIED:        { importance: 55, decayRate: 0.02, direction: "none", tags: ["diplomacy", "death"] },
+  FOREIGN_RULER_SUCCEEDED:   { importance: 45, decayRate: 0.02, direction: "none", tags: ["diplomacy", "succession"] },
 };
 
 // Event-System: TRIGGER/BEDINGUNGEN/TEXT/ENTSCHEIDUNGEN/KONSEQUENZEN (§38)

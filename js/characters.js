@@ -209,4 +209,5 @@ function updateCharacterCore(state) {
   }
   updateRivalries(state);
   checkAdvisorDeaths(state);
+  checkForeignRulerDeaths(state); // §Phase-8E: siehe js/diplomacy.js
 }
