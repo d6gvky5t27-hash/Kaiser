@@ -3411,3 +3411,82 @@ sind `newGame()` (3 zusätzliche Charaktere) und
 `checkForeignRulerDeaths()` bei tatsächlichem Herrschertod — beides
 reine Weltzustands-Erzeugung über bereits bestehende, geprüfte
 Funktionen, keine neuen `rnd()`-Aufrufe in irgendeinem ViewModel.
+
+## 2026-08-26 – Phase 8F (KAISERREICH-Zwischenprompt): Events + Story Threads Redesign
+
+"Aus Textboxen werden historische Szenen und Entscheidungen." Die
+Mechanik (`js/event-chains.js`/`js/story-threads.js`/
+`js/drama-director.js`, `resolveEvent()`s `apply(r, s)`-Aufruf) bleibt
+komplett unverändert — jede Option führt exakt dieselbe echte Funktion
+aus wie vorher.
+
+**Event-Hierarchie** (MINOR/IMPORTANT/MAJOR/CRITICAL) rein aus echten
+Signalen: die bereits bestehenden `disastersCount`-markierten Events
+(Seuche/Rebellion/Großfeuer) sind IMPORTANT, jede Event-Chain-
+Entscheidung ist mindestens MAJOR (CRITICAL bei `status === "CLIMAX"`
+oder `importance >= 70`), alles andere MINOR — keine erfundene
+Wichtigkeits-Zahl.
+
+**Deterministisches Illustrationssystem:** `renderEventIllustration()`
+baut "Graphic Novel Panel"-Szenen aus Kategorie + echten Beteiligten,
+Hash aus Kategorie/Charakter-IDs/Jahr statt `rnd()`. 14 Kategorien mit
+Domäne/Akzentfarbe/Symbol auf bestehende Design-Tokens gemappt; die 10
+Event-Chain-Templates hatten dafür bereits ein reales `category`-Feld,
+die 24 Random-Events wurden von Hand nach bestem thematischem Fit
+zugeordnet, ohne sauberen Treffer bewusst der generische Rahmen statt
+einer erzwungenen Kategorie. Beteiligte Charaktere erscheinen als
+Portraitbüste — dieselbe `buildPortraitSvg()` aus 8D, keine zweite
+Portraitlogik.
+
+**Bug gefunden und behoben:** `THREAD_ICON_BY_TYPE` (8B) hatte den
+Schlüssel `RELIGIOUS_TENSION` statt des echten Thread-Typs
+`RELIGIOUS_CONFLICT` — ein Tippfehler seit Phase 6, der jeden
+entsprechenden Thread stumm auf das Fallback-Symbol zurückfallen ließ.
+`THREAD_STAGE_TEXT` bekam außerdem die fehlenden Status DORMANT/
+RESOLVED ergänzt.
+
+**Event-Modal neu aufgebaut:** Kategorie+Jahr-Kopfzeile; bei MAJOR/
+CRITICAL Illustration + Titel/Story/Beteiligte (nur story-relevante
+Fakten, keine Skills) + Story-Kontext (Thread-Titel, natürlichsprachlicher
+Stand, max. 4 echte Timeline-Beats, Vorgeschichte nur bei echter
+Origin-Memory); bei MINOR/IMPORTANT kompakt ohne Illustration.
+Entscheidungskarten statt Buttons: Optionen kennen nur label/outcome/
+eine Blackbox-effect-Funktion — keine deklarierten Folgen, daher keine
+Fake-Vorhersagen. Ein "(-NNN Taler)"-Hinweis, der bereits wörtlich im
+echten Label steht, wird als Kosten-Zeile herausgelöst (dieselbe
+Textinfo, nur anders dargestellt); keine Gut/Böse-Farblogik, da keine
+Ton-Tags im Datenmodell existieren.
+
+**Herrschertod + Erbfolge** waren bisher unsichtbar (nur eine Chronik-
+Zeile) — `handleSuccession()` queued jetzt einen CRITICAL `pendingEvent`
+mit altem (desaturiert, † markiert) und neuem Herrscher als Beteiligte,
+reine Bestätigung ohne echte Entscheidung; der Ablauf selbst bleibt
+unverändert. Geburt-/Heirat-Modals bekamen Portraits ergänzt, Funktionen
+unverändert.
+
+**Neue Story-Ansicht:** `#storyViewModal`, erreichbar über die jetzt
+klickbare/tastaturbedienbare Story Card aus 8B. Zeigt max. 4 relevante
+Threads mit natürlichsprachlichem Stand, Beteiligten, letztem Ereignis,
+kompakter Historie, plus einen kurzen Link zu kürzlich abgeschlossenen
+Geschichten — keine Tension-/Momentum-/Director-Zahlen.
+
+**Getestet:** komplette bestehende Node-Testsuite weiterhin grün.
+`tests/ui_viewmodel_test.js` um 21 neue Prüfungen ergänzt (Herrschertod/
+Erbfolge als CRITICAL mit beiden Figuren, Severity nur aus echten
+Signalen, Kategorie-Auflösung über die echte Chain, Entscheidungskarten
+erfinden keine Folgen, Story View ohne Debug-Werte, RNG-Neutralität,
+der Icon-Tippfehler-Fix). Playwright: alle vier Severity-Stufen
+beobachtet und geprüft, Chain-Event mit korrektem Titel/Beteiligten/
+Story/Optionen, Sondertest Succession (beide Figuren korrekt),
+Sondertest Rivale, Hungerkrise, Character Detail aus dem Event öffnen,
+Story View öffnen, Entscheidungskarten klickbar und tastaturbedienbar,
+Vermählung/Geburt mit Portraits, Save/Load mit aktivem Event,
+mehrjährige Simulation ohne Laufzeitfehler. Responsive bei allen drei
+Pflichtauflösungen geprüft.
+
+**Bewusst NICHT Teil dieser Teilphase:** Krieg/Battle-UI-Redesign,
+Chronik-Buchansicht, Kaiserwahl 2.0, neue Event Chains, veränderte
+Story-/Drama-Director-Mechanik (weiterhin 8G/8H). Bundle-Größe 756.621
+→ 785.147 Bytes (+3,8 %). Battle Engine unverändert, Kartenwerk aus
+8C.2 unverändert, keine neue SAVE_VERSION, 0 neue `rnd()`-Aufrufe in
+irgendeinem ViewModel.

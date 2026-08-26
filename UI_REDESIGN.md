@@ -923,7 +923,117 @@ tatsächlichem Herrschertod — beides reine Weltzustands-Erzeugung über
 bereits bestehende, geprüfte Funktionen, keine neuen `rnd()`-Aufrufe in
 irgendeinem ViewModel (testgestützt bestätigt).
 
-## 10. Screen Inventory (Status nach Phase 8A + 8B + 8C + 8C.1 + 8C.2 + 8D + 8E)
+## 10. Phase 8F: Events + Story Threads Redesign
+
+"Aus Textboxen werden historische Szenen und Entscheidungen." Die
+zugrundeliegende Mechanik (`js/event-chains.js`/`js/story-threads.js`/
+`js/drama-director.js`, das alte `resolveEvent()`s `apply(r, s)`-Aufruf)
+bleibt vollständig unverändert — jede Option führt exakt dieselbe echte
+Funktion aus wie vorher, keine Fake-Vorhersagen, keine neue Formel.
+
+**Event-Hierarchie (§2), rein aus echten Signalen abgeleitet:**
+MINOR (Standard) / IMPORTANT (die drei bereits bestehenden
+`disastersCount`-markierten Random-Events: Seuche/Rebellion/Großfeuer) /
+MAJOR (jede Event-Chain-Entscheidung — laut Spieldesign seit Phase 5/6
+grundsätzlich bedeutender als ein Flavour-Event) / CRITICAL (Chain-
+Entscheidung in einem Thread mit `status === "CLIMAX"` oder
+`importance >= 70`, sowie der neue Herrschertod/Erbfolge-Moment). Keine
+erfundene Wichtigkeits-Zahl — die einzigen neuen Tabellen
+(`DISASTER_EVENT_IDS`, die Schwellen) sind reine UI-Klassifikation.
+
+**Illustrationssystem (§7-12/56-59):** `renderEventIllustration()` in
+index.html baut deterministische "Graphic Novel Panel"-Szenen aus
+Kategorie + echten Beteiligten — Hash aus Kategorie/Charakter-IDs/Jahr
+(`hashStringToInt`), kein `rnd()`. 14 Kategorien
+(`EVENT_CATEGORY_INFO`) mit je einer Domäne/Akzentfarbe/Symbol, auf
+bereits vorhandene Design-Tokens gemappt (`--accent` Burgunder für
+Dynastie/Hof, `--ochre` für Wirtschaft, `--blue` für Diplomatie,
+`--purple` [Bronze] für Glaube, `--red-muted` für Krieg). Bestehende
+Eventtypen wurden abgebildet: die 10 Event-Chain-Templates tragen
+bereits ein reales `category`-Feld (`js/event-chains.js`), die 24
+Random-Events wurden von Hand nach bestem thematischem Fit zugeordnet
+(§8/9) — ohne sauberen Treffer bleibt es bewusst beim generischen
+Rahmen (§56) statt einer erzwungenen Kategorie. Beteiligte Charaktere
+erscheinen als Portraitbüste in der Szene — exakt dieselbe
+`buildPortraitSvg()` aus 8D, keine zweite Portraitlogik (§12).
+
+**Ein realer, während der Umsetzung gefundener Bug behoben:**
+`THREAD_ICON_BY_TYPE` (aus 8B) hatte den Schlüssel `RELIGIOUS_TENSION`
+statt des echten Thread-Typs `RELIGIOUS_CONFLICT` (siehe
+`STORY_THREAD_TYPES`/`CHAIN_THREAD_TYPE` in `js/story-threads.js`) — ein
+Tippfehler, der seit Einführung des Typs in Phase 6 jeden
+RELIGIOUS_CONFLICT-Thread stumm auf das "⚜"-Fallback-Symbol
+zurückfallen ließ. `THREAD_STAGE_TEXT` bekam außerdem die beiden
+fehlenden Status DORMANT/RESOLVED ergänzt (§39 verlangt alle 6).
+
+**Event-Modal neu aufgebaut (§6):** Kategorie+Jahr-Kopfzeile, bei
+MAJOR/CRITICAL eine Illustrationsspalte + Titel/Story/Beteiligte
+(`getCharacterCardViewModel`, nur story-relevante Fakten statt Skills,
+§13), bei MINOR/IMPORTANT kompakt ohne Illustration (§3). Story-Kontext
+(§18-21) nur wenn die Entscheidung wirklich zu einer Chain/einem Thread
+gehört: Thread-Titel, natürlichsprachlicher Stand
+(`THREAD_STAGE_TEXT`), max. 4 Timeline-Beats aus der echten
+`chain.history`, eine "VORGESCHICHTE"-Zeile nur wenn eine echte
+`chain.originatingMemoryIds`-Memory existiert.
+
+**Entscheidungskarten statt Buttons (§23/24/26/27):** Optionen kennen
+nur `label`/`outcome`/eine Blackbox-`effect`-Funktion — keine
+deklarierten Folgen. Ein "(-NNN Taler)"-Hinweis, der bereits wörtlich im
+echten Label steht, wird als eigene Kosten-Zeile herausgelöst (dieselbe
+Textinfo, nur anders dargestellt) — keine Fake-Vorhersagen, keine
+Gut/Böse-Farblogik (§29), da keine Ton-Tags (CONCILIATORY/PRAGMATIC/...)
+im Datenmodell existieren (§28 "nur falls Tags vorhanden" — gibt es
+nicht, daher konsequent weggelassen statt erfunden).
+
+**Herrschertod + Erbfolge (§47-49/73):** bisher unsichtbar (nur eine
+Chronik-Zeile) — `handleSuccession()` (`js/population-dynasty.js`)
+queued jetzt am Ende einen CRITICAL `pendingEvent` (`source:
+"SUCCESSION"`) mit dem alten (desaturiert, † markiert) und neuen
+Herrscher als Beteiligte, reine Bestätigung ohne echte Entscheidung
+(§48: der bestehende Tod-/Erbfolge-Ablauf selbst bleibt unverändert,
+nur ein bereits abgeschlossenes Ergebnis wird sichtbar gemacht).
+Garantiert konfliktfrei mit anderen Event-Quellen desselben Jahres, da
+`updateDynasty()` vor jeder anderen Event-Quelle in `advanceYear()`
+läuft und `pendingEvent` zu Jahresbeginn immer leer ist.
+
+**Geburt/Vermählung (§50/51):** die bestehenden `birthModal`/
+`marriageModal` bekamen Portraits ergänzt (Kind bzw. Herrscher+Gemahl(in)
+mit Ring-Siegel) — Funktionen/Ablauf (`confirmBirthName`/
+`closeMarriageAnnouncement`) komplett unverändert.
+
+**Story-Ansicht (§35-42, neu):** `#storyViewModal`, erreichbar über die
+jetzt klickbare/tastaturbedienbare Story Card aus 8B. Zeigt max. 4
+aktuell relevante Threads (DORMANT ausgeschlossen, wie schon die
+bestehende `getPrimaryStoryViewModel`-Filterung) mit natürlichsprachlichem
+Stand, Beteiligten, letztem Ereignis, kompakter Historie, sowie einen
+kurzen Link zu kürzlich abgeschlossenen Geschichten (§41) — keine
+Tension-/Momentum-/Director-Zahlen (§37/93, bleiben im Debug-Panel).
+
+**Getestet:** komplette bestehende Node-Testsuite weiterhin grün.
+`tests/ui_viewmodel_test.js` um 21 neue Prüfungen ergänzt (Herrschertod/
+Erbfolge als CRITICAL mit beiden Figuren, Severity nur aus echten
+Signalen, Kategorie-Auflösung über die echte Chain statt eines nicht
+existierenden Felds, Entscheidungskarten erfinden keine Folgen,
+Story View ohne Debug-Werte, RNG-Neutralität, der Icon-Tippfehler-Fix).
+Playwright: MINOR/IMPORTANT/MAJOR/CRITICAL-Events beobachtet und
+geprüft, Chain-Event mit korrektem Titel/Beteiligten/Story/Optionen,
+Sondertest Succession (beide Figuren korrekt), Sondertest Rivale (echte
+Badges, echter Story-Kontext), Hungerkrise, Character Detail aus dem
+Event öffnen, Story Context/View öffnen, Entscheidungskarten klickbar
+und tastaturbedienbar (Enter), Vermählung/Geburt mit Portraits,
+Save/Load mit aktivem Event (Rundlauf identisch), mehrjährige
+Simulation ohne Laufzeitfehler. Responsive bei 1920×1080/1440×900/
+1366×768 geprüft (Illustration verkleinert sich, Optionen stapeln sich,
+Titel/Optionen bleiben sichtbar, nur der Inhaltsbereich scrollt intern).
+
+**Bewusst NICHT Teil dieser Teilphase:** Krieg/Battle-UI-Redesign,
+Chronik-Buchansicht, Kaiserwahl 2.0, neue Event Chains, veränderte
+Story-/Drama-Director-Mechanik (weiterhin 8G/8H). Bundle-Größe 756.621
+→ 785.147 Bytes (+3,8 %). Battle Engine unverändert, Kartenwerk aus 8C.2
+unverändert, keine neue SAVE_VERSION, 0 neue `rnd()`-Aufrufe in
+irgendeinem ViewModel.
+
+## 11. Screen Inventory (Status nach Phase 8A + 8B + 8C + 8C.1 + 8C.2 + 8D + 8E + 8F)
 
 | Screen/Bereich | Status | Anmerkung |
 |---|---|---|
@@ -940,14 +1050,16 @@ irgendeinem ViewModel (testgestützt bestätigt).
 | Diplomatie-Panel (Seiteninhalt) | **REDESIGNED** | 8E — Machtkarten-Liste + Detailansicht statt Beziehungstabelle, siehe Abschnitt 9 |
 | Militär-Panel (Seiteninhalt) | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | weiterhin über die Navigation erreichbar, Informationsarchitektur unverändert (das ist 8G) |
 | Gebäude/Land/Schulden-Panels | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | unverändert, kein Baufortschritt (keine Datenbasis, §Abschnitt 5) |
-| Event-/Geburt-/Heirat-/Kassenbuch-Modals | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | kein Illustrationsbereich (§56-58), das ist 8F |
+| Event-Modal (Titel/Illustration/Story/Beteiligte/Entscheidungskarten) | **REDESIGNED** | 8F — Event-Hierarchie, deterministisches Illustrationssystem, Story-Kontext, siehe Abschnitt 10 |
+| Geburt-/Heirat-Modals | **REDESIGNED** | 8F — Portraits ergänzt (Kind bzw. Herrscher+Gemahl(in) mit Ring-Siegel), Ablauf unverändert |
+| Kassenbuch-Modal | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | unverändert, kein Scope dieser Phase |
 | Kampf-Overlay | **REDESIGNED** (Tokens) | Battle Engine unverändert (§61 bestätigt), Strukturaufwertung ist 8G |
 | Kriegskarte-Overlay | **REDESIGNED** (Tokens) | Kartenstil (handgezeichnete Landkarte) weiterhin nicht vertieft, bleibt als reines Kriegs-Overlay bestehen |
 | Welt-/Regionskarte als Hauptbildschirm-Zentrum | **REDESIGNED** | 8B (Layout/HUD/Kontextpanel) + 8C.1 (Node-Grafik → politische Flächenkarte) + 8C.2 (Voronoi → handgestaltete Landschaftskarte mit Fluss/Wildnis, Abschnitt 7) |
 | Charakterportraits/Placeholder-System | **REDESIGNED** | 8D — deterministisches Inline-SVG-Bust-System (Hash statt `rnd()`), rangbasierte Rahmen, siehe Abschnitt 8. Topbar-Portrait bleibt bewusst der einfache Emoji-Platzhalter (kein Scope dieser Phase) |
 | Character Card / Character Detail | **REDESIGNED** | 8D — neue `#characterDetailModal`, Skills als Grid, Traits als Badges mit echtem Effekttext, echte Beziehungs-/Loyalitäts-Aufschlüsselung, Erinnerungs-Zeitleiste, siehe Abschnitt 8 |
 | Dynastie-/Stammbaum-Ansicht | **REDESIGNED** | 8D — neuer `#dynastiePage`, genealogische Generationenreihen statt Node-Graph, Thronfolgeliste, frühere Herrscher, siehe Abschnitt 8 |
-| Story-Thread-Spieler-UI | **REDESIGNED** (Story Card, Kurzform) / **LEGACY** (volle Ansicht) | 8B liefert nur die kompakte Fokus-Karte auf dem Hauptbildschirm (§12-15/43), eine vollständige Story-Thread-Liste/-Historie im Spieler-UI ist 8F |
+| Story-Thread-Spieler-UI | **REDESIGNED** | 8F — neue `#storyViewModal` ("Geschichten am Hof"), erreichbar über die jetzt klickbare Story Card aus 8B, siehe Abschnitt 10 |
 | Chronik-als-Buch-Ansicht | **LEGACY** | noch nicht begonnen (8H, bestehende `#chronicle`-Liste bleibt) |
 | Game Over / Dynastie-Ende-Inszenierung | **REDESIGNED** (Tokens) | Struktur unverändert |
 | Debug-Panel | **REDESIGNED** (Tokens) | bewusst weiterhin optisch als Debug erkennbar (§146), keine Graphic-Novel-Anmutung gewünscht |
@@ -972,6 +1084,10 @@ sieht jetzt Menschen mit Rollen/Ansprüchen/Rivalitäten/Geschichte statt
 Zahlenzeilen (§98). 8E überträgt dieselbe Lehre auf die Außenpolitik:
 fremde Herrscher sind jetzt Personen aus derselben Charakterwelt statt
 einer Beziehungstabelle, Verträge/Krieg lesen sich als Siegel/Dokumente
-statt Checkboxen. Event-Illustrationen, Chronik-Buch und Kampf-
-Neuinszenierung bleiben weiterhin bewusst NICHT Teil dieser Teilphase —
-sie sind laut Auftrag selbst als 8F–8H vorgesehen.
+statt Checkboxen. 8F schließt die Kette: bedeutende Ereignisse sind
+jetzt historische Momente mit Illustration, echten Beteiligten und
+Story-Kontext statt Titel/Text/Button, der Herrschertod bekam nach
+sechs Phasen erstmals eine sichtbare Inszenierung, und die Story Card
+aus 8B öffnet jetzt eine echte Geschichten-Ansicht. Chronik-Buch und
+Kampf-Neuinszenierung bleiben weiterhin bewusst NICHT Teil dieser
+Teilphase — sie sind laut Auftrag selbst als 8G–8H vorgesehen.
