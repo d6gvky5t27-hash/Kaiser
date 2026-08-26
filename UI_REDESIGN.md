@@ -607,7 +607,82 @@ für sie keinen Verwendungszweck mehr (anders als in 8C, wo die alte
 `#priceTable` bewusst als harmloser Fallback erhalten blieb, weil ihr
 Render-Code weiterhin unverändert mitläuft).
 
-## 7. Screen Inventory (Status nach Phase 8A + 8B + 8C + 8C.1)
+## 7. Phase 8C.2: Complete Map Art Redesign
+
+Zweite Zwischenphase vor 8D. 8C.1 war technisch korrekt (Adjazenz
+validiert, alle States funktionsfähig), aber visuell noch als
+Voronoi-Diagramm erkennbar — gleichmäßig große Zellen, uniforme
+algorithmische Randwellen. Diese Phase verwirft die Voronoi-Geometrie
+vollständig als Quelle der finalen Kartenform (§37) und ersetzt sie
+durch 16 **handplatzierte** Territorien.
+
+**Warum Voronoi verworfen wurde:** ein automatisch berechnetes
+Diagramm erzeugt zwangsläufig ähnlich große, ähnlich geformte Zellen
+(mathematische Eigenschaft von Punktmengen-Tessellation) — genau das
+Gegenteil von unregelmäßigen historischen Herrschaftsgebieten (§5/48).
+Auch mit organischer Kantenverschiebung blieb die Voronoi-Struktur als
+"Signatur" erkennbar (dritter Qualitätstest §58).
+
+**Neue Methode (`tools/build-map-art.js`, ersetzt `tools/generate-map-
+geometry.js` vollständig, §37):** 17 handplatzierte geteilte Grenz-
+segmente (je eine Punktliste mit bewusst gewähltem, unregelmäßigem
+Verlauf — Fluss-Grenzen großzügig geschwungen, übrige Grenzen moderat
+organisch), zusammengesetzt zu 16 Territorien-Polygonen. Jedes
+Territorium erhält eine Punktwolke (geteilte Segmentpunkte + frei
+gezeichnete Außenkurven), nach Winkel um einen bewusst gewählten
+Mittelpunkt sortiert — das garantiert ein einfaches, nicht selbst-
+überschneidendes Polygon, ohne dass die Form dabei einer Formel folgt.
+**Strukturvalidierung statt geometrischer Berechnung:** der Generator
+prüft bei jedem Lauf, dass jedes in `TERRITORIES.adjacent` (live aus
+`data/gamedata.js` gelesen) deklarierte Paar exakt EIN gemeinsames
+Segment referenziert, und dass kein Segment existiert, das nicht
+deklariert ist — bricht sonst ab.
+
+**Landschaftskonzept aus bereits vorhandenen Namen abgeleitet (§46/47,
+kein neuer Lore erfunden):** "Rheinfeld" (ai2) liegt am namensgebenden
+Fluss — der zugleich exakt die drei einzigen Grenzen dieses Reiches zu
+seinen Nachbarn bildet (`m_ost|r_nord`, `p_ost|r_west`, `r_sued|b_ost`).
+"Bergheim" (ai3) bekommt ein südliches Gebirge. Der im Gameplay ohnehin
+nachbarlose Westrand der Karte (m_west/b_west sind Sackgassen) wird zur
+"Westmark"-Wildnis — eine einzige, echte benannte Landschaft statt der
+vier technischen Voronoi-Lückenfüller aus 8C.1 (§36).
+
+**Besitzerfarbe als Lasur statt Vollfarbe (§15):** `fill-opacity: 0.62`
+auf jeder Territoriumsfläche — der Pergament-Untergrund und der Fluss
+scheinen an den Rändern durch, statt einer sterilen 100 %-Fläche.
+
+**Ein iteratives Konstruktionsproblem gefunden und gelöst:** die erste
+Fassung (Segmente einfach in Aufzählungsreihenfolge zu einem Pfad
+verkettet) erzeugte selbstüberschneidende, teils unsichtbare Polygone
+(z. B. `m_sued`/`r_west` auf wenige Pixel zusammengequetscht). Ursache:
+zu eng benachbarte Grenzbänder ohne Sicherheitsabstand. Behoben durch
+(a) großzügige, klar getrennte Nord-Süd-/West-Ost-Bänder für jedes
+Territorium und (b) die winkelbasierte Punktsortierung statt
+Verkettungsreihenfolge, die Selbstüberschneidungen strukturell
+ausschließt, solange die Form grob sternförmig um ihren Mittelpunkt
+bleibt.
+
+**Karte wächst von quadratisch (8C.1) zu hochformatig** (`viewBox`
+neu `-60 -100 1340 1900`, Seitenverhältnis `1340/1900`) — Raum für den
+Fluss als durchgehende Nord-Süd-Achse und deutlich unterschiedliche
+Territoriumsgrößen (§5: keine gleichmäßigen Polygone).
+
+**Wiederverwendet aus 8C.1, unverändert:** Besitzerfarben-Palette,
+Hover/Selected/Attackable/Ally-Zustände (inkl. des dort gefundenen
+Cremeweiß-statt-Gold-Kontrastfixes), Hauptstadt-/Terrain-/Banner-Symbole
+(`icon-burg`/`icon-tree`/`icon-hill`/`icon-sword`/`icon-banner`), das
+JS-Tooltip-System, das Kontextpanel, die Playwright-Testmethodik.
+
+**Ein reales Overlay-Detail zusätzlich abgesichert:** `#worldMapWild`
+und `#worldMapRiver` bekamen explizit `pointer-events: none` (§72) —
+bei der bisherigen DOM-Reihenfolge (Wildnis/Fluss unter den Territorien)
+war das bereits durch die Zeichenreihenfolge praktisch nie ein Problem,
+aber die explizite Regel macht es strukturell unmöglich, unabhängig von
+künftigen Änderungen an der Zeichenreihenfolge.
+
+**Bundle-Größe:** 677.811 → 684.506 Bytes (+0,99 %).
+
+## 8. Screen Inventory (Status nach Phase 8A + 8B + 8C + 8C.1 + 8C.2)
 
 | Screen/Bereich | Status | Anmerkung |
 |---|---|---|
@@ -625,7 +700,7 @@ Render-Code weiterhin unverändert mitläuft).
 | Event-/Geburt-/Heirat-/Kassenbuch-Modals | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | kein Illustrationsbereich (§56-58), das ist 8F |
 | Kampf-Overlay | **REDESIGNED** (Tokens) | Battle Engine unverändert (§61 bestätigt), Strukturaufwertung ist 8G |
 | Kriegskarte-Overlay | **REDESIGNED** (Tokens) | Kartenstil (handgezeichnete Landkarte) weiterhin nicht vertieft, bleibt als reines Kriegs-Overlay bestehen |
-| Welt-/Regionskarte als Hauptbildschirm-Zentrum | **REDESIGNED** | 8B (Layout/HUD/Kontextpanel) + 8C.1 (Node-Grafik → politische Flächenkarte, Abschnitt 6) |
+| Welt-/Regionskarte als Hauptbildschirm-Zentrum | **REDESIGNED** | 8B (Layout/HUD/Kontextpanel) + 8C.1 (Node-Grafik → politische Flächenkarte) + 8C.2 (Voronoi → handgestaltete Landschaftskarte mit Fluss/Wildnis, Abschnitt 7) |
 | Charakterportraits/Placeholder-System | **LEGACY** | noch nicht begonnen (8D) — Topbar-Portrait ist bewusst nur ein einfacher Emoji-Platzhalter |
 | Dynastie-/Stammbaum-Ansicht | **LEGACY** | noch nicht begonnen (8D) |
 | Story-Thread-Spieler-UI | **REDESIGNED** (Story Card, Kurzform) / **LEGACY** (volle Ansicht) | 8B liefert nur die kompakte Fokus-Karte auf dem Hauptbildschirm (§12-15/43), eine vollständige Story-Thread-Liste/-Historie im Spieler-UI ist 8F |
@@ -641,9 +716,12 @@ Tabellen zu einer lesbaren, aber weiterhin vollständig ehrlichen
 Herrschaftsübersicht (Status-Wörter, Progressive Disclosure, keine
 erfundenen Trends), 8C.1 ersetzte die Node-Grafik-Optik der Weltkarte
 durch eine echte politische Flächenkarte (Territorien/Grenzen/Land/
-Herrschaft statt Kreise/Linien) — vier Teilphasen zusammen bereits ein
-klar sichtbarer Wechsel weg vom "Dashboard"-Look hin zu "das ist mein
-Reich". Die in §72-73/71/70 explizit aufgeschobenen STRUKTURELLEN
+Herrschaft statt Kreise/Linien), 8C.2 verwarf die dabei noch als
+Voronoi-Diagramm erkennbare Geometrie zugunsten 16 handplatzierter
+Territorien mit einer eigenen Landschaftsidentität (Fluss, Gebirge,
+benannte Wildnis) — fünf Teilphasen zusammen bereits ein klar
+sichtbarer Wechsel weg vom "Dashboard"-Look hin zu "das ist mein Reich".
+Die in §72-73/71/70 explizit aufgeschobenen STRUKTURELLEN
 Neubauten (Hof-Charakterkarten, Stammbaum, Event-Illustrationen,
 Diplomatie-Umbau, Chronik-Buch, Kampf-Neuinszenierung) sind weiterhin
 bewusst NICHT Teil dieser Teilphase — sie sind laut Auftrag selbst als

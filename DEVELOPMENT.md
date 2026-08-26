@@ -3192,3 +3192,73 @@ primär `js/map-geometry.js` plus das neue SVG-Rendering in
 inkl. neuer attackable/ally-Felder), Battle Engine unverändert
 (bestätigt per Diff, leerer `git diff --stat` für `battle-engine/` und
 `js/battle-bridge.js`), keine neue SAVE_VERSION.
+
+## 2026-08-23 – Phase 8C.2 (KAISERREICH-Zwischenprompt): Complete Map Art Redesign
+
+Zweite Zwischenphase vor 8D. Voller Ablauf und Begründung in
+`UI_REDESIGN.md` Abschnitt 7/8. Ersetzt die in 8C.1 noch als Voronoi-
+Diagramm erkennbare Kartengeometrie vollständig durch handplatzierte
+Territorien — TERRITORIES/state.territories/adjacent/Battle Engine
+unverändert, reine Präsentation.
+
+**Warum verworfen statt optimiert:** ein automatisch berechnetes
+Voronoi-Diagramm erzeugt zwangsläufig ähnlich große, ähnlich geformte
+Zellen — das Gegenteil von unregelmäßigen historischen Herrschafts-
+gebieten. Auch mit organischer Kantenverschiebung blieb die
+mathematische Signatur erkennbar. Kein Tuning-Fix möglich, nur ein
+grundsätzlich anderer Ansatz.
+
+**Neues Dev-Tool `tools/build-map-art.js`** (ersetzt
+`tools/generate-map-geometry.js` vollständig, welches gelöscht wurde):
+17 handplatzierte geteilte Grenzsegmente werden zu 16 Territorien-
+Polygonen zusammengesetzt. Jedes Territorium bekommt eine Punktwolke
+(geteilte Segmentpunkte + frei gezeichnete Außenkurven), die nach
+Winkel um einen bewusst gewählten Mittelpunkt sortiert wird — das
+garantiert ein einfaches, nicht selbstüberschneidendes Polygon, ohne
+einer Formel zu folgen. Validierung erfolgt strukturell (nicht mehr
+geometrisch): jedes deklarierte `TERRITORIES.adjacent`-Paar muss exakt
+ein gemeinsames Segment referenzieren, jedes definierte Segment muss
+einem deklarierten Paar entsprechen — live gegen `data/gamedata.js`
+geprüft, bricht sonst ab.
+
+**Landschaftskonzept aus bereits vorhandenen Namen abgeleitet, kein
+neuer Lore erfunden:** "Rheinfeld" bekommt den namensgebenden Fluss, der
+zugleich exakt die drei einzigen Grenzen dieses Reiches zu seinen
+Nachbarn bildet. "Bergheim" bekommt ein südliches Gebirge. Der im
+Gameplay ohnehin nachbarlose Westrand wird zur "Westmark"-Wildnis — eine
+einzige echte benannte Landschaft statt vier technischer Voronoi-
+Lückenfüller. Besitzerfarbe als Lasur (`fill-opacity: 0.62`) statt
+Vollfarbe, damit Pergament-Untergrund und Fluss durchscheinen.
+
+**Ein iteratives Konstruktionsproblem gefunden und gelöst:** die erste
+Fassung (Segmente in Aufzählungsreihenfolge verkettet) erzeugte
+selbstüberschneidende, teils auf wenige Pixel zusammengequetschte
+Polygone. Behoben durch großzügige, klar getrennte Bänder pro
+Territorium plus winkelbasierte Punktsortierung statt Verkettungs-
+reihenfolge (schließt Selbstüberschneidung strukturell aus).
+
+**Kartenformat wächst von quadratisch zu hochformatig**
+(`viewBox` neu `-60 -100 1340 1900`) für den Fluss als durchgehende
+Nord-Süd-Achse und deutlich unterschiedliche Territoriumsgrößen.
+
+**Wiederverwendet aus 8C.1, unverändert:** Besitzerfarben, Hover/
+Selected/Attackable/Ally-Zustände, Hauptstadt-/Terrain-/Banner-Symbole,
+JS-Tooltip-System, Kontextpanel, Playwright-Testmethodik.
+
+**Playwright-Klicktests:** identische Testsuite wie 8C.1 erneut gegen
+die neue Geometrie ausgeführt — alle 16 Territorien einzeln geklickt (0
+Fehler), Kriegs-/Bündnissimulation (weiterhin exakt 1 attackable Gebiet
+bzw. 4 ally-Gebiete), automatisierter Overlay-Scan (0 blockierende
+Elemente, zusätzlich `pointer-events: none` auf den neuen Wildnis-/
+Fluss-Ebenen abgesichert), Responsive bei allen drei Pflichtauflösungen
+(kein Scrollen, kein Abschneiden, 0 Label-Kollisionen).
+
+**Bewusst NICHT Teil dieser Teilphase:** Hof/Dynastie/Event-Fenster/
+Diplomatie/Krieg/Chronik komplett umbauen (weiterhin 8D–8H), Zoom-/
+Pan-Mechanik, Bewegungspfeile/Belagerungsmarker (Architektur dafür
+vorbereitet, nicht implementiert). Bundle-Größe 677.811 → 684.506 Bytes
+(+0,99 %). Alle Testdateien grün (außer der bekannten unseeded
+`economy_test.js`-Flakiness), Battle Engine unverändert (bestätigt per
+Diff, leerer `git diff --stat` für `battle-engine/` und
+`js/battle-bridge.js`), keine neue SAVE_VERSION, keine neuen
+`rnd()`-Aufrufe.
