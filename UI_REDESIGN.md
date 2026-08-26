@@ -795,7 +795,135 @@ liest ausschließlich bereits vorhandene Felder.
 **Bundle-Größe:** 684.843 → 729.336 Bytes (+6,5 %; `tools/build-bundle.js`
 meldet 725.270 Zeichen für den generierten ersten Script-Block).
 
-## 9. Screen Inventory (Status nach Phase 8A + 8B + 8C + 8C.1 + 8C.2 + 8D)
+## 9. Phase 8E: Diplomatie Redesign
+
+"Aus Beziehungszahlen werden politische Beziehungen." Wie 8D bereits für
+Hof/Dynastie galt: die zugrundeliegende Diplomatiemechanik (§2, komplett
+in `js/diplomacy.js`/`js/politics.js`/`js/military.js`) ist seit früheren
+Phasen real und bleibt unverändert — Beziehungen, Verträge, Krieg,
+Kaiserwahlmechanik, Bestechung, Intrigen, World Memory, Rivalitäten,
+Claims, Event Chains, Story Threads wurden NICHT angefasst. 8E macht nur
+sichtbar, was schon da ist.
+
+**Der eine strukturelle Baustein, der fehlte:** die drei diplomatisch
+erreichbaren KI-Regionen (`state.diplomacy.ai1-3`) hatten bis zu dieser
+Phase KEINEN Herrscher-Charakter — nur einen Namen und eine
+Beziehungszahl. §10/11/38/50 des Auftrags verlangen aber ausdrücklich
+eine echte Person (Portrait, Traits, Skills, anklickbare Character-Detail-
+Ansicht, ein "Herrscherwechsel im Ausland"). Ohne einen echten Charakter
+wäre das nur mit einer zweiten, synthetischen Portrait-/Detaillogik
+möglich gewesen — ausdrücklich untersagt (§10: "keine neue zweite
+Portraitlogik", §11: "keine doppelte Detailansicht"). Die gewählte
+Lösung: `region.rulerId` — EIN echter Character-Core-Charakter pro
+KI-Region, über exakt dieselbe `createCharacter()` erzeugt wie jeder
+andere Charakter im Spiel (`js/core.js newGame()`), bewusst OHNE Familie
+(keine erfundene Genealogie). Verifiziert unschädlich für jedes
+bestehende System, das `state.characters` durchläuft (Event-Chain-
+Kandidaten, Story-Thread-Signale, Drama-Director-Scan, Berater-
+Kandidatenpool) — alle sind über echte Verwandtschaft/Claims/Memories
+zum Spieler-Herrscher gated, ein familien- und claimloser fremder
+Herrscher erfüllt keine dieser Bedingungen. Der einzig nötige neue
+Baustein war ein Tod: `checkForeignRulerDeaths()` (`js/diplomacy.js`)
+nutzt dieselbe `rollDeathChance()`-Formel wie der bestehende
+Berater-Tod, mit einfacher Neubesetzung statt eines eigenen
+Erbfolgesystems (das wäre eine neue Mechanik gewesen). Zwei neue
+Memory-Typen (`FOREIGN_RULER_DIED`/`FOREIGN_RULER_SUCCEEDED`) aus
+demselben Grund wie `DYNASTY_ENDED` in Phase 7: ohne Memory wäre das
+Ereignis für die diplomatische Zeitleiste unsichtbar geblieben.
+
+**Zwei-Ebenen-Hauptansicht (§3/4):** links/mitte eine Liste kompakter
+Machtkarten (Portrait, Name, Beziehungs-Tier, max. 2 Warnungen), rechts
+die Detailansicht der gewählten Macht — keine Tabelle als Standard (§32).
+
+**Beziehung als natürlicher Zustand (§6):** eine reine UI-Klassifikation
+(`RELATION_TIERS`, sieben Stufen ENG VERBÜNDET…ERBITTERTER GEGNER) über
+der echten Zahl, keine Gameplaywirkung — testgestützt bestätigt
+(`state.diplomacy.ai1.relation` bleibt durch die Anzeige unverändert).
+
+**"Warum stehen wir so zueinander?" (§7):** anders als bei
+Charakteren gibt es für die diplomatische Beziehung KEIN gespeichertes
+Komponentenmodell — `updateDiplomacy()` ist ein reiner Drift-Akkumulator
+ohne Einzelposten. Eine erfundene Zeile-für-Zeile-Zerlegung wie bei
+Charakteren wäre daher erfundene Struktur gewesen (§7 "keine Gründe
+erfinden"). Ehrlicher Ersatz: aktuelle Verträge/Kriegsstatus + eine echte
+World-Memory-Zeitleiste (`getDiplomaticMemoryTimeline()`, nach
+`regionIds` statt `actorIds`/`targetIds` gefiltert — diplomatische
+Ereignisse wie ALLIANCE_FORMED/WAR_DECLARED/PEACE_SIGNED tragen das
+bereits seit Phase 5/6), gefiltert über dieselbe `isChronicleWorthy()`-
+Signifikanzprüfung wie die Charakter-Zeitleiste aus 8D.
+
+**Verträge/Krieg als Siegel-/Dokumentkarten (§13-15/33/34):**
+`.treatySeal` (goldener Rahmen, Punkt-Siegel) für Bündnis/Handel/
+Nichtangriff/Durchmarschrecht/Vasall/Garantie/dynastische Verbindung
+— alle aus echten `dip.treaties`/`state.vassals`/`dip.guaranteeFloor`/
+`dip.dynasticMarriageFloor`-Feldern. `.warSeal` (rotes Wachssiegel statt
+Vollbildwarnung) mit dem echten Kriegsjahr, aus der realen
+WAR_DECLARED-Memory rekonstruiert (kein neues Datumsfeld nötig).
+
+**Kaiserwahl-Informationen (§23/24):** alle drei `state.diplomacy`-
+Regionen sind im bestehenden Wahlcode (`resolveElection()`) bereits
+gleichberechtigte Kurfürsten — hier nur sichtbar gemacht (Kronensymbol +
+eine Live-Einschätzung, exakt aus derselben
+`knownElectorVoteRelationThreshold`-Schwelle wie die echte Abstimmung,
+keine neuen Deals).
+
+**Militärische Einschätzung (§27):** ausschließlich die bereits
+vorhandene, unsichere Intel-Schätzung (`state.intel[aiId].rangeLow/
+rangeHigh`) gegen die eigene reale Armeestärke verglichen — SCHWÄCHER/
+ETWA GLEICH/STÄRKER, keine neue Formel, keine aufgedeckten Exaktwerte.
+
+**Kartenintegration (§28/29):** "Auf Karte zeigen" ruft die bereits aus
+8B bestehende `selectMapTerritory()`/Kontextpanel-Auswahl für die
+Hauptstadt der gewählten Macht auf — keine neue Kartenmechanik, 8C.2
+unangetastet.
+
+**Aktionen neu geordnet, nicht neu erfunden (§19-22):** dieselben
+`doDiplomacy()`-Aktionen wie zuvor, nur nach Freundschaft/Handel/Politik
+gruppiert (Sekundär-/Ghost-Buttons, Bündnis als einzige "Imperial"-
+Aktion). Krieg/Intrigen bleiben bewusst auf der Militär-Seite (Krieg-
+Redesign ist explizit nicht Teil dieser Phase) — die Diplomatie-Detailseite
+zeigt nur den realen Kriegsstatus plus einen Link zur bestehenden
+Kriegskarte, dupliziert die Kriegserklärung nicht.
+
+**Ein echter, universell nützlicher CSS-Fix unterwegs gefunden:**
+`[data-tip]:hover::after` (das globale Tooltip-System aus 8B) hatte kein
+`pointer-events: none` — bei eng gestapelten Listen (wie der neuen
+Machtliste) konnte ein sichtbarer Tooltip Klicks auf das darunterliegende
+Element abfangen. Ein Tooltip soll nie Interaktion blockieren; die
+Ein-Zeilen-Korrektur behebt das strukturell für alle bestehenden und
+künftigen `data-tip`-Elemente, keine Verhaltensänderung des Tooltips
+selbst.
+
+**Getestet:** komplette bestehende Node-Testsuite weiterhin grün.
+`tests/ui_viewmodel_test.js` um 7 neue Prüfblöcke erweitert (echte
+Character-Core-Bürger, RNG-Neutralität, Tier-Klassifikation ohne
+Gameplaywirkung, Verträge/Kriegsstatus nur aus echten Feldern,
+regionIds-gefilterte Memory-Timeline, Sondertest Herrscherwechsel im
+Ausland, keine Loyalität/Beziehung für fremde Herrscher). Playwright:
+Diplomatie öffnen, mehrere Mächte auswählen, fremden Herrscher öffnen
+(echtes Character-Detail-Modal), Beziehungserklärung, Memory-Timeline,
+Vertrag anzeigen, Filter/Sortierung, Kriegserklärung bis zum sichtbaren
+Kriegssiegel, Jahr weiter mit korrektem Refresh, Save/Load-Rundlauf,
+Tastatur-Fokus + Enter — alle bestanden, 0 Laufzeitfehler. Sondertest
+Herrscherwechsel im Ausland: über wiederholte reale
+`checkForeignRulerDeaths()`-Aufrufe bei erzwungen kritischer Gesundheit
+bestätigt, dass die Diplomatiekarte danach den neuen Herrscher zeigt,
+nie die veraltete Person. Responsive bei 1920×1080/1440×900/1366×768
+geprüft, kein horizontales Seiten-Overflow.
+
+**Bewusst NICHT Teil dieser Teilphase:** Kaiserwahl 2.0, neue
+Diplomatieaktionen/Verträge/Intrigen, Event-Redesign, Krieg-Redesign,
+Chronik-Buchansicht (weiterhin 8F-8H). Bundle-Größe 729.336 → 756.621
+Bytes (+3,7 %). Battle Engine unverändert (leerer `git diff --stat` für
+`battle-engine/` und `js/battle-bridge.js`), Kartenwerk aus 8C.2
+unverändert (kein `js/map-*.js` angefasst), keine neue SAVE_VERSION.
+Einzige neue `rnd()`-Verbraucher sind `newGame()`
+(3 zusätzliche Charaktere) und `checkForeignRulerDeaths()` bei
+tatsächlichem Herrschertod — beides reine Weltzustands-Erzeugung über
+bereits bestehende, geprüfte Funktionen, keine neuen `rnd()`-Aufrufe in
+irgendeinem ViewModel (testgestützt bestätigt).
+
+## 10. Screen Inventory (Status nach Phase 8A + 8B + 8C + 8C.1 + 8C.2 + 8D + 8E)
 
 | Screen/Bereich | Status | Anmerkung |
 |---|---|---|
@@ -809,7 +937,8 @@ meldet 725.270 Zeichen für den generierten ersten Script-Block).
 | WIRTSCHAFT-Tab (Waren/Steuern/Handel/Risiken) | **REDESIGNED** | 8C — Kategorie-Karten statt 24-Zeilen-Tabelle, Preiserklärung + Produktionskette auf Klick; Regionalhandel/Arbitrage-Panel unverändert |
 | Kontextpanel WIRTSCHAFT/BEVÖLKERUNG-Tabs | **REDESIGNED** | 8C — echte Top-Produktion/Engpässe/Jahreswachstum, für Spieler- UND KI-Regionen |
 | Hof-Panel (Seiteninhalt) | **REDESIGNED** | 8D — Portraitwand (Herrscher/Gemahl/Thronfolger + 6 Hofämter) statt 6-Text-Slot-Grid, siehe Abschnitt 8 |
-| Diplomatie/Militär-Panels (Seiteninhalt) | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | weiterhin über die Navigation erreichbar, Informationsarchitektur innerhalb der einzelnen Seiten unverändert (das ist 8E/8G) |
+| Diplomatie-Panel (Seiteninhalt) | **REDESIGNED** | 8E — Machtkarten-Liste + Detailansicht statt Beziehungstabelle, siehe Abschnitt 9 |
+| Militär-Panel (Seiteninhalt) | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | weiterhin über die Navigation erreichbar, Informationsarchitektur unverändert (das ist 8G) |
 | Gebäude/Land/Schulden-Panels | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | unverändert, kein Baufortschritt (keine Datenbasis, §Abschnitt 5) |
 | Event-/Geburt-/Heirat-/Kassenbuch-Modals | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | kein Illustrationsbereich (§56-58), das ist 8F |
 | Kampf-Overlay | **REDESIGNED** (Tokens) | Battle Engine unverändert (§61 bestätigt), Strukturaufwertung ist 8G |
@@ -840,6 +969,9 @@ sichtbarer Wechsel weg vom "Dashboard"-Look hin zu "das ist mein Reich".
 Neubauten: Hof-Charakterkarten, Character-Detail mit echter Beziehungs-/
 Loyalitäts-/Erinnerungs-Aufschlüsselung und der Stammbaum — der Spieler
 sieht jetzt Menschen mit Rollen/Ansprüchen/Rivalitäten/Geschichte statt
-Zahlenzeilen (§98). Event-Illustrationen, Diplomatie-Umbau, Chronik-Buch
-und Kampf-Neuinszenierung bleiben weiterhin bewusst NICHT Teil dieser
-Teilphase — sie sind laut Auftrag selbst als 8E–8H vorgesehen.
+Zahlenzeilen (§98). 8E überträgt dieselbe Lehre auf die Außenpolitik:
+fremde Herrscher sind jetzt Personen aus derselben Charakterwelt statt
+einer Beziehungstabelle, Verträge/Krieg lesen sich als Siegel/Dokumente
+statt Checkboxen. Event-Illustrationen, Chronik-Buch und Kampf-
+Neuinszenierung bleiben weiterhin bewusst NICHT Teil dieser Teilphase —
+sie sind laut Auftrag selbst als 8F–8H vorgesehen.

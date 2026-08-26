@@ -3337,3 +3337,77 @@ unverändert (leerer `git diff --stat` für `battle-engine/` und
 `js/battle-bridge.js`), Kartenwerk aus 8C.2 unverändert (kein
 `js/map-*.js` angefasst), keine neue SAVE_VERSION, keine neuen
 `rnd()`-Aufrufe.
+
+## 2026-08-26 – Phase 8E (KAISERREICH-Zwischenprompt): Diplomatie Redesign
+
+"Aus Beziehungszahlen werden politische Beziehungen." Wie 8D bleibt die
+zugrundeliegende Mechanik (`js/diplomacy.js`/`js/politics.js`/
+`js/military.js`: Beziehungen, Verträge, Krieg, Kaiserwahl, Bestechung,
+Intrigen) komplett unverändert — nur die Anzeige wird neu gebaut.
+
+**Der eine fehlende Baustein:** die drei diplomatisch erreichbaren
+KI-Regionen hatten bisher keinen Herrscher-Charakter, nur Namen +
+Beziehungszahl — der Auftrag verlangt aber eine echte Person (Portrait,
+Traits, anklickbare Character-Detail-Ansicht, Herrscherwechsel). Lösung:
+`region.rulerId` — ein echter Character-Core-Charakter pro KI-Region
+(`js/core.js newGame()`, dieselbe `createCharacter()` wie überall sonst,
+bewusst ohne Familie). Geprüft unschädlich für jedes bestehende System,
+das `state.characters` durchläuft (alle Event-Chain-/Story-Thread-/
+Drama-Director-Prüfungen sind über echte Verwandtschaft/Claims/Memories
+zum Spieler-Herrscher gated). Einziger neuer Mechanik-Baustein:
+`checkForeignRulerDeaths()` — dieselbe `rollDeathChance()`-Formel wie
+der bestehende Berater-Tod, einfache Neubesetzung statt eines eigenen
+Erbfolgesystems. Zwei neue Memory-Typen (FOREIGN_RULER_DIED/
+_SUCCEEDED), aus demselben Grund wie DYNASTY_ENDED in Phase 7.
+
+**Zwei-Ebenen-Hauptansicht:** links eine Liste kompakter Machtkarten
+(Portrait/Name/Beziehungs-Tier/max. 2 Warnungen), rechts die
+Detailansicht — keine Tabelle als Standard. Beziehung zeigt sieben
+Tier-Stufen (ENG VERBÜNDET…ERBITTERTER GEGNER) als reine UI-
+Klassifikation über der echten Zahl. Da die diplomatische Beziehung
+(anders als bei Charakteren) kein gespeichertes Komponentenmodell besitzt
+— `updateDiplomacy()` ist ein reiner Drift-Akkumulator —, ersetzt eine
+echte, nach `regionIds` gefilterte World-Memory-Zeitleiste die
+"Warum?"-Frage, statt eine erfundene Zahlen-Zerlegung vorzutäuschen.
+Verträge/Krieg als Siegel-/Dokumentkarten (goldenes Vertragssiegel, rotes
+Kriegs-Wachssiegel mit echtem Jahr aus der realen WAR_DECLARED-Memory).
+Kaiserwahl-Informationen (Kurfürst-Symbol + Live-Einschätzung aus der
+echten Abstimmungsschwelle) und militärische Einschätzung (aus der
+bereits vorhandenen unsicheren Intel-Schätzung) ergänzen die Karte, ohne
+neue Formeln. "Auf Karte zeigen" nutzt die bestehende
+`selectMapTerritory()`-Auswahl aus 8B, keine neue Kartenmechanik.
+Aktionen bestehen unverändert aus den echten `doDiplomacy()`-Funktionen,
+nur nach Freundschaft/Handel/Politik gruppiert; Krieg/Intrigen bleiben
+bewusst auf der Militär-Seite (kein Krieg-Redesign in dieser Phase).
+
+**Nebenbefund:** das globale Tooltip-System (`[data-tip]:hover::after`,
+seit 8B) hatte kein `pointer-events: none` — bei eng gestapelten Listen
+konnte ein sichtbarer Tooltip Klicks aufs darunterliegende Element
+abfangen (im Diplomatie-Playwright-Test entdeckt). Eine Zeile behebt das
+strukturell für alle bestehenden `data-tip`-Elemente.
+
+**Getestet:** komplette bestehende Node-Testsuite weiterhin grün.
+`tests/ui_viewmodel_test.js` um 7 neue Prüfblöcke ergänzt (echte
+Character-Core-Bürger, RNG-Neutralität, Tier-Klassifikation ohne
+Gameplaywirkung, Verträge/Kriegsstatus nur aus echten Feldern,
+regionIds-gefilterte Memory-Timeline, Sondertest Herrscherwechsel im
+Ausland, keine Loyalität/Beziehung für fremde Herrscher). Playwright:
+Diplomatie öffnen, mehrere Mächte auswählen, fremden Herrscher öffnen
+(echtes Character-Detail-Modal), Beziehungserklärung, Memory-Timeline,
+Vertrag anzeigen, Filter/Sortierung, Kriegserklärung bis zum sichtbaren
+Kriegssiegel, Jahr weiter mit korrektem Refresh, Save/Load, Tastatur-
+Fokus + Enter — alle bestanden, 0 Fehler. Herrscherwechsel im Ausland
+über wiederholte reale `checkForeignRulerDeaths()`-Aufrufe bei erzwungen
+kritischer Gesundheit bestätigt: die Karte zeigt danach zuverlässig den
+neuen Herrscher. Responsive bei allen drei Pflichtauflösungen ohne
+horizontales Seiten-Overflow.
+
+**Bewusst NICHT Teil dieser Teilphase:** Kaiserwahl 2.0, neue
+Diplomatieaktionen/Verträge/Intrigen, Event-Redesign, Krieg-Redesign,
+Chronik-Buchansicht (weiterhin 8F-8H). Bundle-Größe 729.336 → 756.621
+Bytes (+3,7 %). Battle Engine unverändert, Kartenwerk aus 8C.2
+unverändert, keine neue SAVE_VERSION. Einzige neuen `rnd()`-Verbraucher
+sind `newGame()` (3 zusätzliche Charaktere) und
+`checkForeignRulerDeaths()` bei tatsächlichem Herrschertod — beides
+reine Weltzustands-Erzeugung über bereits bestehende, geprüfte
+Funktionen, keine neuen `rnd()`-Aufrufe in irgendeinem ViewModel.
