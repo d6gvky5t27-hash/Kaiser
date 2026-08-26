@@ -616,10 +616,27 @@ function ageGroupOf(age) {
   return "alt";
 }
 const PORTRAIT_RANK = { herrscher: 4, hoch: 3, amt: 2, adel: 1 };
+// §Phase-8E: ein fremder Herrscher (state.regions[aiId].rulerId) ist kein
+// state.rulerId, soll aber optisch genauso als Herrscher lesbar sein (Krone),
+// nicht als beliebiger Adliger -- dieselbe kleine Prüfung wie überall sonst
+// in diesem Modul, wenn ein fremder Herrscher gemeint sein könnte.
+function isAnyRulerCharacter(state, characterId) {
+  if (characterId === state.rulerId) return true;
+  for (const aiId in state.diplomacy) {
+    if (state.regions[aiId] && state.regions[aiId].rulerId === characterId) return true;
+  }
+  return false;
+}
+function getForeignRulerRegionId(state, characterId) {
+  for (const aiId in state.diplomacy) {
+    if (state.regions[aiId] && state.regions[aiId].rulerId === characterId) return aiId;
+  }
+  return null;
+}
 function getPortraitViewModel(state, characterId) {
   const c = state.characters[characterId];
   if (!c) return null;
-  const isRuler = characterId === state.rulerId;
+  const isRuler = isAnyRulerCharacter(state, characterId);
   const rank = isRuler ? "herrscher" : (c.advisorRole ? "amt" : (c.claims.some(cl => cl.strength === "primary" || cl.strength === "strong") ? "hoch" : "adel"));
   const seed = hashStringToInt(characterId + "|" + c.name + "|" + (c.surname || ""));
   return {
@@ -727,6 +744,11 @@ function getCharacterRoleLabel(state, characterId) {
   const ruler = state.characters[state.rulerId];
   if (!c) return "";
   if (characterId === state.rulerId) return c.gender === "m" ? "Herrscher" : "Herrscherin";
+  const foreignRegionId = getForeignRulerRegionId(state, characterId);
+  if (foreignRegionId && c.alive) {
+    const rname = state.regions[foreignRegionId].name.replace(/\s*\(.*\)$/, "");
+    return (c.gender === "m" ? "Herrscher von " : "Herrscherin von ") + rname;
+  }
   if (!c.alive) return "Verstorben";
   if (ruler && characterId === ruler.spouseId) return c.gender === "m" ? "Gemahl" : "Gemahlin";
   if (c.advisorRole && ADVISOR_ROLES[c.advisorRole]) return ADVISOR_ROLES[c.advisorRole].name;
@@ -760,14 +782,20 @@ function getCharacterCardViewModel(state, characterId) {
   const c = state.characters[characterId];
   if (!c) return null;
   const topTraits = c.traits.slice(0, 2).map(id => getTraitBadgeViewModel(id)).filter(Boolean);
+  // §Phase-8E: "Loyalität zum Spieler-Thron" ist für einen fremden
+  // Herrscher kein sinnvoller Begriff (er hat keinen) -- null statt eines
+  // technisch berechenbaren, aber bedeutungslosen Werts (vgl. §5-Beispiel
+  // im Auftrag: fremde Karten zeigen "Beziehung", keine Loyalität).
+  const isForeign = !!getForeignRulerRegionId(state, characterId);
   return {
     id: characterId, name: c.name, surname: c.surname || "", fullName: `${c.name} ${c.surname || ""}`.trim(),
     gender: c.gender, age: c.age, alive: c.alive, ageGroup: ageGroupOf(c.age),
     roleLabel: getCharacterRoleLabel(state, characterId),
     portrait: getPortraitViewModel(state, characterId),
-    topTraits, loyalty: c.alive ? (characterId === state.rulerId ? 100 : (c.loyalty !== undefined ? c.loyalty : computeLoyalty(state, characterId))) : null,
+    topTraits,
+    loyalty: (c.alive && !isForeign) ? (characterId === state.rulerId ? 100 : (c.loyalty !== undefined ? c.loyalty : computeLoyalty(state, characterId))) : null,
     warnings: c.alive ? getCharacterWarnings(state, characterId) : [],
-    isRuler: characterId === state.rulerId,
+    isRuler: characterId === state.rulerId, isForeignRuler: isForeign,
   };
 }
 
@@ -781,6 +809,12 @@ function getCharacterDetailViewModel(state, characterId) {
   const c = state.characters[characterId];
   if (!c) return null;
   const isRuler = characterId === state.rulerId;
+  // §Phase-8E: ein fremder Herrscher hat keine "Loyalität zum eigenen Thron"
+  // und keine persönliche Beziehung zum Spieler-Herrscher im Character-Core-
+  // Sinn (nur eine SEPARATE diplomatische Beziehung, state.diplomacy[aiId]
+  // -- die zeigt die Diplomatie-Ansicht selbst, nicht dieses Modal). Beides
+  // hier zu zeigen wäre kein Fehler in der Formel, aber irreführend.
+  const isForeignRuler = !!getForeignRulerRegionId(state, characterId);
   const card = getCharacterCardViewModel(state, characterId);
 
   const skills = Object.keys(STAT_LABEL).map(k => ({ id: k, label: STAT_LABEL[k], value: c.stats[k] }));
@@ -815,10 +849,10 @@ function getCharacterDetailViewModel(state, characterId) {
     ...card,
     house: c.surname || "", health: c.alive ? Math.round(c.health) : null,
     skills, traits, claims, rivalries,
-    relationship: (!isRuler && c.alive) ? getRelationshipDisplayViewModel(state, characterId, state.rulerId) : null,
-    loyaltyBreakdown: c.alive ? getLoyaltyDisplayViewModel(state, characterId) : null,
+    relationship: (!isRuler && !isForeignRuler && c.alive) ? getRelationshipDisplayViewModel(state, characterId, state.rulerId) : null,
+    loyaltyBreakdown: (!isForeignRuler && c.alive) ? getLoyaltyDisplayViewModel(state, characterId) : null,
     memoryTimeline, hiddenMemoryCount: hiddenCount, totalMemoryCount: allMems.length,
-    currentStory,
+    currentStory, isForeignRuler,
     spouseId: c.spouseId, parentId: c.parentId, childrenIds: c.childrenIds.slice(),
   };
 }
@@ -917,4 +951,179 @@ function getAdvisorCandidateViewModel(state) {
     };
   });
   return { role: sel.role, roleName: roleInfo.name, roleDesc: roleInfo.desc, statLabel: STAT_LABEL[roleInfo.statKey], cost: sel.cost, candidates };
+}
+
+// ============================================================
+// Phase 8E: DIPLOMATIE -- "aus Beziehungszahlen werden politische
+// Beziehungen". Nur vorhandene Werte/Funktionen (state.diplomacy,
+// state.warState, state.vassals, region.rulerId, World Memory,
+// Story Threads, Intel-Schätzung) angezeigt -- keine neue
+// Diplomatiemechanik, keine veränderte Formel (§2/§42).
+// ============================================================
+
+// ---------- §6: Beziehung als natürlicher Zustand, nicht nur Zahl ----------
+// Schwellen sind REINE UI-Klassifikation (§6 ausdrücklich), keine
+// Gameplaywirkung -- state.diplomacy[aiId].relation bleibt unverändert die
+// einzige echte Zahl.
+const RELATION_TIERS = [
+  { min: 75, label: "ENG VERBÜNDET" },
+  { min: 40, label: "FREUNDSCHAFTLICH" },
+  { min: 10, label: "POSITIV" },
+  { min: -9, label: "NEUTRAL" },
+  { min: -39, label: "ANGESPANNT" },
+  { min: -69, label: "FEINDSELIG" },
+  { min: -101, label: "ERBITTERTER GEGNER" },
+];
+function relationTierLabel(relation) {
+  for (const tier of RELATION_TIERS) if (relation >= tier.min) return tier.label;
+  return "ERBITTERTER GEGNER";
+}
+
+// ---------- §4/§10/§11: fremder Herrscher als Person ----------
+// region.rulerId ist seit dieser Phase ein echter Character-Core-Charakter
+// (js/core.js newGame()) -- die Karte ist deshalb wortwörtlich dieselbe
+// getCharacterCardViewModel() wie im Hof, kein zweites Modell.
+function getForeignRulerCardViewModel(state, aiId) {
+  const region = state.regions[aiId];
+  if (!region || !region.rulerId) return null;
+  return getCharacterCardViewModel(state, region.rulerId);
+}
+
+// ---------- §13/14: Verträge als Siegel-/Dokumentkarten ----------
+const TREATY_LABELS = {
+  allianz: "BÜNDNIS", handel: "HANDELSVERTRAG", nichtangriff: "NICHTANGRIFFSPAKT",
+  durchmarsch: "DURCHMARSCHRECHT", vassal: "VASALL", guarantee: "GARANTIE", marriage: "DYNASTISCHE VERBINDUNG",
+};
+function getTreatyViewModel(state, aiId) {
+  const dip = state.diplomacy[aiId];
+  if (!dip) return [];
+  const out = [];
+  if (dip.treaties.allianz) out.push({ id: "allianz", label: TREATY_LABELS.allianz });
+  if (dip.treaties.handel) out.push({ id: "handel", label: TREATY_LABELS.handel });
+  if (dip.treaties.nichtangriff) out.push({ id: "nichtangriff", label: TREATY_LABELS.nichtangriff });
+  if (dip.treaties.durchmarsch) out.push({ id: "durchmarsch", label: TREATY_LABELS.durchmarsch });
+  if (state.vassals[aiId]) out.push({ id: "vassal", label: TREATY_LABELS.vassal });
+  if (dip.guaranteeFloor !== undefined) out.push({ id: "guarantee", label: TREATY_LABELS.guarantee });
+  if (dip.dynasticMarriageFloor !== undefined) out.push({ id: "marriage", label: TREATY_LABELS.marriage });
+  return out;
+}
+
+// ---------- §8/9: diplomatische World-Memory-Timeline ----------
+// Dieselbe isChronicleWorthy()-Signifikanzprüfung wie die Charakter-
+// Zeitleiste (js/chronicle.js) -- nur nach regionIds statt actorIds/
+// targetIds gefiltert, da diplomatische Ereignisse (ALLIANCE_FORMED,
+// WAR_DECLARED, PEACE_SIGNED, ...) seit Phase 5/6 bereits regionIds tragen.
+function getDiplomaticMemoryTimeline(state, aiId) {
+  const allMems = Object.values(state.memories.byId).filter(m => m.regionIds && m.regionIds.includes(aiId)).sort((a, b) => a.year - b.year);
+  const relevant = allMems.filter(m => isChronicleWorthy(state, m).worthy);
+  const shown = (relevant.length ? relevant : allMems).slice(-MEMORY_TIMELINE_LIMIT);
+  return shown.map(m => ({ year: m.year, text: m.description, type: m.type }));
+}
+
+// ---------- §17: aktueller Story Thread mit dieser Macht ----------
+function getDiplomaticStoryViewModel(state, aiId) {
+  const thread = getActiveStoryThreads(state).find(t => t.status !== "DORMANT" && t.regionIds && t.regionIds.includes(aiId));
+  if (!thread) return null;
+  return {
+    title: thread.title, icon: THREAD_ICON_BY_TYPE[thread.type] || "⚜",
+    stageText: THREAD_STAGE_TEXT[thread.status] || "Die Geschichte entwickelt sich weiter.",
+  };
+}
+
+// ---------- §15: Kriegsstatus, seit wann (aus der echten WAR_DECLARED-Memory) ----------
+function getWarStatusViewModel(state, aiId) {
+  const atWar = !!(state.warState && state.warState[aiId]);
+  if (!atWar) return { atWar: false, sinceYear: null };
+  const declarations = Object.values(state.memories.byId).filter(m => m.type === "WAR_DECLARED" && m.regionIds && m.regionIds.includes(aiId));
+  const sinceYear = declarations.length ? declarations[declarations.length - 1].year : null;
+  return { atWar: true, sinceYear };
+}
+
+// ---------- §27: militärische Einschätzung -- nur die bereits vorhandene,
+// unsichere Intel-Schätzung (state.intel[aiId].rangeLow/High), keine neue
+// Formel/exakte Zahl. ----------
+function getMilitaryAssessmentLabel(state, aiId) {
+  const intel = state.intel[aiId];
+  if (!intel || intel.rangeLow === undefined) return "UNBEKANNT";
+  const playerStrength = armyStrength(state);
+  if (intel.rangeHigh < playerStrength * 0.85) return "SCHWÄCHER";
+  if (intel.rangeLow > playerStrength * 1.15) return "STÄRKER";
+  return "ETWA GLEICH";
+}
+
+// ---------- §23/24: Kaiserwahl-Informationen -- ausschließlich die reale,
+// bereits in resolveElection()/checkElectionTrigger() verwendete Schwelle
+// gespiegelt, keine neuen Deals/Versprechen. Alle drei state.diplomacy-
+// Regionen sind bereits im bestehenden Wahlcode gleichberechtigte
+// Kurfürsten (siehe resolveElection()), daher hier uniform true. ----------
+function getElectorInfoViewModel(state, aiId) {
+  const cfg = CONFIG.election;
+  const dip = state.diplomacy[aiId];
+  if (!dip) return null;
+  let leaning;
+  if (state.pendingElection) {
+    const bribed = !!state.pendingElection.bribed[aiId];
+    const wouldVote = bribed || dip.relation >= cfg.knownElectorVoteRelationThreshold;
+    leaning = wouldVote ? (bribed ? "Unterstützt aktuell: Spieler (bestochen)" : "Unterstützt aktuell: Spieler") : "Unterstützt aktuell: nicht den Spieler";
+  } else {
+    leaning = dip.relation >= cfg.knownElectorVoteRelationThreshold ? "Würde derzeit den Spieler unterstützen" : "Würde derzeit nicht den Spieler unterstützen";
+  }
+  return { isElector: true, leaning };
+}
+
+// ---------- §7: "Warum stehen wir so zueinander?" -- die diplomatische
+// Beziehung ist (anders als Character-Core-Beziehungen) ein reiner
+// Drift-Akkumulator ohne gespeicherte Einzelkomponenten (js/diplomacy.js
+// updateDiplomacy()) -- eine Zeile-für-Zeile-Zerlegung wie bei Charakteren
+// gäbe es nicht wirklich (§7 "keine Gründe erfinden"). Reale Ersatz-
+// Antwort: aktuelle Verträge/Status + die echte Memory-Zeitleiste
+// (bereits oben) als "jüngste Entwicklungen mit Einfluss". ----------
+function getDiplomaticRelationshipViewModel(state, aiId) {
+  const dip = state.diplomacy[aiId];
+  if (!dip) return null;
+  const relation = Math.round(dip.relation);
+  return {
+    relation, tierLabel: relationTierLabel(relation),
+    war: getWarStatusViewModel(state, aiId),
+    treaties: getTreatyViewModel(state, aiId),
+    militaryAssessment: getMilitaryAssessmentLabel(state, aiId),
+    elector: getElectorInfoViewModel(state, aiId),
+    memoryTimeline: getDiplomaticMemoryTimeline(state, aiId),
+  };
+}
+
+// ---------- Gesamtansicht: eine Karte je Macht (§3/4) ----------
+function getDiplomacyOverviewViewModel(state) {
+  return Object.keys(state.diplomacy).map(aiId => {
+    const region = state.regions[aiId];
+    const dip = state.diplomacy[aiId];
+    const relation = Math.round(dip.relation);
+    const rulerCard = getForeignRulerCardViewModel(state, aiId);
+    const war = getWarStatusViewModel(state, aiId);
+    const warnings = [];
+    if (war.atWar) warnings.push({ id: "war", text: "KRIEG" });
+    if (dip.treaties.allianz) warnings.push({ id: "ally", text: "BÜNDNIS" });
+    if (relation <= -40 && !war.atWar) warnings.push({ id: "hostile", text: "FEINDSELIG" });
+    return {
+      aiId, regionName: region.name.replace(/\s*\(.*\)$/, ""), houseName: "Haus " + region.name.replace(/\s*\(.*\)$/, ""),
+      heraldry: getHeraldryViewModel(region.name), rulerCard,
+      relation, tierLabel: relationTierLabel(relation),
+      atWar: war.atWar, isVassal: !!state.vassals[aiId],
+      treatyCount: getTreatyViewModel(state, aiId).length,
+      warnings: warnings.slice(0, 2),
+    };
+  });
+}
+
+// ---------- Detailansicht für die ausgewählte Macht (§7-12/16-25) ----------
+function getForeignPowerDetailViewModel(state, aiId) {
+  const region = state.regions[aiId];
+  if (!region) return null;
+  return {
+    aiId, regionName: region.name.replace(/\s*\(.*\)$/, ""), houseName: "Haus " + region.name.replace(/\s*\(.*\)$/, ""),
+    heraldry: getHeraldryViewModel(region.name),
+    rulerCard: getForeignRulerCardViewModel(state, aiId),
+    relationship: getDiplomaticRelationshipViewModel(state, aiId),
+    story: getDiplomaticStoryViewModel(state, aiId),
+  };
 }
