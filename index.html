@@ -1023,6 +1023,208 @@
   .warCardRow { display: flex; justify-content: space-between; font-size: var(--fs-body); margin: 2px 0; }
   .warCardRow .label { color: var(--umber); }
   .warCardStory { font-size: var(--fs-body); font-style: italic; margin: 4px 0; }
+
+  /* ============================================================
+     §Phase-8H: CHRONICLE BOOK -- "Das große Buch der Dynastie" statt
+     Log-/Listenansicht. Reine Präsentationsschicht über Chronicle 2.0
+     (js/chronicle.js) -- keine neue Erzähl-Engine. Buchmaterial (§7):
+     warmes Elfenbein (--panel), Tinte dunkelbraun (--ink), Akzente
+     Burgunder (--accent) / Gold (--gold) / Bronze (--purple) -- exakt
+     die bereits bestehenden Design-Tokens, keine neue Palette.
+     ============================================================ */
+  #chronikPage { display: flex; flex-direction: column; gap: var(--sp-3); align-items: center; }
+  .chronikFrame { width: 100%; max-width: 1180px; }
+  #chronikNav { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; margin-bottom: var(--sp-2); }
+  .chronikNavBtn {
+    font-family: var(--font-display); font-size: var(--fs-body); font-weight: 600; letter-spacing: 0.5px;
+    padding: 7px 16px; background: transparent; color: var(--panel); border: 2px solid var(--gold); box-shadow: none;
+  }
+  .chronikNavBtn.active { background: var(--gold); color: var(--ink); }
+  .chronikNavBtn.ending { border-color: var(--accent); color: var(--panel); }
+  .chronikNavBtn.ending.active { background: var(--accent); color: var(--panel); }
+  #chronikSearchBar { text-align: center; margin-bottom: var(--sp-2); }
+  #chronikSearchBar input {
+    width: min(420px, 90%); font-family: var(--font); font-size: var(--fs-body); padding: 6px 10px;
+    border-radius: var(--r-sm); border: 2px solid var(--ink); background: var(--panel); color: var(--ink);
+  }
+
+  /* ---- §7/8: das Buch selbst -- Elfenbein-Papier, dezente Struktur,
+     dunkler Ledereinband-Rahmen, kein WebGL/Page-Curl (§6). ---- */
+  .chronikBook {
+    position: relative; background:
+      repeating-linear-gradient(0deg, rgba(74,53,36,0.025) 0px, rgba(74,53,36,0.025) 1px, transparent 1px, transparent 3px),
+      radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.35) 0%, transparent 55%),
+      var(--panel);
+    border: 5px solid var(--ink); border-radius: var(--r-md); box-shadow: var(--shadow-lg);
+    padding: var(--sp-5) var(--sp-5) var(--sp-4); color: var(--ink); min-height: 420px;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .chronikBook { animation: chronikPageIn 0.3s ease-out; }
+  }
+  @keyframes chronikPageIn { from { opacity: 0; } to { opacity: 1; } }
+  .chronikEyebrow { font-family: var(--font); font-size: var(--fs-micro); letter-spacing: 1.5px; color: var(--umber); text-transform: uppercase; text-align: center; }
+  .chronikTitle { font-family: var(--font-display); font-size: 34px; font-weight: 700; text-align: center; margin: 2px 0 var(--sp-2); }
+  .chronikSub { font-family: var(--font-display); font-size: var(--fs-lg); text-align: center; color: var(--umber); margin-bottom: var(--sp-3); }
+  .chronikDivider { border: none; border-top: 2px solid var(--gold); width: 120px; margin: var(--sp-3) auto; opacity: 0.7; }
+
+  /* ---- §8: dezenter Mittelfalz bei Doppelseiten (nur Schatten, kein Text im Falz). ---- */
+  .chronikSpread { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5); position: relative; }
+  .chronikSpread::before {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 14px; margin-left: -7px;
+    background: linear-gradient(90deg, transparent, rgba(32,24,17,0.14) 45%, rgba(32,24,17,0.14) 55%, transparent);
+    pointer-events: none;
+  }
+  .chronikPageCol { min-width: 0; }
+  .chronikPageCol.right { padding-left: var(--sp-2); }
+  .chronikPageCol.left { padding-right: var(--sp-2); }
+  @media (max-width: 1400px) {
+    .chronikSpread { grid-template-columns: 1fr; }
+    .chronikSpread::before { display: none; }
+    .chronikPageCol.right, .chronikPageCol.left { padding: 0; }
+  }
+
+  /* ---- Titelseite (§9/10) ---- */
+  .chronikTitleHeraldry { display: flex; justify-content: center; margin-bottom: var(--sp-3); }
+  .chronikTitleHeraldry svg { width: 96px; height: 112px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); }
+  .chronikTitleStats { display: flex; justify-content: center; gap: var(--sp-5); flex-wrap: wrap; margin-top: var(--sp-3); text-align: center; }
+  .chronikTitleStat .val { font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 700; color: var(--accent); }
+  .chronikTitleStat .lbl { font-size: var(--fs-micro); color: var(--umber); text-transform: uppercase; letter-spacing: 0.4px; }
+
+  /* ---- Dynasty Summary (§11/12): historische Eckdaten, keine Achievement-Optik. ---- */
+  .chronikSummaryGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-3) var(--sp-5); max-width: 760px; margin: 0 auto; }
+  .chronikSummaryRow .lbl { font-size: var(--fs-micro); letter-spacing: 0.4px; text-transform: uppercase; color: var(--umber); }
+  .chronikSummaryRow .val { font-family: var(--font-display); font-size: var(--fs-md); font-weight: 600; }
+  @media (max-width: 900px) { .chronikSummaryGrid { grid-template-columns: 1fr; } }
+
+  /* ---- Herrscher-Zeitstrahl (§14/42-44) ---- */
+  #chronikRulerList { display: flex; gap: var(--sp-2); flex-wrap: wrap; justify-content: center; margin-bottom: var(--sp-3); }
+  .chronikRulerChip {
+    font-family: var(--font-display); font-size: var(--fs-body); padding: 5px 12px; background: transparent;
+    border: 2px solid var(--ink); color: var(--ink); box-shadow: none;
+  }
+  .chronikRulerChip.current { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+
+  /* ---- Regenten-Doppelseite (§16-21) ---- */
+  .chronikRulerPortraitBox { display: flex; justify-content: center; margin-bottom: var(--sp-2); }
+  .chronikRulerPortrait {
+    width: 148px; height: 148px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 4px var(--gold), 0 0 0 6px var(--ink), var(--shadow-md);
+  }
+  /* §15: entsättigt statt "deaktivierter Button" -- warmer, historischer
+     Ton (leichtes Sepia) statt hartem Graustufen+Verdunkelungsfilter. */
+  .chronikRulerPortrait.deceased { filter: grayscale(0.45) sepia(0.18) brightness(0.94); }
+  .chronikRulerPortrait svg { width: 100%; height: 100%; display: block; }
+  .chronikRulerName { font-family: var(--font-display); font-size: 26px; font-weight: 700; text-align: center; }
+  .chronikRulerDates { font-size: var(--fs-body); color: var(--umber); text-align: center; margin-bottom: var(--sp-3); }
+  .chronikFactRow { display: flex; justify-content: space-between; font-size: var(--fs-body); padding: 3px 0; border-bottom: 1px dotted rgba(32,24,17,0.18); }
+  .chronikFactRow .lbl { color: var(--umber); }
+  .chronikTraitRow { text-align: center; margin: var(--sp-2) 0; }
+  .chronikHighlightList { list-style: none; margin: 0; padding: 0; }
+  .chronikHighlightList li { padding: 5px 0; font-size: var(--fs-body); border-bottom: 1px dotted rgba(32,24,17,0.15); }
+  .chronikHighlightList li .yr { font-family: var(--font-display); font-weight: 700; color: var(--accent); margin-right: 6px; }
+  .chronikMetricRow { display: flex; justify-content: space-between; align-items: center; font-size: var(--fs-body); margin: 3px 0; }
+  .chronikMetricRow .arrow { color: var(--umber); margin: 0 4px; }
+  .chronikBioText { font-size: var(--fs-md); line-height: 1.7; margin-top: var(--sp-3); }
+  .chronikBioText::first-letter { font-family: var(--font-display); font-size: 2.6em; font-weight: 700; float: left; line-height: 0.85; padding-right: 4px; color: var(--accent); }
+  #chronikRulerPagination { text-align: center; margin-top: var(--sp-3); display: flex; justify-content: center; align-items: center; gap: var(--sp-3); }
+
+  /* ---- Story-/Kriegskapitel-Karten (§23-33) ---- */
+  .chronikChapterCard {
+    border: 2px solid var(--ink); border-radius: var(--r-sm); padding: var(--sp-3) var(--sp-4);
+    margin-bottom: var(--sp-3); background: rgba(255,255,255,0.28); cursor: pointer;
+  }
+  .chronikChapterCard:hover, .chronikChapterCard:focus-visible { background: rgba(255,255,255,0.5); outline: 2px solid var(--gold); outline-offset: 1px; }
+  .chronikChapterTitle { font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 700; }
+  .chronikChapterMeta { font-size: var(--fs-micro); color: var(--umber); text-transform: uppercase; letter-spacing: 0.4px; }
+  /* §27: Tonalität dezent als Randfarbe, immer zusätzlich Text -- keine
+     moralische Wertung (§28), rein dramaturgisch. */
+  .chronikChapterCard.tone-PEACEFUL { border-left: 6px solid var(--c-positive); }
+  .chronikChapterCard.tone-CONFLICT { border-left: 6px solid var(--accent); }
+  .chronikChapterCard.tone-TRAGIC { border-left: 6px solid var(--ink); }
+  .chronikChapterCard.tone-TRIUMPHANT { border-left: 6px solid var(--gold); }
+  .chronikChapterCard.tone-AMBIGUOUS { border-left: 6px solid var(--umber); }
+
+  /* §72-75: visuelle Bedeutungsstufen (chronicleEntryTier) -- Stufen, kein
+     technisches Label spielerseitig (§75). */
+  .chronikChapterCard.tier-NOTE { padding: var(--sp-2) var(--sp-3); }
+  .chronikChapterCard.tier-NOTE .chronikChapterTitle { font-size: var(--fs-body); }
+  .chronikChapterCard.tier-CHAPTER { padding: var(--sp-4) var(--sp-5); }
+  .chronikChapterCard.tier-CHAPTER .chronikChapterTitle { font-size: 26px; }
+
+  /* ---- Story-Filter (§45/46) ---- */
+  #chronikStoryFilters { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; margin-bottom: var(--sp-3); }
+  .chronikFilterChip { font-family: var(--font); font-size: 12px; font-weight: 600; padding: 4px 10px; background: transparent; border: 2px solid var(--umber); color: var(--umber); box-shadow: none; }
+  .chronikFilterChip.active { background: var(--umber); color: var(--panel); }
+
+  /* ---- Story-Kapitel-Detail ---- */
+  .chronikStoryIllustration { border-radius: var(--r-md); overflow: hidden; margin-bottom: var(--sp-3); box-shadow: var(--shadow-sm); }
+  .chronikBeatList { list-style: none; margin: 0; padding: 0; }
+  .chronikBeatList li { display: flex; gap: var(--sp-3); padding: 6px 0; border-bottom: 1px dotted rgba(32,24,17,0.15); }
+  .chronikBeatList .yr { font-family: var(--font-display); font-weight: 700; color: var(--accent); flex: 0 0 52px; }
+  .chronikResolutionBox { margin-top: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); border: 2px solid var(--gold); background: rgba(179,137,63,0.1); }
+
+  /* ---- Kriegskapitel-Detail + Kartenfragment (§31) ---- */
+  .chronikWarMapFragment { width: 100%; max-width: 260px; margin: 0 auto var(--sp-3); display: block; }
+  .chronikWarMapFragment svg { width: 100%; height: auto; }
+  .chronikBattleRow { display: flex; justify-content: space-between; font-size: var(--fs-body); padding: 4px 0; border-bottom: 1px dotted rgba(32,24,17,0.15); }
+  .chronikBattleRow.won .outcome { color: var(--c-positive); font-weight: 600; }
+  .chronikBattleRow.lost .outcome { color: var(--c-danger); font-weight: 600; }
+
+  /* ---- Meilensteine (§40/41): Randnotiz/Siegel-Optik. ---- */
+  #chronikMilestoneList { display: flex; flex-wrap: wrap; gap: var(--sp-3); justify-content: center; }
+  .chronikMilestone { flex: 0 1 220px; text-align: center; padding: var(--sp-3); }
+  .chronikMilestoneSeal {
+    width: 46px; height: 46px; border-radius: 50%; margin: 0 auto var(--sp-1); background: var(--gold);
+    display: flex; align-items: center; justify-content: center; color: var(--ink); font-family: var(--font-display); font-weight: 700;
+    box-shadow: 0 0 0 3px var(--panel), 0 0 0 4px var(--gold), var(--shadow-sm);
+  }
+  .chronikMilestone .txt { font-size: var(--fs-body); font-style: italic; }
+
+  /* ---- Familienmeilensteine (§34/35) ---- */
+  .chronikFamilyEntry { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) 0; border-bottom: 1px dotted rgba(32,24,17,0.15); }
+  .chronikFamilyEntry .yr { font-family: var(--font-display); font-weight: 700; color: var(--accent); flex: 0 0 52px; text-align: right; }
+
+  /* ---- Herrschertod (§36) -- würdevoll, nicht wie Game-Over-Warnung. ---- */
+  .chronikDeathPage { text-align: center; padding: var(--sp-4) 0; }
+  .chronikDeathPage .chronikRulerPortrait { filter: grayscale(0.5) sepia(0.2) brightness(0.75); box-shadow: 0 0 0 4px var(--umber), 0 0 0 6px var(--ink); }
+  .chronikDeathCross { font-family: var(--font-display); font-size: var(--fs-lg); color: var(--umber); }
+
+  /* ---- World Log (§47/48): bewusst NICHT wie das Buch -- sachliches
+     Register/Archiv statt Buch-Highlight, klare Trennung. ---- */
+  #chronikWorldLogPanel {
+    background: var(--panel-dark); color: #e8dcc0; border-radius: var(--r-md); padding: var(--sp-3);
+    max-height: 480px; overflow-y: auto; font-family: var(--font); font-size: var(--fs-body);
+  }
+  .chronikLogRow { padding: 2px 0; border-bottom: 1px solid rgba(232,220,192,0.08); }
+
+  /* ---- Zeitstrahl am Buchrand (§42-44) ---- */
+  #chronikTimeline { display: flex; align-items: center; margin-top: var(--sp-3); width: 100%; max-width: 1180px; overflow-x: auto; padding: var(--sp-2) 0; }
+  .chronikTimelineSeg {
+    flex: 1 1 0; min-width: 60px; text-align: center; font-family: var(--font-display); font-size: var(--fs-micro);
+    padding: 4px 2px; border-top: 3px solid var(--umber); color: var(--panel); cursor: pointer; background: transparent; box-shadow: none;
+  }
+  .chronikTimelineSeg.current { border-top-color: var(--gold); color: var(--gold); font-weight: 700; }
+
+  /* ---- Dynastieende / Kaiserkrone (§38/39/103/104) ---- */
+  .chronikFinalePage { text-align: center; padding: var(--sp-4) var(--sp-3); }
+  .chronikFinalePage.ending { border-top: 4px solid var(--ink); }
+  .chronikFinalePage.imperial { border-top: 4px solid var(--gold); }
+  .chronikFinaleTitle { font-family: var(--font-display); font-size: 32px; font-weight: 700; margin: var(--sp-2) 0; }
+  .chronikFinaleTitle.imperial { color: var(--gold); }
+
+  /* ---- Personen-/Regionenverlinkung (§50/51) ---- */
+  .chronikLink { color: var(--accent); cursor: pointer; text-decoration: underline dotted; background: none; border: none; padding: 0; font: inherit; }
+  .chronikLink:hover, .chronikLink:focus-visible { color: var(--gold); }
+
+  /* ---- Empty-State (§13: nicht künstlich füllen) ---- */
+  .chronikEmpty { text-align: center; font-style: italic; color: var(--umber); padding: var(--sp-4) 0; }
+
+  /* ---- Responsive: 1366x768 -- Doppelseite nur wenn lesbar, sonst
+     Einzelseiten-Modus (§57/59), kein Miniaturtext (§58). ---- */
+  @media (max-width: 1230px) {
+    .chronikFrame { max-width: 96vw; }
+    .chronikBook { padding: var(--sp-4) var(--sp-3) var(--sp-3); }
+    .chronikTitle { font-size: 27px; }
+  }
 </style>
 </head>
 <body>
@@ -1147,6 +1349,7 @@
       <button id="tabProvinz" class="pagetab">🏰<span data-i18n="tab_provinz_label">PROVINZ</span></button>
       <button id="tabHof" class="pagetab">📚<span data-i18n="tab_hof_label">HOF</span></button>
       <button id="tabDynastie" class="pagetab">⚜<span data-i18n="tab_dynastie_label">DYNASTIE</span></button>
+      <button id="tabChronik" class="pagetab">📖<span data-i18n="tab_chronik_label">CHRONIK</span></button>
       <button id="tabWirtschaft" class="pagetab">💰<span data-i18n="tab_wirtschaft_label">WIRTSCHAFT</span></button>
       <button id="tabDiplomatie" class="pagetab">🤝<span data-i18n="tab_diplomatie_label">DIPLOMATIE</span></button>
       <button id="tabKarte" class="pagetab">🗺<span data-i18n="tab_karte_label">GEBÄUDE</span></button>
@@ -1295,6 +1498,20 @@
       <h2 class="title" data-i18n="dynasty_succession_title">THRONFOLGE</h2>
       <div id="successionPanel"></div>
       <div id="deceasedRulersSection"></div>
+    </div>
+  </div>
+
+  <!-- §Phase-8H "Chronicle Book": "Das große Buch der Dynastie" -- reine
+       Präsentationsschicht über Chronicle 2.0 (js/chronicle.js), keine
+       neue Erzähl-Engine. -->
+  <div id="chronikPage" style="display:none;">
+    <div class="chronikFrame">
+      <div id="chronikNav"></div>
+      <div id="chronikSearchBar"><input id="chronikSearchInput" type="text" placeholder="Suche nach Namen oder Jahr…" oninput="onChronikSearch(this.value)"></div>
+      <div class="chronikBook" id="chronikBook" tabindex="-1">
+        <div id="chronikContent"></div>
+      </div>
+      <div id="chronikTimeline"></div>
     </div>
   </div>
 
@@ -1552,6 +1769,9 @@
   <div style="max-width: 700px;">
     <div id="go-text"></div>
     <div id="go-stats" style="text-align:left; font-size:var(--fs-md); background:rgba(0,0,0,0.3); border:2px solid #b8963e; padding:14px; margin:14px 0; line-height:1.8;"></div>
+    <!-- §103/104: bei Spielende bekommt der Spieler nicht nur eine
+         Verlust-/Sieg-Meldung, sondern seine Geschichte im Chronikbuch. -->
+    <button class="btn-imperial" onclick="openChronikFromGameOver()">📖 DEINE GESCHICHTE ANSEHEN</button>
     <button onclick="location.reload()">NEUES SPIEL</button>
   </div>
 </div>
@@ -3263,7 +3483,7 @@ const STRINGS = {
     tab_karte: "🗺 KARTE & GEBÄUDE",
     tab_militaer: "⚔ MILITÄR",
     tab_reich_label: "REICH", tab_provinz_label: "PROVINZ", tab_hof_label: "HOF",
-    tab_dynastie_label: "DYNASTIE",
+    tab_dynastie_label: "DYNASTIE", tab_chronik_label: "CHRONIK",
     hof_ruling_title: "DAS HERRSCHERHAUS", hof_offices_title: "HOFÄMTER",
     dynasty_tree_title: "STAMMBAUM", dynasty_succession_title: "THRONFOLGE",
     tab_wirtschaft_label: "WIRTSCHAFT", tab_diplomatie_label: "DIPLOMATIE",
@@ -3328,7 +3548,7 @@ const STRINGS = {
     tab_karte: "🗺 MAP & BUILDINGS",
     tab_militaer: "⚔ MILITARY",
     tab_reich_label: "REALM", tab_provinz_label: "PROVINCE", tab_hof_label: "COURT",
-    tab_dynastie_label: "DYNASTY",
+    tab_dynastie_label: "DYNASTY", tab_chronik_label: "CHRONICLE",
     hof_ruling_title: "THE RULING HOUSE", hof_offices_title: "COURT OFFICES",
     dynasty_tree_title: "FAMILY TREE", dynasty_succession_title: "SUCCESSION",
     tab_wirtschaft_label: "ECONOMY", tab_diplomatie_label: "DIPLOMACY",
@@ -11926,6 +12146,259 @@ function getBattleChronicleHintViewModel(state, aiId) {
   return isChronicleWorthy(state, mem).worthy ? { worthy: true } : null;
 }
 
+// ============================================================
+// Phase 8H: CHRONICLE BOOK -- "Die Geschichte der Dynastie wird zum
+// illustrierten Buch". Liest ausschließlich bereits vorhandene
+// Chronicle-2.0-Quellen (js/chronicle.js: computeDynastyChronicle,
+// getRulerEras, buildRulerBiography, computeDynastyMilestones,
+// computeDynastySummary, isChronicleWorthy) sowie World Memory/Story
+// Threads -- keine neue Narrative Engine, keine neuen Scores, keine
+// neuen rnd()-Aufrufe. computeDynastyChronicle() bleibt pure/on-demand,
+// kein neuer inkrementeller Chronicle-State (§85).
+// ============================================================
+
+// §72-75: visuelle Bedeutungsstufe rein aus der bereits vorhandenen
+// Chronicle-Importance -- keine neue Kennzahl, nur Bucketing (damit
+// 51 vs. 52 Punkte nicht sichtbar unterschiedlich wirken, §73).
+function chronicleEntryTier(importance) {
+  if (importance >= 85) return "CHAPTER";
+  if (importance >= 65) return "FEATURE";
+  if (importance >= 45) return "ENTRY";
+  return "NOTE";
+}
+
+// §45: Story-Filterkategorien nur aus real existierenden Thread-Typen --
+// 1:1-Abbildung auf STORY_THREAD_TYPES, keine erfundene Kategorie.
+const STORY_FILTER_LABEL = {
+  SUCCESSION_CONFLICT: "Dynastie", PERSONAL_RIVALRY: "Rivalität",
+  FOOD_CRISIS: "Krise", FOREIGN_CONFLICT: "Krieg",
+  RELIGIOUS_CONFLICT: "Religion", IMPERIAL_AMBITION: "Kaiserreich",
+  DYNASTIC_ALLIANCE: "Diplomatie",
+};
+// §25: dieselbe Illustrations-Kategorisierung wie 8Fs RANDOM_EVENT_CATEGORY/
+// CHAIN_EVENT_CATEGORY -- Story-Threads bekommen eine bereits bestehende
+// EVENT_CATEGORY_INFO-Kategorie zugeordnet, keine zweite Bildsprache.
+const STORY_THREAD_ILLUSTRATION_CATEGORY = {
+  SUCCESSION_CONFLICT: "succession", PERSONAL_RIVALRY: "rivalry",
+  FOOD_CRISIS: "famine", FOREIGN_CONFLICT: "war",
+  RELIGIOUS_CONFLICT: "religion", IMPERIAL_AMBITION: "imperial",
+  DYNASTIC_ALLIANCE: "marriage",
+};
+
+// ---------- §9/10: Titelseite ----------
+function getChronicleTitlePageViewModel(state) {
+  const currentRuler = state.characters[state.rulerId];
+  const summary = computeDynastySummary(state);
+  const houseName = state.dynastyName || (currentRuler ? currentRuler.surname : "") || "";
+  return {
+    dynastyName: state.dynastyName, foundingYear: 1500, currentYear: state.year,
+    currentRulerName: currentRuler ? `${currentRuler.name} ${currentRuler.surname || ""}`.trim() : null,
+    currentRulerCard: currentRuler ? getCharacterCardViewModel(state, state.rulerId) : null,
+    highestTitleName: summary.highestTitleName,
+    generations: summary.generations, rulerCount: summary.rulerCount,
+    heraldry: getHeraldryViewModel(houseName),
+    gameOver: state.gameOver,
+  };
+}
+
+// ---------- §11/12: Dynasty Summary -- die bereits vollständige, echte
+// Summary direkt weiterreichen, kein Zwischenschritt, keine neue Wertung. ----------
+function getDynastySummaryViewModel(state) {
+  return computeDynastySummary(state);
+}
+
+// ---------- §14/42/68: Herrscherliste (Kapitelübersicht + Zeitstrahl-
+// Grundlage) -- dieselbe Era-Iteration wie getDynastyTreeViewModel, nur
+// inklusive des aktuellen Herrschers. ----------
+function getChronicleRulerListViewModel(state) {
+  const eras = getRulerEras(state);
+  return eras.map((e, idx) => {
+    const c = state.characters[e.rulerId];
+    return {
+      rulerId: e.rulerId, order: idx + 1,
+      name: c ? `${c.name} ${c.surname || ""}`.trim() : "Unbekannt",
+      startYear: e.startYear, endYear: e.endYear, isCurrent: e.endYear === null,
+      alive: c ? c.alive : false,
+      card: c ? getCharacterCardViewModel(state, e.rulerId) : null,
+    };
+  });
+}
+
+// ---------- §14-21/68/69: Regenten-Kapitel -- buildRulerBiography()
+// bleibt Source of Truth, hier nur um Portrait/Familienlinks/Traits/
+// Navigation ergänzt (keine parallele Biografie-Berechnung). ----------
+function getRulerChapterViewModel(state, rulerId) {
+  const bio = buildRulerBiography(state, rulerId);
+  const c = state.characters[rulerId];
+  if (!bio || !c) return null;
+  const card = getCharacterCardViewModel(state, rulerId);
+  const spouse = c.spouseId && state.characters[c.spouseId] ? getCharacterCardViewModel(state, c.spouseId) : null;
+  const children = (c.childrenIds || []).map(id => getCharacterCardViewModel(state, id)).filter(Boolean);
+  const eras = getRulerEras(state);
+  const idx = eras.findIndex(e => e.rulerId === rulerId);
+  // §19: kein erfundenes Geburtsjahr -- reine Arithmetik aus bereits realen
+  // Feldern (Alter friert bei Tod ein, s. updateDynasty()), nichts geschätzt.
+  const birthYear = (bio.reignEnd !== null ? bio.reignEnd : state.year) - c.age;
+  // §17: kurze, saubere Ereigniszeile statt bio.highlights' voller,
+  // mehrzeiliger Thread-Zusammenfassung -- bei Thread-Sammel-Einträgen den
+  // echten, kurzen Thread-Titel verwenden (dieselbe Unterscheidung, die
+  // Chronicle 2.0 selbst über entry.threadId trifft), sonst die reale
+  // Memory-Beschreibung. Kein neuer Text, nur ein anderes Feld desselben
+  // bereits vorhandenen Chronicle-2.0-Eintrags.
+  const highlights = getChronicleForRuler(state, rulerId).map(e => ({ year: e.year, text: e.threadId ? e.title : e.text }));
+  return {
+    rulerId, bio, card, birthYear, highlights,
+    deathYear: (!c.alive && bio.reignEnd !== null) ? bio.reignEnd : null,
+    spouse, children, topTraits: card ? card.topTraits : [],
+    hasPrev: idx > 0, hasNext: idx >= 0 && idx < eras.length - 1,
+    prevRulerId: idx > 0 ? eras[idx - 1].rulerId : null,
+    nextRulerId: idx >= 0 && idx < eras.length - 1 ? eras[idx + 1].rulerId : null,
+  };
+}
+
+// ---------- §23-28/66/67: Story-Kapitel -- nur bereits real
+// abgeschlossene, bedeutende Threads (dieselbe Schwelle, die Chronicle
+// 2.0 selbst für die Thread-Zusammenfassung verwendet -- Dedup bleibt
+// unverändert bestehen). ----------
+function getStoryChapterListViewModel(state) {
+  const threads = getAllStoryThreads(state).filter(t =>
+    (t.status === "RESOLVED" || t.status === "EXPIRED") && t.importance >= CONFIG.chronicle.threadSummaryThreshold);
+  return threads.map(t => ({
+    threadId: t.id, title: t.title, type: t.type,
+    filterLabel: STORY_FILTER_LABEL[t.type] || "Sonstiges",
+    startYear: t.startedYear,
+    endYear: t.history.length ? t.history[t.history.length - 1].year : t.startedYear,
+    importance: t.importance, tier: chronicleEntryTier(t.importance),
+    resolutionTone: t.resolution ? t.resolution.tone : null,
+  })).sort((a, b) => a.startYear - b.startYear);
+}
+
+// §24: max. 3-6 Beats -- bei längerer History deterministisch Anfang/Ende
+// + gleichmäßig verteilte Zwischenpunkte statt einer erfundenen Auswahl.
+function pickThreadBeats(history) {
+  if (history.length <= 6) return history;
+  const midCount = 2;
+  const picks = [0, 1];
+  for (let i = 1; i <= midCount; i++) picks.push(Math.round(i * (history.length - 1) / (midCount + 1)));
+  picks.push(history.length - 2, history.length - 1);
+  return Array.from(new Set(picks)).sort((a, b) => a - b).map(i => history[i]);
+}
+
+function getStoryChapterViewModel(state, threadId) {
+  const thread = getAllStoryThreads(state).find(t => t.id === threadId);
+  if (!thread) return null;
+  const participants = thread.actorIds.map(id => getCharacterCardViewModel(state, id)).filter(Boolean);
+  const illustrationCategory = STORY_THREAD_ILLUSTRATION_CATEGORY[thread.type] || null;
+  return {
+    threadId: thread.id, title: thread.title,
+    filterLabel: STORY_FILTER_LABEL[thread.type] || "Sonstiges",
+    startYear: thread.startedYear,
+    endYear: thread.history.length ? thread.history[thread.history.length - 1].year : thread.startedYear,
+    participants,
+    beats: pickThreadBeats(thread.history).map(h => ({ year: h.year, note: h.note })),
+    resolution: thread.resolution ? {
+      type: thread.resolution.type, tone: thread.resolution.tone,
+      consequences: thread.resolution.consequences || [],
+    } : null,
+    summaryText: summarizeStoryThread(thread),
+    illustration: illustrationCategory ? {
+      category: illustrationCategory, categoryInfo: EVENT_CATEGORY_INFO[illustrationCategory],
+      participants, year: thread.startedYear, isSuccession: false,
+    } : null,
+  };
+}
+
+// ---------- §29-33: Kriegskapitel -- nur echte WAR_DECLARED/
+// PEACE_SIGNED/MAJOR_BATTLE_*-Memories, nur chronikwürdige Schlachten. ----------
+function getWarChapterViewModel(state, aiId) {
+  const region = state.regions[aiId];
+  if (!region) return null;
+  const declarations = getMemoriesByType(state, "WAR_DECLARED").filter(m => m.regionIds.includes(aiId)).sort((a, b) => a.year - b.year);
+  if (!declarations.length) return null;
+  const peaces = getMemoriesByType(state, "PEACE_SIGNED").filter(m => m.regionIds.includes(aiId)).sort((a, b) => a.year - b.year);
+  const battleMemories = allMemories(state).filter(m =>
+    (m.type === "MAJOR_BATTLE_WON" || m.type === "MAJOR_BATTLE_LOST") && m.regionIds && m.regionIds.includes(aiId));
+  const worthyBattles = battleMemories.filter(m => isChronicleWorthy(state, m).worthy)
+    .sort((a, b) => a.year - b.year)
+    .map(m => ({ year: m.year, won: m.type === "MAJOR_BATTLE_WON", text: m.description, conquest: !!(m.metadata && m.metadata.conquest) }));
+  const conquestBattle = worthyBattles.filter(b => b.conquest).pop() || null;
+  const ongoing = !!(state.warState && state.warState[aiId]);
+  const lastPeace = peaces.length ? peaces[peaces.length - 1] : null;
+  const thread = getAllStoryThreads(state).find(t => t.type === "FOREIGN_CONFLICT" && t.regionIds.includes(aiId));
+  return {
+    aiId, opponentName: region.name.replace(/\s*\(.*\)$/, ""),
+    startYear: declarations[0].year,
+    endYear: ongoing ? null : (lastPeace ? lastPeace.year : (conquestBattle ? conquestBattle.year : null)),
+    ongoing, conquered: !!conquestBattle || !!region.conquered,
+    battles: worthyBattles,
+    storyThread: thread ? { threadId: thread.id, title: thread.title } : null,
+  };
+}
+
+function getWarChapterListViewModel(state) {
+  const aiIds = Object.keys(state.regions).filter(id => id !== "player");
+  const chapters = [];
+  for (const aiId of aiIds) {
+    const worthy = getMemoriesByType(state, "WAR_DECLARED")
+      .filter(m => m.regionIds.includes(aiId)).some(m => isChronicleWorthy(state, m).worthy);
+    if (!worthy) continue;
+    const chapter = getWarChapterViewModel(state, aiId);
+    if (chapter) chapters.push(chapter);
+  }
+  return chapters.sort((a, b) => a.startYear - b.startYear);
+}
+
+// ---------- §34/35: Familienmeilensteine -- dieselben DYNASTIE-
+// kategorisierten Chronicle-2.0-Einträge, keine Zweitquelle. ----------
+function getFamilyMilestonesViewModel(state) {
+  return computeDynastyChronicle(state).filter(e => e.category === "DYNASTIE");
+}
+
+// ---------- §40/41: Meilensteine wie eine historische Randnotiz -- reale
+// computeDynastyMilestones()-Einträge, keine Achievement-Optik. ----------
+function getMilestoneListViewModel(state) {
+  return computeDynastyMilestones(state).map(m => ({
+    type: m.type, year: m.year !== undefined ? m.year : null, text: m.text,
+  }));
+}
+
+// ---------- §47/48: World Log -- separat, sachlich, volles state.chronicle
+// (bereits neueste-zuerst, s. addChronicle()/unshift). ----------
+function getWorldLogViewModel(state) {
+  return state.chronicle.slice();
+}
+
+// ---------- §38/103: Dynastieende als eigene Schlussseite -- nur bei
+// echtem state.gameOver === "no_heir". ----------
+function getDynastyEndingViewModel(state) {
+  if (state.gameOver !== "no_heir") return null;
+  const eras = getRulerEras(state);
+  const lastEra = eras[eras.length - 1];
+  const lastRuler = lastEra ? state.characters[lastEra.rulerId] : null;
+  const summary = computeDynastySummary(state);
+  return {
+    lastRulerName: lastRuler ? `${lastRuler.name} ${lastRuler.surname || ""}`.trim() : null,
+    lastYear: state.year, generations: summary.generations, rulerCount: summary.rulerCount,
+    highestTitleName: summary.highestTitleName,
+    biggestCrisis: summary.biggestCrisis, mostSignificantWar: summary.mostSignificantWar,
+  };
+}
+
+// ---------- §39/104: Kaiser-Sieg als eigene finale Chronikseite -- nur bei
+// echtem state.gameOver === "victory", keine neue Mechanik. ----------
+function getImperialEndingViewModel(state) {
+  if (state.gameOver !== "victory") return null;
+  const ruler = state.characters[state.rulerId];
+  const summary = computeDynastySummary(state);
+  const coronation = allMemories(state).find(m => m.type === "TITLE_GAINED" && m.metadata && m.metadata.titleId === "kaiser");
+  return {
+    dynastyName: state.dynastyName,
+    rulerName: ruler ? `${ruler.name} ${ruler.surname || ""}`.trim() : null,
+    year: coronation ? coronation.year : state.year,
+    generations: summary.generations, rulerCount: summary.rulerCount,
+  };
+}
+
 </script>
 <script>
 let state = null; // erst nach Charaktererstellung bzw. Laden gesetzt (§8/§89)
@@ -12602,6 +13075,7 @@ function switchPage(page) {
   document.getElementById('provinzPage').style.display = page === 'provinz' ? 'block' : 'none';
   document.getElementById('hofPage').style.display = page === 'hof' ? 'block' : 'none';
   document.getElementById('dynastiePage').style.display = page === 'dynastie' ? 'block' : 'none';
+  document.getElementById('chronikPage').style.display = page === 'chronik' ? 'flex' : 'none';
   document.getElementById('wirtschaftPage').style.display = page === 'wirtschaft' ? 'block' : 'none';
   document.getElementById('diplomatiePage').style.display = page === 'diplomatie' ? 'block' : 'none';
   document.getElementById('mapview').style.display = page === 'karte' ? 'block' : 'none';
@@ -12610,6 +13084,7 @@ function switchPage(page) {
   document.getElementById('tabProvinz').classList.toggle('active', page === 'provinz');
   document.getElementById('tabHof').classList.toggle('active', page === 'hof');
   document.getElementById('tabDynastie').classList.toggle('active', page === 'dynastie');
+  document.getElementById('tabChronik').classList.toggle('active', page === 'chronik');
   document.getElementById('tabWirtschaft').classList.toggle('active', page === 'wirtschaft');
   document.getElementById('tabDiplomatie').classList.toggle('active', page === 'diplomatie');
   document.getElementById('tabKarte').classList.toggle('active', page === 'karte');
@@ -12620,6 +13095,7 @@ document.getElementById('tabReich').addEventListener('click', () => switchPage('
 document.getElementById('tabProvinz').addEventListener('click', () => switchPage('provinz'));
 document.getElementById('tabHof').addEventListener('click', () => switchPage('hof'));
 document.getElementById('tabDynastie').addEventListener('click', () => switchPage('dynastie'));
+document.getElementById('tabChronik').addEventListener('click', () => switchPage('chronik'));
 document.getElementById('tabWirtschaft').addEventListener('click', () => switchPage('wirtschaft'));
 document.getElementById('tabDiplomatie').addEventListener('click', () => switchPage('diplomatie'));
 document.getElementById('tabKarte').addEventListener('click', () => switchPage('karte'));
@@ -12773,6 +13249,7 @@ function render() {
   // Zahlen.
   if (currentPage === 'hof') renderCourtPage();
   if (currentPage === 'dynastie') renderDynastyPage();
+  if (currentPage === 'chronik') renderChronikPage();
 
   // Technologie (§28)
   let techHtml = `<b>Forschungspunkte:</b> ${Math.round(state.researchPoints || 0)}<br>`;
@@ -12864,7 +13341,7 @@ function render() {
     document.getElementById('titleProgress').textContent = 'Höchster Titel erreicht!';
   }
 
-  if (state.gameOver) {
+  if (state.gameOver && !chronikDismissedGameOver) {
     const cond = CONFIG.victoryConditions[state.victoryCondition];
     const msgs = {
       victory: state.victoryCondition && state.victoryCondition !== 'kaiser'
@@ -14482,6 +14959,349 @@ function renderDynastyPage() {
   }
   document.getElementById('deceasedRulersSection').innerHTML = deadHtml;
 }
+
+// ============================================================
+// §Phase-8H "Chronicle Book": "Das große Buch der Dynastie" -- reine
+// Präsentationsschicht über Chronicle 2.0 (js/chronicle.js) und die
+// Phase-8H-ViewModels (js/ui-viewmodels.js). Keine neue Erzähl-Engine,
+// keine neuen Scores, keine Gameplaylogik hier.
+// ============================================================
+const CHRONIK_SECTIONS = [
+  { id: 'dynastie', label: 'DYNASTIE' },
+  { id: 'herrscher', label: 'HERRSCHER' },
+  { id: 'geschichten', label: 'GESCHICHTEN' },
+  { id: 'kriege', label: 'KRIEGE' },
+  { id: 'meilensteine', label: 'MEILENSTEINE' },
+  { id: 'worldlog', label: 'WORLD LOG' },
+];
+let chronikSection = null; // §53/54: Default = aktuelle Regentschaft, danach UI-State gemerkt
+let chronikRulerId = null;
+let chronikStoryFilter = 'all';
+let chronikStoryDetailId = null;
+let chronikWarDetailId = null;
+let chronikSearchQuery = '';
+// §103: bleibt bewusst dauerhaft (nicht gespeichert) -- render()s eigene
+// gameOver-Anzeige-Logik würde das Overlay sonst bei jedem Re-Render
+// wieder einblenden, sobald state.gameOver gesetzt ist.
+let chronikDismissedGameOver = false;
+
+function setChronikSection(s) { chronikSection = s; chronikStoryDetailId = null; chronikWarDetailId = null; render(); }
+function setChronikRuler(rulerId) { chronikRulerId = rulerId; render(); }
+function jumpToRulerChapter(rulerId) { chronikSection = 'herrscher'; chronikRulerId = rulerId; render(); }
+function openChronikStory(threadId) { chronikStoryDetailId = threadId; render(); }
+function openChronikWar(aiId) { chronikWarDetailId = aiId; render(); }
+function onChronikSearch(value) { chronikSearchQuery = value; renderChronikPage(); } // kein render(): Suchfeld darf Fokus/Cursor nicht verlieren
+// §103: Aufruf vom Game-Over-Bildschirm ("Deine Geschichte ansehen").
+function openChronikFromGameOver() {
+  chronikDismissedGameOver = true;
+  document.getElementById('gameover').style.display = 'none';
+  chronikSection = state.gameOver === 'victory' ? 'kaiser' : (state.gameOver === 'no_heir' ? 'ende' : 'dynastie');
+  switchPage('chronik');
+}
+// §51: Regionenverlinkung über die bestehende Kartenauswahl -- keine neue Kartenmechanik.
+function chronikShowWarOnMap(aiId) {
+  const capital = TERRITORIES.find(t => t.region === aiId && t.capital);
+  if (capital) { selectMapTerritory(capital.id); switchPage('reich'); }
+}
+// §50: Personenverlinkung über das bestehende 8D-Character-Detail.
+function buildChronikPersonLink(card) {
+  if (!card) return '';
+  return `<button class="chronikLink" onclick="openCharacterDetail('${card.id}')">${card.fullName}</button>`;
+}
+
+function renderChronikPage() {
+  if (!chronikSection) { chronikSection = 'herrscher'; chronikRulerId = state.rulerId; } // §53
+  let navHtml = CHRONIK_SECTIONS.map(s =>
+    `<button class="chronikNavBtn${chronikSection === s.id ? ' active' : ''}" onclick="setChronikSection('${s.id}')">${s.label}</button>`).join('');
+  if (state.gameOver === 'no_heir') navHtml += `<button class="chronikNavBtn ending${chronikSection === 'ende' ? ' active' : ''}" onclick="setChronikSection('ende')">DYNASTIEENDE</button>`;
+  if (state.gameOver === 'victory') navHtml += `<button class="chronikNavBtn ending${chronikSection === 'kaiser' ? ' active' : ''}" onclick="setChronikSection('kaiser')">KAISERKRONE</button>`;
+  document.getElementById('chronikNav').innerHTML = navHtml;
+
+  const showSearch = ['herrscher', 'geschichten', 'kriege', 'worldlog'].includes(chronikSection);
+  document.getElementById('chronikSearchBar').style.display = showSearch ? 'block' : 'none';
+
+  const content = document.getElementById('chronikContent');
+  if (chronikSection === 'dynastie') content.innerHTML = renderChronikDynastieHtml();
+  else if (chronikSection === 'herrscher') content.innerHTML = renderChronikHerrscherHtml();
+  else if (chronikSection === 'geschichten') content.innerHTML = renderChronikGeschichtenHtml();
+  else if (chronikSection === 'kriege') content.innerHTML = renderChronikKriegeHtml();
+  else if (chronikSection === 'meilensteine') content.innerHTML = renderChronikMeilensteineHtml();
+  else if (chronikSection === 'worldlog') content.innerHTML = renderChronikWorldLogHtml();
+  else if (chronikSection === 'ende') content.innerHTML = renderChronikEndeHtml();
+  else if (chronikSection === 'kaiser') content.innerHTML = renderChronikKaiserHtml();
+
+  renderChronikTimeline();
+}
+
+// ---------- §9-12: Titelseite + Dynasty Summary ----------
+function renderChronikDynastieHtml() {
+  const tp = getChronicleTitlePageViewModel(state);
+  const summary = getDynastySummaryViewModel(state);
+  let html = `<div class="chronikTitleHeraldry">${buildHeraldryShieldSvg(tp.heraldry)}</div>
+    <div class="chronikEyebrow">Chronik des Hauses</div>
+    <div class="chronikTitle">${(tp.dynastyName || '').toUpperCase()}</div>
+    <div class="chronikSub">${tp.foundingYear} – ${tp.currentYear}${tp.currentRulerName ? ' · ' + tp.currentRulerName : ''}</div>
+    <div class="chronikTitleStats">
+      <div class="chronikTitleStat"><div class="val">${tp.rulerCount}</div><div class="lbl">Herrscher</div></div>
+      <div class="chronikTitleStat"><div class="val">${tp.generations}</div><div class="lbl">Generationen</div></div>
+      <div class="chronikTitleStat"><div class="val">${tp.highestTitleName || '–'}</div><div class="lbl">Höchster Titel</div></div>
+    </div>
+    <hr class="chronikDivider">`;
+
+  // §12: nur echte Daten -- fehlende/leere Werte werden weggelassen statt erfunden.
+  const fmtThread = (t) => t ? `${t.title}${t.resolution ? ' (' + t.resolution.type + ')' : ''}` : null;
+  const rows = [
+    ['Längste Regentschaft', summary.longestReign ? summary.longestReign.text.replace(/^Längste Regentschaft:\s*/, '') : null],
+    ['Bedeutendste Krise', fmtThread(summary.biggestCrisis)],
+    ['Bedeutendster Konflikt', fmtThread(summary.mostSignificantWar)],
+    ['Bedeutendster Rivale', fmtThread(summary.mostImportantRivalry)],
+    ['Bedeutende Ehen', summary.importantMarriages || null],
+    ['Höchste Bevölkerung', summary.maxPopulation ? summary.maxPopulation.toLocaleString('de-DE') : null],
+    ['Höchste Staatskasse', summary.maxTreasury ? summary.maxTreasury.toLocaleString('de-DE') + ' Taler' : null],
+  ].filter(r => r[1] !== null && r[1] !== undefined && r[1] !== '');
+  if (rows.length) {
+    html += `<div class="chronikSummaryGrid">` + rows.map(r => `<div class="chronikSummaryRow"><div class="lbl">${r[0]}</div><div class="val">${r[1]}</div></div>`).join('') + `</div>`;
+  } else {
+    html += `<div class="chronikEmpty">Die Geschichte dieses Hauses beginnt gerade erst.</div>`;
+  }
+  return html;
+}
+
+// ---------- §14-21/68/69: Herrscher-Doppelseite ----------
+// Kurze, templatebasierte Fließtext-Biografie (§20-22) -- nur reale
+// Felder aus buildRulerBiography(), keine neue Text-KI, deterministisch.
+function buildChronikBiographyProse(bio, highlights) {
+  const parts = [`${bio.name} regierte von ${bio.reignStart} bis ${bio.reignEnd !== null ? bio.reignEnd : 'heute'} (${bio.reignYears} Jahre).`];
+  if (highlights.length) {
+    parts.push('Prägend für diese Regentschaft: ' + highlights.map(h => h.text.replace(/\.$/, '')).join('; ') + '.');
+  }
+  if (bio.populationStart !== null && bio.populationEnd !== null) {
+    const dir = bio.populationEnd >= bio.populationStart ? 'wuchs' : 'schrumpfte';
+    parts.push(`Die Bevölkerung ${dir} von ${bio.populationStart.toLocaleString('de-DE')} auf ${bio.populationEnd.toLocaleString('de-DE')}.`);
+  }
+  return parts.join(' ');
+}
+
+function renderChronikHerrscherHtml() {
+  const list = getChronicleRulerListViewModel(state);
+  if (!list.length) return `<div class="chronikEmpty">Noch keine Regentschaft bekannt.</div>`;
+  if (!chronikRulerId || !list.find(r => r.rulerId === chronikRulerId)) chronikRulerId = list[list.length - 1].rulerId;
+
+  const chipsHtml = `<div id="chronikRulerList">` + list.map(r =>
+    `<button class="chronikRulerChip${r.rulerId === chronikRulerId ? ' current' : ''}" onclick="setChronikRuler('${r.rulerId}')">${r.order}. ${r.name}${r.isCurrent ? ' (regiert)' : ''}</button>`).join('') + `</div>`;
+
+  const chap = getRulerChapterViewModel(state, chronikRulerId);
+  if (!chap) return chipsHtml + `<div class="chronikEmpty">Kein Kapitel gefunden.</div>`;
+
+  const portraitCls = 'chronikRulerPortrait' + (chap.card.alive ? '' : ' deceased');
+  const datesText = chap.deathYear !== null ? `${chap.birthYear}–${chap.deathYear}` : `${chap.birthYear}–`;
+  const reignText = `Regierte ${chap.bio.reignStart}–${chap.bio.reignEnd !== null ? chap.bio.reignEnd : 'heute'} (${chap.bio.reignYears} Jahre)`;
+
+  let leftHtml = `<div class="chronikRulerPortraitBox"><div class="${portraitCls}">${buildPortraitSvg(chap.card.portrait)}</div></div>
+    <div class="chronikRulerName">${chap.card.fullName}</div>
+    <div class="chronikRulerDates">${datesText} · ${reignText}</div>`;
+  if (chap.spouse) leftHtml += `<div class="chronikFactRow"><span class="lbl">Ehepartner</span><span>${buildChronikPersonLink(chap.spouse)}</span></div>`;
+  if (chap.children.length) leftHtml += `<div class="chronikFactRow"><span class="lbl">Kinder</span><span>${chap.children.map(buildChronikPersonLink).join(', ')}</span></div>`;
+  if (chap.bio.titleStart || chap.bio.titleEnd) leftHtml += `<div class="chronikFactRow"><span class="lbl">Titel</span><span>${chap.bio.titleStart || '–'} → ${chap.bio.titleEnd || chap.bio.titleStart || '–'}</span></div>`;
+  if (chap.topTraits && chap.topTraits.length) leftHtml += `<div class="chronikTraitRow">` + chap.topTraits.map(t => `<span class="traitBadge" data-tip="${t.name}: ${t.effectText}">${t.name}</span>`).join(' ') + `</div>`;
+
+  let rightHtml = `<div class="chronikSub" style="text-align:left; margin-bottom:var(--sp-2);">WICHTIGSTE EREIGNISSE</div>`;
+  rightHtml += chap.highlights.length
+    ? `<ul class="chronikHighlightList">` + chap.highlights.map(h => `<li><span class="yr">${h.year}</span>${h.text}</li>`).join('') + `</ul>`
+    : `<div class="chronikEmpty">Für diese Regentschaft sind keine bedeutenden Ereignisse verzeichnet.</div>`;
+  if (chap.bio.populationStart !== null || chap.bio.treasuryStart !== null) {
+    rightHtml += `<div class="chronikSub" style="text-align:left; margin:var(--sp-3) 0 var(--sp-1);">REGIERUNGS-KENNZAHLEN</div>`;
+    if (chap.bio.populationStart !== null) rightHtml += `<div class="chronikMetricRow"><span>Bevölkerung</span><span>${chap.bio.populationStart.toLocaleString('de-DE')}<span class="arrow">→</span>${chap.bio.populationEnd.toLocaleString('de-DE')}</span></div>`;
+    if (chap.bio.treasuryStart !== null) rightHtml += `<div class="chronikMetricRow"><span>Staatskasse</span><span>${chap.bio.treasuryStart.toLocaleString('de-DE')}<span class="arrow">→</span>${chap.bio.treasuryEnd.toLocaleString('de-DE')} Taler</span></div>`;
+  }
+  rightHtml += `<div class="chronikBioText">${buildChronikBiographyProse(chap.bio, chap.highlights)}</div>`;
+
+  let html = chipsHtml + `<div class="chronikSpread">
+      <div class="chronikPageCol left">${leftHtml}</div>
+      <div class="chronikPageCol right">${rightHtml}</div>
+    </div>
+    <div id="chronikRulerPagination">
+      <button class="btn-ghost" ${!chap.hasPrev ? 'disabled' : ''} onclick="setChronikRuler('${chap.prevRulerId}')">← VORHERIGER HERRSCHER</button>
+      <button class="btn-ghost" ${!chap.hasNext ? 'disabled' : ''} onclick="setChronikRuler('${chap.nextRulerId}')">NÄCHSTER HERRSCHER →</button>
+    </div>`;
+  return html;
+}
+
+// ---------- §23-28/45/46: Story-Kapitel -- Liste + Detail ----------
+function renderChronikGeschichtenHtml() {
+  if (chronikStoryDetailId) {
+    const chap = getStoryChapterViewModel(state, chronikStoryDetailId);
+    if (chap) return renderChronikStoryDetailHtml(chap);
+    chronikStoryDetailId = null;
+  }
+  let list = getStoryChapterListViewModel(state);
+  const q = chronikSearchQuery.trim().toLowerCase();
+  if (q) list = list.filter(t => t.title.toLowerCase().includes(q) || String(t.startYear).includes(q) || String(t.endYear).includes(q));
+
+  const presentTypes = Array.from(new Set(list.map(t => t.type)));
+  let html = `<div id="chronikStoryFilters"><button class="chronikFilterChip${chronikStoryFilter === 'all' ? ' active' : ''}" onclick="setChronikStoryFilter('all')">ALLE</button>`
+    + presentTypes.map(ty => `<button class="chronikFilterChip${chronikStoryFilter === ty ? ' active' : ''}" onclick="setChronikStoryFilter('${ty}')">${(STORY_FILTER_LABEL[ty] || ty).toUpperCase()}</button>`).join('')
+    + `</div>`;
+  const filtered = chronikStoryFilter === 'all' ? list : list.filter(t => t.type === chronikStoryFilter);
+  if (!filtered.length) {
+    html += `<div class="chronikEmpty">${list.length ? 'Keine Geschichten in dieser Kategorie.' : 'Noch keine abgeschlossenen Geschichten -- die Chronik füllt sich mit der Zeit.'}</div>`;
+    return html;
+  }
+  html += filtered.map(t => `
+    <div class="chronikChapterCard tier-${t.tier} tone-${t.resolutionTone || 'AMBIGUOUS'}" tabindex="0" role="button"
+         onclick="openChronikStory('${t.threadId}')" onkeydown="if(event.key==='Enter')openChronikStory('${t.threadId}')">
+      <div class="chronikChapterMeta">${t.startYear}–${t.endYear} · ${t.filterLabel}</div>
+      <div class="chronikChapterTitle">${t.title}</div>
+    </div>`).join('');
+  return html;
+}
+function setChronikStoryFilter(f) { chronikStoryFilter = f; render(); }
+
+function renderChronikStoryDetailHtml(chap) {
+  let html = `<button class="btn-ghost" onclick="chronikStoryDetailId=null; render();">← Zurück zu den Geschichten</button>`;
+  html += `<div class="chronikEyebrow">${chap.filterLabel} · ${chap.startYear}–${chap.endYear}</div>`;
+  html += `<div class="chronikTitle" style="font-size:28px;">${chap.title}</div>`;
+  // §25: Wiederverwendung der 8F-Illustration -- keine neue Art Engine.
+  if (chap.illustration) html += `<div class="chronikStoryIllustration">${renderEventIllustration(chap.illustration)}</div>`;
+  if (chap.participants.length) html += `<div style="text-align:center; margin-bottom:var(--sp-3);">` + chap.participants.map(buildChronikPersonLink).join(' · ') + `</div>`;
+  html += `<ul class="chronikBeatList">` + chap.beats.map(b => `<li><span class="yr">${b.year}</span><span>${b.note}</span></li>`).join('') + `</ul>`;
+  if (chap.resolution) html += `<div class="chronikResolutionBox"><b>ERGEBNIS: ${chap.resolution.type}</b>${chap.resolution.consequences.length ? '<br>' + chap.resolution.consequences.join(' ') : ''}</div>`;
+  return html;
+}
+
+// ---------- §29-33/31: Kriegskapitel -- Liste + Detail + Kartenfragment ----------
+function renderChronikKriegeHtml() {
+  if (chronikWarDetailId) {
+    const chap = getWarChapterViewModel(state, chronikWarDetailId);
+    if (chap) return renderChronikWarDetailHtml(chap);
+    chronikWarDetailId = null;
+  }
+  let list = getWarChapterListViewModel(state);
+  const q = chronikSearchQuery.trim().toLowerCase();
+  if (q) list = list.filter(w => w.opponentName.toLowerCase().includes(q) || String(w.startYear).includes(q));
+  if (!list.length) return `<div class="chronikEmpty">Noch keine chronikwürdigen Kriege.</div>`;
+  return list.map(w => `
+    <div class="chronikChapterCard tone-${w.conquered ? 'TRIUMPHANT' : (w.ongoing ? 'CONFLICT' : 'AMBIGUOUS')}" tabindex="0" role="button"
+         onclick="openChronikWar('${w.aiId}')" onkeydown="if(event.key==='Enter')openChronikWar('${w.aiId}')">
+      <div class="chronikChapterMeta">${w.startYear}–${w.ongoing ? 'andauernd' : (w.endYear || '?')}</div>
+      <div class="chronikChapterTitle">Der Krieg mit ${w.opponentName}</div>
+    </div>`).join('');
+}
+
+// §31: kleines statisches Kartenfragment aus MAP_GEOMETRY -- betroffene
+// Regionen hervorgehoben, keine zweite Karte, keine neue Geometrie.
+function buildChronikWarMapFragmentSvg(aiId) {
+  let paths = '';
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const t of TERRITORIES) {
+    if (t.region !== aiId && t.region !== 'player') continue;
+    const geo = MAP_GEOMETRY[t.id];
+    if (!geo) continue;
+    const color = t.region === aiId ? 'var(--accent)' : 'var(--gold)';
+    paths += `<path d="${geo.path}" fill="${color}" fill-opacity="0.55" stroke="rgba(32,24,17,0.6)" stroke-width="4"/>`;
+    minX = Math.min(minX, geo.centroidX); maxX = Math.max(maxX, geo.centroidX);
+    minY = Math.min(minY, geo.centroidY); maxY = Math.max(maxY, geo.centroidY);
+  }
+  // §31: auf die beteiligten Regionen zugeschnittener Ausschnitt statt der
+  // vollen Kartenfläche (grobe, aber ausreichende Näherung aus den bereits
+  // vorhandenen Territoriums-Zentren, keine neue Geometrie).
+  const viewBox = isFinite(minX) ? `${minX - 170} ${minY - 170} ${(maxX - minX) + 340} ${(maxY - minY) + 340}` : MAP_VIEWBOX;
+  return `<svg viewBox="${viewBox}">${paths}</svg>`;
+}
+
+function renderChronikWarDetailHtml(chap) {
+  let html = `<button class="btn-ghost" onclick="chronikWarDetailId=null; render();">← Zurück zu den Kriegen</button>`;
+  html += `<div class="chronikEyebrow">${chap.startYear}–${chap.ongoing ? 'andauernd' : (chap.endYear || '?')}</div>`;
+  html += `<div class="chronikTitle" style="font-size:28px;">Der Krieg mit ${chap.opponentName}</div>`;
+  html += `<div class="chronikWarMapFragment">${buildChronikWarMapFragmentSvg(chap.aiId)}</div>`;
+  html += `<div style="text-align:center; margin-bottom:var(--sp-3);"><button class="btn-ghost" onclick="chronikShowWarOnMap('${chap.aiId}')">Auf Karte zeigen</button></div>`;
+  if (chap.battles.length) {
+    html += `<div class="chronikSub" style="text-align:left;">SCHLACHTEN</div>`;
+    html += chap.battles.map(b => `<div class="chronikBattleRow ${b.won ? 'won' : 'lost'}"><span>${b.year} — ${b.text}</span><span class="outcome">${b.won ? 'Sieg' : 'Niederlage'}</span></div>`).join('');
+  }
+  html += `<div class="chronikSub" style="text-align:left; margin-top:var(--sp-3);">AUSGANG</div>`;
+  html += `<div>${chap.ongoing ? 'Dieser Krieg dauert an.' : (chap.conquered ? 'Das Gebiet wurde vollständig erobert.' : (chap.endYear ? 'Frieden geschlossen im Jahr ' + chap.endYear + '.' : 'Der Ausgang ist nicht eindeutig verzeichnet.'))}</div>`;
+  if (chap.storyThread) html += `<div class="chronikResolutionBox">Teil der Geschichte: <button class="chronikLink" onclick="openChronikStory('${chap.storyThread.threadId}')">${chap.storyThread.title}</button></div>`;
+  return html;
+}
+
+// ---------- §34/35/40/41: Meilensteine + Familiengeschichte ----------
+function renderChronikMeilensteineHtml() {
+  const milestones = getMilestoneListViewModel(state);
+  const family = getFamilyMilestonesViewModel(state);
+  if (!milestones.length && !family.length) return `<div class="chronikEmpty">Noch keine Meilensteine erreicht.</div>`;
+  let html = '';
+  if (milestones.length) {
+    html += `<div class="chronikSub" style="text-align:left;">MEILENSTEINE</div><div id="chronikMilestoneList">`
+      + milestones.map(m => `<div class="chronikMilestone"><div class="chronikMilestoneSeal">✦</div><div class="txt">${m.text}</div></div>`).join('')
+      + `</div>`;
+  }
+  if (family.length) {
+    html += `<div class="chronikSub" style="text-align:left; margin-top:var(--sp-4);">FAMILIENGESCHICHTE</div>`
+      + family.map(e => `<div class="chronikFamilyEntry"><span class="yr">${e.year}</span><span>${e.text}</span></div>`).join('');
+  }
+  return html;
+}
+
+// ---------- §47/48: World Log -- bewusst sachlich, kein Buch-Highlight ----------
+function renderChronikWorldLogHtml() {
+  const log = getWorldLogViewModel(state);
+  const q = chronikSearchQuery.trim().toLowerCase();
+  const filtered = q ? log.filter(l => l.toLowerCase().includes(q)) : log;
+  if (!filtered.length) return `<div class="chronikEmpty">Keine Einträge.</div>`;
+  return `<div id="chronikWorldLogPanel">` + filtered.map(l => `<div class="chronikLogRow">${l}</div>`).join('') + `</div>`;
+}
+
+// ---------- §38/39/103/104: Dynastieende / Kaiserkrone ----------
+function renderChronikEndeHtml() {
+  const vm = getDynastyEndingViewModel(state);
+  if (!vm) return `<div class="chronikEmpty">Diese Dynastie besteht weiterhin.</div>`;
+  let html = `<div class="chronikFinalePage ending">
+    <div class="chronikEyebrow">${vm.lastYear}</div>
+    <div class="chronikFinaleTitle">DAS HAUS IST ERLOSCHEN</div>`;
+  if (vm.lastRulerName) html += `<div class="chronikSub">Letzter Herrscher: ${vm.lastRulerName}</div>`;
+  html += `<div class="chronikTitleStats">
+      <div class="chronikTitleStat"><div class="val">${vm.rulerCount}</div><div class="lbl">Herrscher</div></div>
+      <div class="chronikTitleStat"><div class="val">${vm.generations}</div><div class="lbl">Generationen</div></div>
+      ${vm.highestTitleName ? `<div class="chronikTitleStat"><div class="val">${vm.highestTitleName}</div><div class="lbl">Höchster Titel</div></div>` : ''}
+    </div>`;
+  if (vm.mostSignificantWar) html += `<div class="chronikSub" style="margin-top:var(--sp-3);">Größter Konflikt: ${vm.mostSignificantWar.title}</div>`;
+  if (vm.biggestCrisis) html += `<div class="chronikSub">Größte Krise: ${vm.biggestCrisis.title}</div>`;
+  html += `</div>`;
+  return html;
+}
+function renderChronikKaiserHtml() {
+  const vm = getImperialEndingViewModel(state);
+  if (!vm) return `<div class="chronikEmpty">Die Kaiserkrone wurde noch nicht erreicht.</div>`;
+  return `<div class="chronikFinalePage imperial">
+    <div class="chronikEyebrow">${vm.year}</div>
+    <div class="chronikFinaleTitle imperial">DIE KAISERKRONE</div>
+    <div class="chronikSub">Das Haus ${vm.dynastyName} errang im Jahre ${vm.year} unter ${vm.rulerName} die Kaiserkrone.</div>
+    <div class="chronikTitleStats">
+      <div class="chronikTitleStat"><div class="val">${vm.rulerCount}</div><div class="lbl">Herrscher</div></div>
+      <div class="chronikTitleStat"><div class="val">${vm.generations}</div><div class="lbl">Generationen</div></div>
+    </div>
+  </div>`;
+}
+
+// ---------- §42-44: dezente, klickbare Zeitleiste am Buchrand ----------
+function renderChronikTimeline() {
+  const list = getChronicleRulerListViewModel(state);
+  const el = document.getElementById('chronikTimeline');
+  if (!list.length) { el.innerHTML = ''; return; }
+  el.innerHTML = list.map(r => `<button class="chronikTimelineSeg${r.rulerId === chronikRulerId && chronikSection === 'herrscher' ? ' current' : ''}"
+    onclick="jumpToRulerChapter('${r.rulerId}')" data-tip="${r.name} (${r.startYear}–${r.endYear || 'heute'})">${r.startYear}</button>`).join('');
+}
+
+// §56: Pfeiltasten optional für die Herrscher-Navigation (Tab/Enter sind
+// bereits über native <button>-Elemente verpflichtend erfüllt).
+document.getElementById('chronikBook').addEventListener('keydown', (e) => {
+  if (chronikSection !== 'herrscher' || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+  const chap = getRulerChapterViewModel(state, chronikRulerId);
+  if (!chap) return;
+  if (e.key === 'ArrowLeft' && chap.hasPrev) setChronikRuler(chap.prevRulerId);
+  if (e.key === 'ArrowRight' && chap.hasNext) setChronikRuler(chap.nextRulerId);
+});
 
 // ============================================================
 // §Phase-8E "Diplomatie Redesign": aus Beziehungszahlen werden politische
