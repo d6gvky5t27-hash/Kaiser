@@ -1595,10 +1595,7 @@ const START_REGIONS = [
 const STRINGS = {
   de: {
     title_h1: "KAISERREICH", title_h2: "AUFSTIEG EINER DYNASTIE",
-    title_new_game: "NEUES SPIEL", title_load_game: "SPIEL LADEN",
-    title_multiplayer: "MEHRSPIELER", title_chronicle: "CHRONIK", title_options: "OPTIONEN",
-    title_multiplayer_hint: "In dieser Version nicht verfügbar",
-    title_chronicle_hint: "Erst nach dem ersten Spielende verfügbar",
+    title_new_game: "NEUES SPIEL", title_load_game: "SPIEL LADEN", title_options: "OPTIONEN",
     title_options_alert: "CRT-Filter, Sound, Musik und Sprache lassen sich im Spiel selbst unten rechts umschalten.",
     intro_line1: "Anno 1500.",
     intro_line2: "Eine junge Dynastie erhebt sich in einem unruhigen Reich —",
@@ -1660,10 +1657,7 @@ const STRINGS = {
   },
   en: {
     title_h1: "KAISERREICH", title_h2: "RISE OF A DYNASTY",
-    title_new_game: "NEW GAME", title_load_game: "LOAD GAME",
-    title_multiplayer: "MULTIPLAYER", title_chronicle: "CHRONICLE", title_options: "OPTIONS",
-    title_multiplayer_hint: "Not available in this version",
-    title_chronicle_hint: "Only available after your first game ends",
+    title_new_game: "NEW GAME", title_load_game: "LOAD GAME", title_options: "OPTIONS",
     title_options_alert: "CRT filter, sound, music and language can be toggled in-game, bottom right.",
     intro_line1: "Anno 1500.",
     intro_line2: "A young dynasty rises in an unquiet realm —",
