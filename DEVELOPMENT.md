@@ -3664,3 +3664,82 @@ Drama-Director-/Story-Thread-Logik. Bundle-Größe 818.576 → 870.312
 Bytes (+6,3 %). Battle Engine unverändert, Kartenwerk aus 8C.2
 unverändert, keine neue SAVE_VERSION, 0 neue `rnd()`-Aufrufe in
 irgendeinem ViewModel.
+
+## 2026-08-27 – Phase 8I (KAISERREICH-Zwischenprompt): Final Polish + Responsive + Accessibility + Visual QA
+
+"Das gesamte Spiel wird zu einem konsistenten Produkt." Reine
+Qualitäts- und Konsistenz-Phase, explizit KEINE neuen
+Gameplay-Features — Fokus ausschließlich auf dem Zusammenspiel der
+Ergebnisse aus 8A–8H.
+
+**Statischer Code-Audit:** 261 IDs auf Duplikate geprüft (0 Funde),
+Z-Index-Werte gegen die Token-Skala geprüft (keine wilden Werte
+außerhalb `--z-*`), Button-Grundsystem geprüft (bare `button{}` bereits
+vollständig token-basiert — kein Legacy-Fund trotz 57/136 Buttons ohne
+explizite Klasse), Emoji-vs-SVG-Bestand aufgenommen (kein generisches
+Icon-System vorhanden außerhalb der Karten-Territorien — als Known
+Limitation dokumentiert statt riskant nachgebaut), keine erreichbaren
+toten Rendering-Pfade gefunden. Eine gezielte Token-Konsolidierung:
+neues `--text-on-dark` (#fff6e2) ersetzt 19 wiederholte Hex-Literale
+für hellen Text auf dunklem Grund; rund 60 weitere Hex-Werte bewusst
+NICHT angefasst, da sie illustrative Geländeverlauf-/Hauttonwerte statt
+semantisches UI-Chrome sind (kein "riesiges Cleanup" laut Auftrag).
+
+**Automatisierter Klickblocker-/Overlay-Scan (Playwright):** 57 Checks
+über alle 9 Hauptscreens × 3 Pflichtauflösungen plus 12 Checks über 6
+Modal-Overlays (Character Detail, Event, Story View, Kriegskarte,
+Battle, Battle Result) mit auf den jeweils obersten Modal-Container
+skopiertem Scan (verhindert False Positives durch legitim verdeckte
+Hintergrund-Elemente) — 69/69 bestanden, 0 echte Klickblocker.
+
+**Responsive:** 1920×1080 / 1440×900 / 1366×768 auf allen Hauptscreens
+und Modals geprüft — 0 horizontales Overflow.
+
+**Titelbildschirm-Korrektur:** zwei funktionslose, deaktivierte
+Platzhalter-Buttons ("MEHRSPIELER", "CHRONIK" — Relikt aus der Zeit vor
+8H) widersprachen dem im Auftrag explizit geforderten Zielbild von
+genau 3 Buttons. Entfernt inkl. verwaister i18n-Keys
+(`title_multiplayer`, `title_chronicle` + Hint-Varianten) aus
+`data/gamedata.js`. Titelbildschirm zeigt jetzt exakt NEUES SPIEL /
+SPIEL LADEN / OPTIONEN.
+
+**End-to-End-Playtest (30 Minuten, kontinuierlich):** ein
+durchgehender Spieldurchlauf über Charaktererstellung, mehrere
+Jahresrunden, Hof-/Diplomatie-/Wirtschafts-Interaktionen, Event- und
+Story-Thread-Auflösung, Kriegserklärung mit Kriegskarte und Schlacht,
+Speichern/Laden — 15/15 Prüfungen bestanden, 0 Konsolenfehler.
+
+**50-Jahre-Automatiktest:** Simulation über 50 Spieljahre ohne
+UI-Interaktion — 0 Abstürze. Der resultierende Zustand (mehrere
+Herrschergenerationen, gealterte/verstorbene Charaktere) wurde
+anschließend in einer echten Browser-Session geladen und über alle 9
+Hauptscreens auf UI-Konsistenz geprüft — 12/12 bestanden.
+
+**Human-Flow-Test + Screenshot-Matrix:** 7 typische Spielerfragen
+("Wie geht es meinem Reich?", "Wer ist mein Erbe?", "Bin ich im
+Krieg?" usw.) jeweils in 0-3 Klicks beantwortbar (Zielvorgabe des
+Auftrags erfüllt). 12-teilige Screenshot-Vergleichsmatrix über
+Hauptscreens und alle 3 Auflösungen erstellt.
+
+**Gameplay/Determinismus:** Golden-Determinism-Test weiterhin grün,
+Battle Engine (`battle-engine/*.js`) unverändert, Kartenwerk aus 8C.2
+unverändert, keine neue SAVE_VERSION, 0 neue `rnd()`-Aufrufe.
+
+**Getestet:** komplette bestehende Node-Testsuite weiterhin grün (bis
+auf die vorbekannte, unabhängige `economy_test.js`-Flakiness). Keine
+neuen ViewModel-Funktionen in dieser Phase, daher keine neuen
+Regressionstests in `tests/ui_viewmodel_test.js` nötig — stattdessen
+acht Playwright-/Node-QA-Skripte als Nachweis (Overlay-Scan,
+Modal-Scan, Responsive-Matrix, E2E-Playtest, 50-Jahre-Test,
+50-Jahre-UI-Check, Human-Flow-Matrix, Titelbildschirm-Check).
+
+**Bewusst NICHT Teil dieser Teilphase:** neue Gameplay-Mechanik jeder
+Art (Kaiserwahl 2.0, politische Interessengruppen, neue Güter,
+Event-Ketten, Story-Thread-Typen, Kampf-/Friedensmechanik, Regionen),
+großflächiges Hex-Farb-Cleanup, Ersatz des Emoji-Icon-Bestands durch
+ein neues generisches SVG-System, Fix der vorbestehenden
+`economy_test.js`-Flakiness. Bundle-Größe 870.312 → 870.089 Bytes
+(marginal kleiner trotz neuem Token, durch die entfernten
+Titelbildschirm-Buttons); Gesamtwachstum Phase 8A-Start bis
+8I-Ende: 589.045 → 870.089 Bytes (+47,7 %) über alle neun
+Teilphasen.

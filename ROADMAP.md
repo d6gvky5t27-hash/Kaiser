@@ -136,6 +136,30 @@ werden zuerst fertiggestellt/gefestigt, bevor neue Breite hinzukommt.
       (Kandidaten/Dynasty Chronicle/Herrscher-Biografie/Dynasty Summary).
       **Phase 8 wurde NICHT automatisch begonnen** — wartet auf
       ausdrückliche Freigabe (§Phase-7-Punkt 97).
+- [x] **Phase 8 — Visual Identity & UI-Redesign** (Teilphasen 8A-8I,
+      vollständig abgeschlossen; Details/Design-System/Screen-Inventory/
+      Final-QA-Findings siehe `UI_REDESIGN.md`, Ablauf je Teilphase siehe
+      DEVELOPMENT.md "Phase 8A" bis "Phase 8I"): 8A Design-System (Farb-/
+      Typografie-/Spacing-/Button-/Z-Index-Tokens). 8B Hauptbildschirm neu
+      um eine kartenzentrierte Ansicht mit HUD/Kontextpanel/Story-Card.
+      8C Reich/Provinz/Wirtschaft von Rohtabellen zu lesbaren Karten-
+      Ansichten. 8C.1/8C.2 Weltkarte von Node-Grafik zu einer echten,
+      handgestalteten politischen Landschaftskarte. 8D Hof/Dynastie/
+      Charaktere mit deterministischem Portraitsystem und echtem
+      Stammbaum. 8E Diplomatie als Personen-/Machtkarten statt
+      Beziehungstabelle. 8F Events/Story-Threads mit Illustrationssystem
+      und echter Story-Kontextanzeige. 8G Kriegskarte + Kampf-Overlay
+      komplett neu inszeniert (Battle Engine unangetastet). 8H Chronik als
+      illustriertes, durchblätterbares Dynastiebuch (Chronicle 2.0 als
+      Source of Truth unverändert). 8I reine Qualitäts-/Konsistenz-Politur
+      über alle Vorphasen (Responsive/Klickblocker-Scan, 30-Minuten-
+      Playtest, 50-Jahre-Test, Human-Flow-Test, Titelbildschirm-Korrektur,
+      `--text-on-dark`-Token) — 0 Critical/High-Findings. Über alle
+      Teilphasen: keine neue SAVE_VERSION, Battle Engine und
+      Kartengameplay unverändert, Golden-Determinism-Tests durchgehend
+      grün. Bundle-Größe Phase-8-Start → Phase-8-Ende: 589.045 → 870.089
+      Bytes (+47,7 %). **Ausdrückliches STOPP nach Phase 8I** — Phase 9
+      wurde NICHT automatisch begonnen, wartet auf ausdrückliche Freigabe.
 
 ## NEXT (nach Freigabe, in der vom Master-Prompt vorgeschlagenen Reihenfolge)
 
@@ -144,14 +168,6 @@ werden zuerst fertiggestellt/gefestigt, bevor neue Breite hinzukommt.
       ob `tools/data-sync.js` um `TERRITORIES`/`START_REGIONS`/`TRAITS`/
       `MEMORY_TYPES` erweitert oder die JSON-Modding-Schicht bewusst als
       begrenzt dokumentiert wird (siehe CODE_AUDIT.md Abschnitt 6).
-- [ ] **Phase 8 — Visual Identity & UI-Redesign** (nächste angekündigte
-      Phase, siehe § "Bewusst NICHT Teil von Phase 7"/§Punkt 97 STOPP der
-      Phase-7-Vorgabe — noch NICHT begonnen): entspricht inhaltlich dem
-      seit Phase 2 als "Phase 10 — UI-Redesign" unter UI & Fun Pass unten
-      vorgeplanten Historical-Graphic-Novel-Look (Weltkarte als
-      Hauptbildschirm-Zentrum, sichtbare Weltzustände) — beide Einträge
-      meinen denselben noch ungeplanten Umbau, hier nur unter dem vom
-      aktuellen Master-Prompt verwendeten Namen zusätzlich referenziert.
 - [ ] Phase 9 — Kaiserwahl 2.0: Wahlkampf, Versprechen, Kurfürsten-
       Interessen statt reiner Bestechung/Beziehungsschwelle.
 - [ ] Phase 10 (Politik/Krieg-Nummerierung dieser Liste) — War & Peace 2.0:
@@ -184,14 +200,18 @@ aktueller Auftrag.
 
 ### UI & Fun Pass
 
-- [ ] Phase 10 — UI-Redesign (erst wenn Gameplay-Systeme aus Phase 2–9
-      stabil sind): Historical-Graphic-Novel-Look, Weltkarte als
-      Hauptbildschirm-Zentrum, sichtbare Weltzustände (Gebäude/Straßen auf
-      der Karte).
-- [ ] Phase 11 — Fun Pass: 100+ Simulationen mit unterschiedlichen
-      KI-Strategien (economic/military/diplomatic/dynastic/balanced) zur
-      Dominanzanalyse, Story-Metriken (`majorEventsPerDecade` u. ä.),
-      automatisierte Chronik-Langweiligkeits-Prüfung.
+- [x] ~~UI-Redesign (Historical-Graphic-Novel-Look, Weltkarte als
+      Hauptbildschirm-Zentrum, sichtbare Weltzustände)~~ — erledigt als
+      Phase 8A-8I, siehe CURRENT oben und `UI_REDESIGN.md`. Der frühere
+      Platzhaltername "Phase 10" für diesen Punkt (aus der Vor-Master-
+      Prompt-Nummerierung) ist damit hinfällig.
+- [ ] Fun Pass (noch kein fester Phasenname/keine feste Nummer
+      zugewiesen — der frühere Platzhalter "Phase 11" bezog sich auf die
+      alte, inzwischen durch Phase 8 überholte Nummerierung): 100+
+      Simulationen mit unterschiedlichen KI-Strategien (economic/
+      military/diplomatic/dynastic/balanced) zur Dominanzanalyse,
+      Story-Metriken (`majorEventsPerDecade` u. ä.), automatisierte
+      Chronik-Langweiligkeits-Prüfung.
 - [ ] Dynastie-Aussterberate senken oder bewusst als Spielhebel gestalten
       (Baseline: 53% aller rein passiven 100-Jahre-Partien enden mit
       `no_heir` — siehe BASELINE.md, unverändert nach Phase 3, siehe

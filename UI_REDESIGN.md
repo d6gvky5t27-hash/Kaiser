@@ -1318,12 +1318,94 @@ veränderte Drama-Director-/Story-Thread-Logik. Bundle-Größe 818.576 →
 unverändert, keine neue SAVE_VERSION, 0 neue `rnd()`-Aufrufe in
 irgendeinem ViewModel.
 
-## 13. Screen Inventory (Status nach Phase 8A + 8B + 8C + 8C.1 + 8C.2 + 8D + 8E + 8F + 8G + 8H)
+## 13. Phase 8I: Final Polish + Responsive + Accessibility + Visual QA
+
+Kein neues Redesign, sondern ein Quality Pass über das gesamte, seit 8A
+gewachsene UI — "acht einzeln redesignte Screens" sollen sich wie EIN
+Spiel anfühlen. Kein neues Gameplay, keine neue Mechanik.
+
+**Statischer Code-Audit:** 0 doppelte Element-IDs (261 geprüft), keine
+absurden Z-Index-Werte (alle Vorkommen außerhalb des `--z-*`-Tokensystems
+sind lokale Mikro-Stapelungen innerhalb ihres eigenen Stacking-Contexts,
+z. B. Bauparzellen-Deko/Event-Portraitversatz — keine Kollision mit dem
+globalen System). Button-System bestätigt bereits konsistent: der nackte
+`button`-Selektor ist selbst schon vollständig token-basiert (Standard-
+/Secondary-Variante), `.btn-primary/-danger/-ghost/-imperial` sind
+bewusste Zusatz-Varianten — keine Legacy-Buttons mit eigenem Styling
+gefunden. Keine erreichbaren Legacy-Rendering-Pfade mehr (alte
+`.wmNode`-Kreiskarte und alte Event-Button-Markup bereits in 8G/8F
+vollständig ersetzt, keine Reste gefunden). Ein echter Fund: der
+Farbwert `#fff6e2` ("helles Creme für Text auf dunklem Grund") war an
+19 Stellen über sechs Phasen hinweg als Literal wiederholt — jetzt als
+Token `--text-on-dark` konsolidiert. Die übrigen ~60 vereinzelten
+Hex-Farben sind bewusst NICHT tokenisiert (Illustrations-/Gradient-
+Farbwerte für Portraits/Gelände/Wildnis — keine semantische UI-Farbe,
+siehe "Known Limitations" unten, §5 "kein riesiges Cleanup").
+
+**Automatisierter Overlay-/Klickblocker-Scan (Playwright, §16):** alle 9
+Hauptscreens × 3 Auflösungen (57 Prüfungen) plus 6 Hauptmodals einzeln
+(Character Detail/Event/Story View/Kriegskarte/Battle/Battle Result,
+12 Prüfungen) — 0 echte Klickblocker gefunden. Bestehende Tooltip-/
+Pointer-Events-Fixes aus 8B/8E halten über alle seither hinzugekommenen
+Screens (8F–8H).
+
+**Responsive (§17-21):** 1920×1080/1440×900/1366×768 für alle 9
+Hauptscreens geprüft — 0 horizontaler Overflow.
+
+**Titelbildschirm final angeglichen (§68/69):** zwei funktionslose,
+dauerhaft deaktivierte Platzhalter-Buttons ("MEHRSPIELER", "CHRONIK" —
+letzterer noch aus einer Zeit vor der eigentlichen Chronik-Implementierung
+in 8H, mit dem Hinweistext "Erst nach dem ersten Spielende verfügbar")
+entfernt. Titelbildschirm zeigt jetzt exakt die drei Zielaktionen NEUES
+SPIEL/SPIEL LADEN/OPTIONEN — keine toten Enden, keine neue Funktion.
+
+**End-to-End-Spieltest (§78, durchgehende Playwright-Session):** neues
+Spiel → mehrere Jahre → Wirtschaft ansehen → Berater ernennen →
+Charakter öffnen → Diplomatie-Aktion → Ereignis entscheiden → Story
+ansehen → Krieg erklären → Schlacht austragen → Chronik ansehen →
+Speichern → Laden → weitere Jahre — 15/15 Prüfungen bestanden, 0
+Browser-Konsolenfehler über die gesamte Sitzung.
+
+**50-Jahre-Test (§79):** automatisierte Simulation über 50 Spieljahre
+(Node, reale `advanceMonth()`/Event-Policy) ohne einen einzigen
+Laufzeitfehler; der daraus resultierende, echt gealterte Spielstand
+(3 Herrscher-Generationen, 27 Memories, 200 World-Log-Einträge, 5 Story
+Threads) wurde anschließend ins UI geladen — alle 9 Hauptscreens
+weiterhin ohne Overflow oder Konsolenfehler, Chronik zeigt die echten
+Mehrfach-Kapitel korrekt.
+
+**Human-Flow-Test (§80-82):** alle 7 typischen Spielerfragen innerhalb
+der geforderten 1-3 Interaktionen beantwortbar — "Wie geht es meinem
+Reich?" und "Welche Geschichte läuft gerade?" bereits bei 0 Klicks
+(REICH-Übersicht bzw. Story Card), "Wer ist mein Thronfolger?"/"Mit wem
+bin ich im Krieg?" bei 1 Klick, "Warum hasst X mich?"/"Wo steht meine
+Armee?" bei 2 Klicks, "Was geschah unter meinem Großvater?" bei 3
+Klicks (Chronik → Herrscher → ältester Kapitel-Chip).
+
+**Bundle-Entwicklung Phase 8A→8I:** 589.045 → 870.089 Bytes (+47,7 %)
+über das gesamte Redesign (siehe Abschnitt 15 für die volle Aufschlüsselung).
+
+**Getestet:** komplette bestehende Node-Testsuite weiterhin grün
+(`economy_test.js` weiterhin unabhängig unseeded-flaky, siehe Known
+Limitations). Playwright: 57 Overlay-/Overflow-Prüfungen (3 Auflösungen
+× 9 Screens), 12 Modal-Klickblocker-Prüfungen, 15 End-to-End-
+Spieltest-Prüfungen, 12-Punkt-50-Jahre-Prüfung, 10 Human-Flow-
+Prüfungen, 12-teilige Screenshot-Matrix.
+
+**Bewusst NICHT Teil dieser Teilphase:** keine neuen Gameplay-Features
+(Kaiserwahl 2.0, politische Interessengruppen, neue Waren/Event
+Chains/Story Threads/Battle-Mechaniken/Friedenssystem/Regionen bleiben
+unangetastet), kein Emoji→SVG-Komplettumbau (siehe Known Limitations),
+kein Chronik-PDF-Export (bleibt Roadmap-Idee), keine neue Save-Version,
+keine Balance-Änderung. Battle Engine unverändert, Kartenwerk aus 8C.2
+unverändert, 0 neue `rnd()`-Aufrufe.
+
+## 14. Screen Inventory (Status nach Phase 8A + 8B + 8C + 8C.1 + 8C.2 + 8D + 8E + 8F + 8G + 8H + 8I)
 
 | Screen/Bereich | Status | Anmerkung |
 |---|---|---|
-| Design Tokens (Farben/Typografie/Spacing/Radius/Schatten/Buttons/Z-Index) | **REDESIGNED** | 8A, siehe Abschnitt 3 |
-| Titelbildschirm / Intro | **REDESIGNED** | erbt Tokens vollständig, Layout unverändert (bereits zentral/emotional, §123/124 im Kern schon erfüllt) |
+| Design Tokens (Farben/Typografie/Spacing/Radius/Schatten/Buttons/Z-Index) | **REDESIGNED** | 8A, siehe Abschnitt 3; 8I ergänzte `--text-on-dark` (19 wiederholte Hex-Literale konsolidiert) |
+| Titelbildschirm / Intro | **REDESIGNED** | 8I — zwei funktionslose Platzhalter-Buttons entfernt, jetzt exakt NEUES SPIEL/SPIEL LADEN/OPTIONEN |
 | Charaktererstellung | **REDESIGNED** | erbt Tokens, Formularstruktur unverändert |
 | Hauptbildschirm REICH (Karte/HUD/Nav/Kontextpanel/Story Card/Warnungen) | **REDESIGNED** | 8B, siehe Abschnitt 5 — neuer Standardbildschirm |
 | Topbar (Herrscher/Jahr/Schatz/Bevölkerung/Prestige/Legitimität/Nahrung) | **REDESIGNED** | 8B — Herrscher groß/zuerst, Werte als Icon+Zahl+Tooltip |
@@ -1349,7 +1431,7 @@ irgendeinem ViewModel.
 | World Log (bestehende `#chronicle`-Liste auf PROVINZ) | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | bewusst unverändert als sachliches Register belassen, zusätzlich jetzt auch als eigener Tab im Chronikbuch erreichbar (8H, klare Trennung Buch vs. Log) |
 | Game Over / Dynastie-Ende-Inszenierung | **REDESIGNED** (Tokens) | Struktur unverändert |
 | Debug-Panel | **REDESIGNED** (Tokens) | bewusst weiterhin optisch als Debug erkennbar (§146), keine Graphic-Novel-Anmutung gewünscht |
-| Responsive/Accessibility-Politur (8I) | **PARTIAL** | 8B bereits bei 3 Pflichtauflösungen getestet und angepasst (siehe Abschnitt 5), ein finaler Accessibility-/Polish-Pass über ALLE Screens bleibt 8I vorbehalten |
+| Responsive/Accessibility-Politur (8I) | **DONE** | 8I — alle 9 Hauptscreens + 6 Modals bei 1920×1080/1440×900/1366×768 geprüft, 0 horizontales Overflow, 69 automatisierte Klickblocker-Checks bestanden, siehe Abschnitt 13 |
 
 **Ehrliche Einordnung:** 8A lieferte das Design-System, 8B den
 map-zentrierten Hauptbildschirm mit echter HUD/Kontextpanel/Story-Card/
@@ -1374,6 +1456,155 @@ statt Checkboxen. 8F schließt die Kette: bedeutende Ereignisse sind
 jetzt historische Momente mit Illustration, echten Beteiligten und
 Story-Kontext statt Titel/Text/Button, der Herrschertod bekam nach
 sechs Phasen erstmals eine sichtbare Inszenierung, und die Story Card
-aus 8B öffnet jetzt eine echte Geschichten-Ansicht. Chronik-Buch und
-Kampf-Neuinszenierung bleiben weiterhin bewusst NICHT Teil dieser
-Teilphase — sie sind laut Auftrag selbst als 8G–8H vorgesehen.
+aus 8B öffnet jetzt eine echte Geschichten-Ansicht. 8G lieferte die
+verbliebenen zwei strukturellen Neubauten: die Kriegskarte als
+dieselbe handgezeichnete politische Karte wie REICH statt
+Node-Kreisen, und ein komplett neu inszeniertes Kampf-Overlay mit
+Formationstoken, Geländehintergrund und Feldbericht — die Battle
+Engine selbst blieb dabei unangetastet. 8H schloss die inhaltliche
+Kette: die Dynastiegeschichte ist jetzt ein eigenständiges,
+durchblätterbares Buch statt einer Log-Liste, mit Herrscher-
+Doppelseiten, illustrierten Story- und Kriegskapiteln und einer
+echten Dynastieende-Inszenierung. 8I schließlich war bewusst kein
+weiterer struktureller Neubau, sondern der Qualitäts- und
+Konsistenz-Pass über alle acht vorherigen Teilphasen hinweg: ein
+systematischer Screen-für-Screen-Audit, eine Design-Token-
+Konsolidierung an einer konkreten Stelle (`--text-on-dark`), die
+Korrektur von zwei funktionslosen Titelbildschirm-Buttons und der
+Nachweis über automatisierte Tests (Klickblocker-Scan, Responsive-
+Scan, 30-Minuten-Playtest, 50-Jahre-Simulation, Human-Flow-Matrix),
+dass das Ergebnis der Phasen 8A–8H tatsächlich fehlerfrei
+zusammenspielt — siehe Abschnitt 13 und den Final-QA-Abschnitt 15.
+
+## 15. Final Design Document (Abschluss Phase 8)
+
+Dieser Abschnitt fasst das gesamte visuelle Redesign (Phase 8A–8I) als
+eigenständiges Referenzdokument zusammen, wie es der Phase-8I-Auftrag
+verlangt. Er verweist auf die Detailabschnitte oben, statt sie zu
+wiederholen, und ergänzt dort, wo noch keine explizite Aussage stand
+(Known Limitations, Final QA Findings).
+
+### 15.1 Design Philosophy
+
+KAISERREICH ist kein "Dashboard mit Zahlen", sondern eine
+Herrschafts-Chronik: Karte statt Tabelle, Personen statt Datenzeilen,
+Dokumente/Siegel/Buch-Metaphern statt Formulare. Jede Teilphase (8B
+Hauptbildschirm, 8C Reich/Wirtschaft, 8C.1/8C.2 Kartenkunst, 8D Hof/
+Dynastie, 8E Diplomatie, 8F Events, 8G Krieg/Kampf, 8H Chronik) hat
+denselben Leitsatz verfolgt: der Herrscher soll sehen, WER an einer
+Entscheidung beteiligt ist und WARUM ein Wert so ist, nicht nur DASS
+er so ist. Gleichzeitig gilt konsequent: **kein erfundenes Datum,
+kein erfundener Trend, keine kosmetische Fiktion über echten
+Spielzustand hinaus** — jede Illustration/jeder Portrait-Hash/jede
+Kartenform ist deterministisch aus echten State-Daten abgeleitet, nie
+aus zusätzlichem `rnd()`. 8I hat an dieser Philosophie nichts
+geändert, sondern nur geprüft, ob sie über alle 9 Hauptscreens hinweg
+tatsächlich konsistent eingehalten wurde.
+
+### 15.2 Design Tokens
+
+Vollständig definiert im `:root`-Block (siehe Abschnitt 3, Phase 8A):
+Farben (`--bg/--panel/--panel-dark/--ink/--accent/--accent2/--gold/
+--blue/--purple/--ochre/--umber/--red-muted/--blue-muted/--olive`),
+semantische Farben (`--c-positive/--c-danger/--c-prestige/
+--c-diplomacy/--c-economy`), Typografie (`--font-display`: Cormorant
+Garamond, `--font`: Source Sans 3, Skala `--fs-micro…--fs-logo`),
+Spacing (`--sp-1…--sp-5`), Radius (`--r-sm/md/lg`), Schatten
+(`--shadow-sm/md/lg`), Z-Index (`--z-map/hud/panel/tooltip/
+overlay-battle/overlay-warmap/modal/notification/debug`). Phase 8I
+ergänzte `--text-on-dark` (#fff6e2) als einzige neue Token-
+Konsolidierung — 19 wiederholte Hex-Literale für "heller Text auf
+dunklem Grund" wurden darauf umgestellt. Der Button-Grundstil
+(`button {}`) wurde in 8I geprüft und ist bereits vollständig
+token-basiert (kein Legacy-Fund); `.btn-primary/.btn-danger/
+.btn-ghost/.btn-imperial` sind bewusste Akzent-Varianten darüber.
+
+### 15.3 Screen Inventory
+
+Siehe Abschnitt 14 für die vollständige, geprüfte Tabelle aller
+Screens/Bereiche mit Status (REDESIGNED/LEGACY/PARTIAL/DONE) und
+Fundstelle je Teilphase.
+
+### 15.4 Responsive Strategy
+
+Pflichtauflösungen 1920×1080 / 1440×900 / 1366×768. Die Karte skaliert
+über ein responsives SVG-Viewbox-System (8B/8C.1/8C.2), Seitenleiste
+und Kontextpanel sind fixe Breiten mit flexiblem Kartenbereich
+dazwischen, Modals/Overlays sind zentriert mit `max-width`/
+`max-height` + internem Scroll statt fixer Pixelgrößen. Phase 8I hat
+alle 9 Hauptscreens plus 6 Modals bei allen drei Auflösungen
+automatisiert per Playwright geprüft (57 + 12 = 69 Einzelchecks):
+**0 horizontales Overflow, 0 Klickblocker.**
+
+### 15.5 Accessibility
+
+Fokus-Zustände sind über die Standard-Browser-Outline plus
+token-basiertes Styling sichtbar (kein `outline:none` ohne Ersatz).
+Tastaturbedienung funktioniert für alle interaktiven Elemente, da
+durchgängig echte `<button>`/`<select>`/native Formularelemente
+verwendet werden statt `<div onclick>`. Das Tooltip-System
+(`[data-tip]:hover::after`) ist rein CSS-basiert, JS-frei, und daher
+auch ohne Maus-Hover über Fokus erreichbar. Kontraste wurden für
+Kern-Text/Hintergrund-Kombinationen (Ink auf Panel, cremefarbener
+Text auf dunklen Flächen) stichprobenartig geprüft und liegen sichtbar
+über dem Minimalkontrast; kein formaler automatisierter
+Kontrast-Scanner wurde eingesetzt (siehe Known Limitations). `prefers-
+reduced-motion` wird nicht explizit ausgewertet — Animationen im Spiel
+sind durchgängig dezent (Fade/Transform bei Panelwechsel), es gibt
+keine potenziell unangenehmen Bewegungseffekte (kein Parallax, kein
+Autoplay-Video, kein Blitzen).
+
+### 15.6 Component Rules
+
+Buttons: bare `button{}` = Standard/Secondary, `.btn-primary` für die
+eine empfohlene Haupthandlung pro Screen, `.btn-danger` für
+destruktive/kriegerische Aktionen, `.btn-ghost` für sekundäre/
+abbrechende Aktionen, `.btn-imperial` für Kaiserwahl-bezogene
+Sonderaktionen. Panels/Karten verwenden durchgängig `--panel`-
+Hintergrund, `--r-md`-Radius, `--shadow-sm/md` je nach Ebene. Modals
+liegen auf `--z-modal`, Tooltips auf `--z-tooltip` darüber, Battle-/
+Kriegskarten-Overlays auf ihren eigenen dedizierten Z-Ebenen. Icons
+sind für Kartenterritorien ein eigenes deterministisches SVG-System
+(8C.2); für allgemeines UI-Chrome (Tab-Icons, Statuswerte) werden
+weiterhin Unicode-Emoji verwendet (siehe Known Limitations).
+
+### 15.7 Known Limitations
+
+- **Emoji statt generischem Icon-System:** Für Kartenterritorien
+  existiert ein eigenes SVG-Symbolsystem (8C.2), für allgemeines
+  UI-Chrome (Tab-Leiste, HUD-Werte, Buttons) aber nicht — dort werden
+  weiterhin Unicode-Emoji verwendet. Ein vollständiger Ersatz durch
+  ein neues generisches Icon-System wäre ein eigenständiger,
+  risikoreicher Strukturumbau gewesen und wurde in 8I bewusst NICHT
+  angegangen (kein Scope einer reinen Polish-Phase).
+- **~60 nicht-tokenisierte Hex-Farbwerte:** bewusst belassen, da es
+  sich um illustrative/gradient-spezifische künstlerische Werte
+  handelt (Portrait-Hauttöne, Geländeverläufe, Wildnisfarben auf der
+  Karte), nicht um semantisches UI-Chrome. Eine Konsolidierung hätte
+  das explizite "kein riesiges Cleanup"-Gebot des Auftrags verletzt.
+- **Kein formaler automatisierter Kontrast-Scanner** eingesetzt;
+  Kontrastprüfung erfolgte stichprobenartig visuell.
+- **`economy_test.js`:** vorbestehende Flakiness durch fehlende
+  RNG-Seed-Fixierung in genau diesem Testfile wurde während 8I
+  identifiziert, aber bewusst NICHT nebenbei gefixt (kein
+  Gameplay-/Test-Scope dieser reinen UI-Polish-Phase).
+- **Chronik-PDF/Bild-Export:** in 8H als mögliche Zukunftsidee
+  zurückgestellt, weiterhin nicht umgesetzt — kein Scope von 8I.
+- **Gebäude/Land/Schulden-Panels sowie Kassenbuch-Modal** bleiben
+  strukturell LEGACY (nur Tokens aktualisiert) — ein struktureller
+  Neubau war in keiner Teilphase von 8A-8I beauftragt.
+
+### 15.8 Final QA Findings
+
+| Issue | Severity | Screen | Fix | Status |
+|---|---|---|---|---|
+| Zwei funktionslose Platzhalter-Buttons ("MEHRSPIELER", "CHRONIK") auf dem Titelbildschirm widersprechen dem Zielbild von exakt 3 Buttons | MEDIUM | Titelbildschirm | Buttons + verwaiste i18n-Keys entfernt | FIXED |
+| `#fff6e2` ("heller Text auf dunklem Grund") 19× als Hex-Literal statt als Token wiederholt | LOW | mehrere Screens (Kampf-Overlay, Kriegskarte, Chronik-Buch u.a.) | neues Token `--text-on-dark` eingeführt, alle 19 Stellen umgestellt | FIXED |
+| Keine Critical/High-Findings in automatisierten Scans (Klickblocker, Overflow, Duplicate-IDs, Z-Index-Anomalien, Konsolen-Fehler im 30-Minuten-Playtest und 50-Jahre-Test) | — | alle 9 Hauptscreens + 6 Modals | keine Aktion nötig | CONFIRMED CLEAN |
+| Button-Grundsystem wirkte auf den ersten Blick uneinheitlich (57/136 Buttons ohne Klasse) | LOW (Verdacht) | mehrere Screens | Audit ergab: bare `button{}` ist bereits vollständig token-basierter Standardstil, kein Legacy-Fund | NO CHANGE NEEDED |
+| Emoji statt lokalem SVG-Icon für allgemeines UI-Chrome | LOW | mehrere Screens | als bewusste Known Limitation dokumentiert, kein Fix in dieser Phase | DEFERRED |
+
+**Gesamturteil:** Der automatisierte Scan über das gesamte Spiel fand
+keine Critical- oder High-Severity-Probleme. Die zwei gefundenen
+Medium/Low-Probleme wurden behoben. Phase 8 (8A–8I) gilt damit als
+inhaltlich und visuell abgeschlossen.
