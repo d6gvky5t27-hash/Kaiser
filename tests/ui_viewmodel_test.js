@@ -755,6 +755,158 @@ console.log('--- Phase 8G: RNG-Neutralitaet aller neuen ViewModels (§66/69/70) 
   check('kein einziger rnd()-Aufruf durch die Phase-8G-ViewModels', __rngCalls === before);
 })();
 
+// ============================================================
+// Phase 8H: CHRONICLE BOOK -- Regressionstests (§Abschlussbericht U)
+// ============================================================
+
+console.log('--- Phase 8H: Titelseite / Dynasty Summary ---');
+(function() {
+  const state = newGame({ seed: 1950 });
+  const tp = getChronicleTitlePageViewModel(state);
+  check('Titelseite: foundingYear ist real 1500', tp.foundingYear === 1500);
+  check('Titelseite: aktueller Herrscher wird real erkannt', tp.currentRulerName === (state.characters[state.rulerId].name + ' ' + (state.characters[state.rulerId].surname || '')).trim());
+  const summary = getDynastySummaryViewModel(state);
+  check('Dynasty Summary ist dieselbe reale computeDynastySummary()', summary.rulerCount === computeDynastySummary(state).rulerCount);
+})();
+
+console.log('--- Phase 8H: Herrscherliste + Kapitel-Navigation (echte Mehrfach-Nachfolge) ---');
+(function() {
+  const state = newGame({ seed: 1951 });
+  for (let i = 0; i < 2; i++) {
+    const ruler = state.characters[state.rulerId];
+    const heirId = 'th_heir' + i;
+    const heir = createCharacter(i % 2 === 0 ? 'f' : 'm', 22, state.dynastyName);
+    state.characters[heirId] = heir;
+    heir.parentId = state.rulerId;
+    ruler.childrenIds.push(heirId);
+    ruler.alive = false;
+    snapshotRulerEraStart(state, heirId);
+    recordWorldEvent(state, { type: 'RULER_DIED', actorIds: [state.rulerId], targetIds: [], regionIds: ['player'], importance: 90, emotionalWeight: -40, description: 'Ein Herrscher ist verstorben.' });
+    recordWorldEvent(state, { type: 'SUCCESSION', actorIds: [state.rulerId], targetIds: [heirId], regionIds: ['player'], importance: 80, emotionalWeight: 10, description: 'Nachfolge.' });
+    state.rulerId = heirId;
+    state.stats.generations++;
+  }
+  const list = getChronicleRulerListViewModel(state);
+  check('3 echte Regentschaften erkannt (2 erzwungene Nachfolgen)', list.length === 3);
+  check('nur die letzte Regentschaft ist isCurrent', list.filter(r => r.isCurrent).length === 1 && list[list.length - 1].isCurrent);
+  const firstChap = getRulerChapterViewModel(state, list[0].rulerId);
+  check('erster Herrscher: kein Vorgänger, aber ein Nachfolger', firstChap.hasPrev === false && firstChap.hasNext === true);
+  const lastChap = getRulerChapterViewModel(state, list[list.length - 1].rulerId);
+  check('letzter (aktueller) Herrscher: kein Nachfolger, aber ein Vorgänger', lastChap.hasNext === false && lastChap.hasPrev === true);
+  check('verstorbener Herrscher hat ein reales Todesjahr', firstChap.deathYear === firstChap.bio.reignEnd && firstChap.deathYear !== null);
+  check('aktueller Herrscher hat kein Todesjahr (lebt noch)', lastChap.deathYear === null);
+})();
+
+console.log('--- Phase 8H: Regressionstest -- Highlights zeigen den kurzen Thread-Titel, nicht die volle Zusammenfassung ---');
+(function() {
+  const state = newGame({ seed: 1952 });
+  const ruler = state.characters[state.rulerId];
+  const rivalId = 'th_rival';
+  const rival = createCharacter('m', 30, state.dynastyName);
+  state.characters[rivalId] = rival;
+  rival.parentId = state.rulerId;
+  ruler.childrenIds.push(rivalId);
+  const t = createStoryThread(state, 'PERSONAL_RIVALRY', { actorIds: [rivalId], regionIds: [], memoryIds: [], strength: 65 });
+  resolveStoryThread(state, t, null);
+  const chap = getRulerChapterViewModel(state, state.rulerId);
+  const threadHighlight = chap.highlights.find(h => h.text === t.title);
+  check('Highlight einer Thread-Zusammenfassung ist der kurze Titel', !!threadHighlight);
+  check('Highlight enthält NICHT die volle mehrzeilige summarizeStoryThread()-Ausgabe', chap.highlights.every(h => h.text.indexOf('ERGEBNIS:') === -1));
+})();
+
+console.log('--- Phase 8H: Story-Kapitel -- nur echte, hinreichend bedeutende, abgeschlossene Threads ---');
+(function() {
+  const state = newGame({ seed: 1953 });
+  check('vor jedem abgeschlossenen Thread: leere Liste', getStoryChapterListViewModel(state).length === 0);
+  const t = createStoryThread(state, 'FOOD_CRISIS', { actorIds: [], regionIds: ['player'], memoryIds: [], strength: 70 });
+  t.importance = 60; // oberhalb CONFIG.chronicle.threadSummaryThreshold (50), s. computeThreadImportance()
+  resolveStoryThread(state, t, null);
+  const list = getStoryChapterListViewModel(state);
+  check('nach Auflösung erscheint der Thread als Kapitel', list.some(c => c.threadId === t.id));
+  check('Filter-Label kommt aus der echten 1:1-Kategorie-Abbildung', list.find(c => c.threadId === t.id).filterLabel === 'Krise');
+  const detail = getStoryChapterViewModel(state, t.id);
+  check('Detail-ViewModel liefert eine Illustrations-Kategorie aus EVENT_CATEGORY_INFO (Wiederverwendung 8F)', detail.illustration && detail.illustration.categoryInfo === EVENT_CATEGORY_INFO.famine);
+  check('unbekannte Thread-ID liefert null (kein Rateergebnis)', getStoryChapterViewModel(state, 'nichtvorhanden') === null);
+})();
+
+console.log('--- Phase 8H: Kriegskapitel -- nur echte WAR_DECLARED/PEACE_SIGNED/MAJOR_BATTLE_*-Memories ---');
+(function() {
+  const state = newGame({ seed: 1954 });
+  check('vor jedem Krieg: leere Liste', getWarChapterListViewModel(state).length === 0);
+  declareWar(state, 'ai1');
+  const armyA = buildPlayerBattleArmy(state, {});
+  const armyB = buildAiBattleArmy(state, 'ai1', 1.0, {});
+  armyA.formation = 'ausgewogen'; armyA.tactic = 'frontalangriff';
+  const bs = simulateBattle(armyA, armyB, 'ebene', 'klar', 9911, aiDecisionPolicy);
+  applyBattleResultToGame(state, 'ai1', bs);
+  const list = getWarChapterListViewModel(state);
+  check('nach Kriegserklärung + Schlacht erscheint genau ein Kriegskapitel', list.length === 1 && list[0].aiId === 'ai1');
+  const chap = list[0];
+  check('Kriegskapitel: startYear kommt aus der echten WAR_DECLARED-Memory', chap.startYear === state.year);
+  check('Kriegskapitel: Schlachten sind nur chronikwürdige echte Memories', chap.battles.every(b => typeof b.text === 'string' && b.text.length > 0));
+  check('Kriegskapitel ohne Krieg liefert null', getWarChapterViewModel(state, 'ai2') === null);
+})();
+
+console.log('--- Phase 8H: Meilensteine / Familiengeschichte -- nur echte Chronicle-2.0-Daten ---');
+(function() {
+  const state = newGame({ seed: 1955 });
+  recordWorldEvent(state, { type: 'HEIR_BORN', actorIds: [state.rulerId], targetIds: [], regionIds: ['player'], importance: 65, emotionalWeight: 30, description: 'Ein Erbe wurde geboren.' });
+  const milestones = getMilestoneListViewModel(state);
+  const sameAsCore = computeDynastyMilestones(state);
+  check('Meilensteine sind dieselbe Menge wie computeDynastyMilestones()', milestones.length === sameAsCore.length);
+  const family = getFamilyMilestonesViewModel(state);
+  check('Familiengeschichte enthält nur DYNASTIE-kategorisierte Einträge', family.every(e => e.category === 'DYNASTIE'));
+  check('die reale HEIR_BORN-Memory erscheint in der Familiengeschichte', family.some(e => e.title === 'HEIR_BORN'));
+})();
+
+console.log('--- Phase 8H: World Log -- volles, unverändertes state.chronicle ---');
+(function() {
+  const state = newGame({ seed: 1956 });
+  const log = getWorldLogViewModel(state);
+  check('World Log entspricht state.chronicle (neueste zuerst)', log.length === state.chronicle.length && log[0] === state.chronicle[0]);
+})();
+
+console.log('--- Phase 8H: Dynastieende / Kaiserkrone -- nur bei echtem state.gameOver ---');
+(function() {
+  const state = newGame({ seed: 1957 });
+  check('vor Spielende: beide Endings null', getDynastyEndingViewModel(state) === null && getImperialEndingViewModel(state) === null);
+  state.gameOver = 'no_heir';
+  const ending = getDynastyEndingViewModel(state);
+  check('Dynastieende: lastYear ist der echte state.year', ending.lastYear === state.year);
+  check('Dynastieende: rulerCount kommt aus der echten Summary', ending.rulerCount === computeDynastySummary(state).rulerCount);
+  check('Kaiserkrone bleibt null bei no_heir-Ende', getImperialEndingViewModel(state) === null);
+  state.gameOver = 'victory';
+  state.titleIndex = TITLES.findIndex(t => t.id === 'kaiser');
+  recordWorldEvent(state, { type: 'TITLE_GAINED', actorIds: [state.rulerId], targetIds: [], regionIds: ['player'], importance: 100, emotionalWeight: 50, metadata: { titleId: 'kaiser' }, description: 'Zum Kaiser gekrönt.' });
+  const imperial = getImperialEndingViewModel(state);
+  check('Kaiserkrone: Jahr kommt aus der echten TITLE_GAINED-Memory', imperial.year === state.year);
+})();
+
+console.log('--- Phase 8H: chronicleEntryTier -- Bucketing ohne sichtbaren 51-vs-52-Unterschied ---');
+(function() {
+  check('44 und 45 landen in unterschiedlichen, aber jeweils stabilen Stufen', chronicleEntryTier(44) === 'NOTE' && chronicleEntryTier(45) === 'ENTRY');
+  check('64 und 65 an der ENTRY/FEATURE-Grenze', chronicleEntryTier(64) === 'ENTRY' && chronicleEntryTier(65) === 'FEATURE');
+  check('84 und 85 an der FEATURE/CHAPTER-Grenze', chronicleEntryTier(84) === 'FEATURE' && chronicleEntryTier(85) === 'CHAPTER');
+})();
+
+console.log('--- Phase 8H: RNG-Neutralitaet aller neuen ViewModels (§83) ---');
+(function() {
+  const state = newGame({ seed: 1958 });
+  declareWar(state, 'ai1');
+  const before = __rngCalls;
+  getChronicleTitlePageViewModel(state);
+  getDynastySummaryViewModel(state);
+  getChronicleRulerListViewModel(state).forEach(r => getRulerChapterViewModel(state, r.rulerId));
+  getStoryChapterListViewModel(state).forEach(t => getStoryChapterViewModel(state, t.threadId));
+  getWarChapterListViewModel(state);
+  getFamilyMilestonesViewModel(state);
+  getMilestoneListViewModel(state);
+  getWorldLogViewModel(state);
+  getDynastyEndingViewModel(state);
+  getImperialEndingViewModel(state);
+  check('kein einziger rnd()-Aufruf durch die Phase-8H-ViewModels', __rngCalls === before);
+})();
+
 console.log('');
 if (failures > 0) { console.log(failures + ' Test(s) fehlgeschlagen.'); process.exit(1); }
 console.log('Alle UI-ViewModel-Tests bestanden.');
