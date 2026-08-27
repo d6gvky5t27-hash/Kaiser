@@ -1491,3 +1491,256 @@ function getBattleChronicleHintViewModel(state, aiId) {
   const mem = mems[mems.length - 1];
   return isChronicleWorthy(state, mem).worthy ? { worthy: true } : null;
 }
+
+// ============================================================
+// Phase 8H: CHRONICLE BOOK -- "Die Geschichte der Dynastie wird zum
+// illustrierten Buch". Liest ausschließlich bereits vorhandene
+// Chronicle-2.0-Quellen (js/chronicle.js: computeDynastyChronicle,
+// getRulerEras, buildRulerBiography, computeDynastyMilestones,
+// computeDynastySummary, isChronicleWorthy) sowie World Memory/Story
+// Threads -- keine neue Narrative Engine, keine neuen Scores, keine
+// neuen rnd()-Aufrufe. computeDynastyChronicle() bleibt pure/on-demand,
+// kein neuer inkrementeller Chronicle-State (§85).
+// ============================================================
+
+// §72-75: visuelle Bedeutungsstufe rein aus der bereits vorhandenen
+// Chronicle-Importance -- keine neue Kennzahl, nur Bucketing (damit
+// 51 vs. 52 Punkte nicht sichtbar unterschiedlich wirken, §73).
+function chronicleEntryTier(importance) {
+  if (importance >= 85) return "CHAPTER";
+  if (importance >= 65) return "FEATURE";
+  if (importance >= 45) return "ENTRY";
+  return "NOTE";
+}
+
+// §45: Story-Filterkategorien nur aus real existierenden Thread-Typen --
+// 1:1-Abbildung auf STORY_THREAD_TYPES, keine erfundene Kategorie.
+const STORY_FILTER_LABEL = {
+  SUCCESSION_CONFLICT: "Dynastie", PERSONAL_RIVALRY: "Rivalität",
+  FOOD_CRISIS: "Krise", FOREIGN_CONFLICT: "Krieg",
+  RELIGIOUS_CONFLICT: "Religion", IMPERIAL_AMBITION: "Kaiserreich",
+  DYNASTIC_ALLIANCE: "Diplomatie",
+};
+// §25: dieselbe Illustrations-Kategorisierung wie 8Fs RANDOM_EVENT_CATEGORY/
+// CHAIN_EVENT_CATEGORY -- Story-Threads bekommen eine bereits bestehende
+// EVENT_CATEGORY_INFO-Kategorie zugeordnet, keine zweite Bildsprache.
+const STORY_THREAD_ILLUSTRATION_CATEGORY = {
+  SUCCESSION_CONFLICT: "succession", PERSONAL_RIVALRY: "rivalry",
+  FOOD_CRISIS: "famine", FOREIGN_CONFLICT: "war",
+  RELIGIOUS_CONFLICT: "religion", IMPERIAL_AMBITION: "imperial",
+  DYNASTIC_ALLIANCE: "marriage",
+};
+
+// ---------- §9/10: Titelseite ----------
+function getChronicleTitlePageViewModel(state) {
+  const currentRuler = state.characters[state.rulerId];
+  const summary = computeDynastySummary(state);
+  const houseName = state.dynastyName || (currentRuler ? currentRuler.surname : "") || "";
+  return {
+    dynastyName: state.dynastyName, foundingYear: 1500, currentYear: state.year,
+    currentRulerName: currentRuler ? `${currentRuler.name} ${currentRuler.surname || ""}`.trim() : null,
+    currentRulerCard: currentRuler ? getCharacterCardViewModel(state, state.rulerId) : null,
+    highestTitleName: summary.highestTitleName,
+    generations: summary.generations, rulerCount: summary.rulerCount,
+    heraldry: getHeraldryViewModel(houseName),
+    gameOver: state.gameOver,
+  };
+}
+
+// ---------- §11/12: Dynasty Summary -- die bereits vollständige, echte
+// Summary direkt weiterreichen, kein Zwischenschritt, keine neue Wertung. ----------
+function getDynastySummaryViewModel(state) {
+  return computeDynastySummary(state);
+}
+
+// ---------- §14/42/68: Herrscherliste (Kapitelübersicht + Zeitstrahl-
+// Grundlage) -- dieselbe Era-Iteration wie getDynastyTreeViewModel, nur
+// inklusive des aktuellen Herrschers. ----------
+function getChronicleRulerListViewModel(state) {
+  const eras = getRulerEras(state);
+  return eras.map((e, idx) => {
+    const c = state.characters[e.rulerId];
+    return {
+      rulerId: e.rulerId, order: idx + 1,
+      name: c ? `${c.name} ${c.surname || ""}`.trim() : "Unbekannt",
+      startYear: e.startYear, endYear: e.endYear, isCurrent: e.endYear === null,
+      alive: c ? c.alive : false,
+      card: c ? getCharacterCardViewModel(state, e.rulerId) : null,
+    };
+  });
+}
+
+// ---------- §14-21/68/69: Regenten-Kapitel -- buildRulerBiography()
+// bleibt Source of Truth, hier nur um Portrait/Familienlinks/Traits/
+// Navigation ergänzt (keine parallele Biografie-Berechnung). ----------
+function getRulerChapterViewModel(state, rulerId) {
+  const bio = buildRulerBiography(state, rulerId);
+  const c = state.characters[rulerId];
+  if (!bio || !c) return null;
+  const card = getCharacterCardViewModel(state, rulerId);
+  const spouse = c.spouseId && state.characters[c.spouseId] ? getCharacterCardViewModel(state, c.spouseId) : null;
+  const children = (c.childrenIds || []).map(id => getCharacterCardViewModel(state, id)).filter(Boolean);
+  const eras = getRulerEras(state);
+  const idx = eras.findIndex(e => e.rulerId === rulerId);
+  // §19: kein erfundenes Geburtsjahr -- reine Arithmetik aus bereits realen
+  // Feldern (Alter friert bei Tod ein, s. updateDynasty()), nichts geschätzt.
+  const birthYear = (bio.reignEnd !== null ? bio.reignEnd : state.year) - c.age;
+  // §17: kurze, saubere Ereigniszeile statt bio.highlights' voller,
+  // mehrzeiliger Thread-Zusammenfassung -- bei Thread-Sammel-Einträgen den
+  // echten, kurzen Thread-Titel verwenden (dieselbe Unterscheidung, die
+  // Chronicle 2.0 selbst über entry.threadId trifft), sonst die reale
+  // Memory-Beschreibung. Kein neuer Text, nur ein anderes Feld desselben
+  // bereits vorhandenen Chronicle-2.0-Eintrags.
+  const highlights = getChronicleForRuler(state, rulerId).map(e => ({ year: e.year, text: e.threadId ? e.title : e.text }));
+  return {
+    rulerId, bio, card, birthYear, highlights,
+    deathYear: (!c.alive && bio.reignEnd !== null) ? bio.reignEnd : null,
+    spouse, children, topTraits: card ? card.topTraits : [],
+    hasPrev: idx > 0, hasNext: idx >= 0 && idx < eras.length - 1,
+    prevRulerId: idx > 0 ? eras[idx - 1].rulerId : null,
+    nextRulerId: idx >= 0 && idx < eras.length - 1 ? eras[idx + 1].rulerId : null,
+  };
+}
+
+// ---------- §23-28/66/67: Story-Kapitel -- nur bereits real
+// abgeschlossene, bedeutende Threads (dieselbe Schwelle, die Chronicle
+// 2.0 selbst für die Thread-Zusammenfassung verwendet -- Dedup bleibt
+// unverändert bestehen). ----------
+function getStoryChapterListViewModel(state) {
+  const threads = getAllStoryThreads(state).filter(t =>
+    (t.status === "RESOLVED" || t.status === "EXPIRED") && t.importance >= CONFIG.chronicle.threadSummaryThreshold);
+  return threads.map(t => ({
+    threadId: t.id, title: t.title, type: t.type,
+    filterLabel: STORY_FILTER_LABEL[t.type] || "Sonstiges",
+    startYear: t.startedYear,
+    endYear: t.history.length ? t.history[t.history.length - 1].year : t.startedYear,
+    importance: t.importance, tier: chronicleEntryTier(t.importance),
+    resolutionTone: t.resolution ? t.resolution.tone : null,
+  })).sort((a, b) => a.startYear - b.startYear);
+}
+
+// §24: max. 3-6 Beats -- bei längerer History deterministisch Anfang/Ende
+// + gleichmäßig verteilte Zwischenpunkte statt einer erfundenen Auswahl.
+function pickThreadBeats(history) {
+  if (history.length <= 6) return history;
+  const midCount = 2;
+  const picks = [0, 1];
+  for (let i = 1; i <= midCount; i++) picks.push(Math.round(i * (history.length - 1) / (midCount + 1)));
+  picks.push(history.length - 2, history.length - 1);
+  return Array.from(new Set(picks)).sort((a, b) => a - b).map(i => history[i]);
+}
+
+function getStoryChapterViewModel(state, threadId) {
+  const thread = getAllStoryThreads(state).find(t => t.id === threadId);
+  if (!thread) return null;
+  const participants = thread.actorIds.map(id => getCharacterCardViewModel(state, id)).filter(Boolean);
+  const illustrationCategory = STORY_THREAD_ILLUSTRATION_CATEGORY[thread.type] || null;
+  return {
+    threadId: thread.id, title: thread.title,
+    filterLabel: STORY_FILTER_LABEL[thread.type] || "Sonstiges",
+    startYear: thread.startedYear,
+    endYear: thread.history.length ? thread.history[thread.history.length - 1].year : thread.startedYear,
+    participants,
+    beats: pickThreadBeats(thread.history).map(h => ({ year: h.year, note: h.note })),
+    resolution: thread.resolution ? {
+      type: thread.resolution.type, tone: thread.resolution.tone,
+      consequences: thread.resolution.consequences || [],
+    } : null,
+    summaryText: summarizeStoryThread(thread),
+    illustration: illustrationCategory ? {
+      category: illustrationCategory, categoryInfo: EVENT_CATEGORY_INFO[illustrationCategory],
+      participants, year: thread.startedYear, isSuccession: false,
+    } : null,
+  };
+}
+
+// ---------- §29-33: Kriegskapitel -- nur echte WAR_DECLARED/
+// PEACE_SIGNED/MAJOR_BATTLE_*-Memories, nur chronikwürdige Schlachten. ----------
+function getWarChapterViewModel(state, aiId) {
+  const region = state.regions[aiId];
+  if (!region) return null;
+  const declarations = getMemoriesByType(state, "WAR_DECLARED").filter(m => m.regionIds.includes(aiId)).sort((a, b) => a.year - b.year);
+  if (!declarations.length) return null;
+  const peaces = getMemoriesByType(state, "PEACE_SIGNED").filter(m => m.regionIds.includes(aiId)).sort((a, b) => a.year - b.year);
+  const battleMemories = allMemories(state).filter(m =>
+    (m.type === "MAJOR_BATTLE_WON" || m.type === "MAJOR_BATTLE_LOST") && m.regionIds && m.regionIds.includes(aiId));
+  const worthyBattles = battleMemories.filter(m => isChronicleWorthy(state, m).worthy)
+    .sort((a, b) => a.year - b.year)
+    .map(m => ({ year: m.year, won: m.type === "MAJOR_BATTLE_WON", text: m.description, conquest: !!(m.metadata && m.metadata.conquest) }));
+  const conquestBattle = worthyBattles.filter(b => b.conquest).pop() || null;
+  const ongoing = !!(state.warState && state.warState[aiId]);
+  const lastPeace = peaces.length ? peaces[peaces.length - 1] : null;
+  const thread = getAllStoryThreads(state).find(t => t.type === "FOREIGN_CONFLICT" && t.regionIds.includes(aiId));
+  return {
+    aiId, opponentName: region.name.replace(/\s*\(.*\)$/, ""),
+    startYear: declarations[0].year,
+    endYear: ongoing ? null : (lastPeace ? lastPeace.year : (conquestBattle ? conquestBattle.year : null)),
+    ongoing, conquered: !!conquestBattle || !!region.conquered,
+    battles: worthyBattles,
+    storyThread: thread ? { threadId: thread.id, title: thread.title } : null,
+  };
+}
+
+function getWarChapterListViewModel(state) {
+  const aiIds = Object.keys(state.regions).filter(id => id !== "player");
+  const chapters = [];
+  for (const aiId of aiIds) {
+    const worthy = getMemoriesByType(state, "WAR_DECLARED")
+      .filter(m => m.regionIds.includes(aiId)).some(m => isChronicleWorthy(state, m).worthy);
+    if (!worthy) continue;
+    const chapter = getWarChapterViewModel(state, aiId);
+    if (chapter) chapters.push(chapter);
+  }
+  return chapters.sort((a, b) => a.startYear - b.startYear);
+}
+
+// ---------- §34/35: Familienmeilensteine -- dieselben DYNASTIE-
+// kategorisierten Chronicle-2.0-Einträge, keine Zweitquelle. ----------
+function getFamilyMilestonesViewModel(state) {
+  return computeDynastyChronicle(state).filter(e => e.category === "DYNASTIE");
+}
+
+// ---------- §40/41: Meilensteine wie eine historische Randnotiz -- reale
+// computeDynastyMilestones()-Einträge, keine Achievement-Optik. ----------
+function getMilestoneListViewModel(state) {
+  return computeDynastyMilestones(state).map(m => ({
+    type: m.type, year: m.year !== undefined ? m.year : null, text: m.text,
+  }));
+}
+
+// ---------- §47/48: World Log -- separat, sachlich, volles state.chronicle
+// (bereits neueste-zuerst, s. addChronicle()/unshift). ----------
+function getWorldLogViewModel(state) {
+  return state.chronicle.slice();
+}
+
+// ---------- §38/103: Dynastieende als eigene Schlussseite -- nur bei
+// echtem state.gameOver === "no_heir". ----------
+function getDynastyEndingViewModel(state) {
+  if (state.gameOver !== "no_heir") return null;
+  const eras = getRulerEras(state);
+  const lastEra = eras[eras.length - 1];
+  const lastRuler = lastEra ? state.characters[lastEra.rulerId] : null;
+  const summary = computeDynastySummary(state);
+  return {
+    lastRulerName: lastRuler ? `${lastRuler.name} ${lastRuler.surname || ""}`.trim() : null,
+    lastYear: state.year, generations: summary.generations, rulerCount: summary.rulerCount,
+    highestTitleName: summary.highestTitleName,
+    biggestCrisis: summary.biggestCrisis, mostSignificantWar: summary.mostSignificantWar,
+  };
+}
+
+// ---------- §39/104: Kaiser-Sieg als eigene finale Chronikseite -- nur bei
+// echtem state.gameOver === "victory", keine neue Mechanik. ----------
+function getImperialEndingViewModel(state) {
+  if (state.gameOver !== "victory") return null;
+  const ruler = state.characters[state.rulerId];
+  const summary = computeDynastySummary(state);
+  const coronation = allMemories(state).find(m => m.type === "TITLE_GAINED" && m.metadata && m.metadata.titleId === "kaiser");
+  return {
+    dynastyName: state.dynastyName,
+    rulerName: ruler ? `${ruler.name} ${ruler.surname || ""}`.trim() : null,
+    year: coronation ? coronation.year : state.year,
+    generations: summary.generations, rulerCount: summary.rulerCount,
+  };
+}
