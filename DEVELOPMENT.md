@@ -3579,3 +3579,88 @@ Vasallisierungslogik (unverändert). Bundle-Größe 785.147 → 818.576
 Bytes (+4,3 %). Battle Engine unverändert, Kriegskarten-Mechanik
 (`js/war-map.js`) unverändert, keine neue SAVE_VERSION, 0 neue
 `rnd()`-Aufrufe in irgendeinem ViewModel.
+
+## 2026-08-27 – Phase 8H (KAISERREICH-Zwischenprompt): Chronicle Book Redesign
+
+"Die Geschichte der Dynastie wird zum illustrierten Buch." Chronicle 2.0
+(`js/chronicle.js`) bleibt vollständig unverändert und ist Source of
+Truth — keine neue Erzähl-Engine, keine neuen Scores, keine Text-KI.
+
+**Buchmetapher:** neue `#chronikPage` (Sidenav "📖 CHRONIK"), Papier in
+warmem Elfenbein, Tinte in dunklem Anthrazit, Akzente Burgunder/Gold/
+Bronze — dieselben bestehenden Design-Tokens, keine neue Palette. Eine
+Doppelseite (CSS-Grid, dezenter Mittelfalz-Schatten) trägt die
+Herrscher-Kapitel; kein Page-Curl, kein WebGL, nur ein kurzer
+reduced-motion-respektierter Fade beim Seitenwechsel.
+
+**Navigation:** DYNASTIE / HERRSCHER / GESCHICHTEN / KRIEGE /
+MEILENSTEINE / WORLD LOG, plus DYNASTIEENDE/KAISERKRONE nur bei echtem
+`state.gameOver`. Leere Bereiche werden nicht künstlich gefüllt. Beim
+ersten Öffnen Standardansicht = aktuelle Regentschaft, danach merkt
+sich reiner UI-State (keine neue Save-Version) die letzte Position.
+
+**Titelseite + Dynasty Summary:** reichen die bereits reale
+`computeDynastySummary()` durch — Wappen (8D-Wiederverwendung),
+Gründungsjahr, aktueller Herrscher, Generationen, höchster Titel als
+historische Eckdaten statt Achievement-Badges.
+
+**Herrscher-Doppelseite:** `buildRulerBiography()` ergänzt um Portrait
+(8D-Wiederverwendung, deutlich größer als die normale Character Card),
+Ehepartner-/Kinder-Verlinkung, die wichtigsten 2-3 Traits sowie eine
+kurze, templatebasierte Fließtext-Biografie aus denselben realen
+Feldern. Verstorbene Herrscher dezent entsättigt (leichtes Sepia statt
+hartem Graustufen-Filter) statt wie ein deaktivierter Button. Ein
+gefundenes Problem behoben: die Highlight-Liste zeigte für Thread-
+Sammel-Einträge die volle mehrzeilige Zusammenfassung statt eines
+kurzen Titels — jetzt wird bei Thread-Einträgen der echte, kurze
+Thread-Titel verwendet.
+
+**Story-/Kriegskapitel:** nur real abgeschlossene, hinreichend
+bedeutende Threads (dieselbe Schwelle, die Chronicle 2.0 selbst für die
+Dedup-Grenze nutzt). Bis zu 6 Beats deterministisch ausgewählt.
+Illustration: dieselbe Funktion aus 8F, Thread-Typen 1:1 auf
+bestehende Event-Kategorien gemappt, keine zweite Bildsprache.
+Resolution-Tonalität nur als dezenter Rand, immer zusätzlich Text,
+keine moralische Wertung. Kriegskapitel ausschließlich aus echten
+Kriegs-/Schlacht-Memories, nur chronikwürdige Schlachten, plus ein auf
+die beteiligten Regionen zugeschnittenes Kartenfragment (8C.2-
+Wiederverwendung, keine zweite Karte).
+
+**Meilensteine + Familiengeschichte:** reichen die bestehenden
+Milestone-/Chronik-Funktionen durch, als Siegel-Randnotiz statt
+Achievement-Popup dargestellt.
+
+**Dynastieende / Kaiserkrone:** eigene Schlussseiten nur bei echtem
+Spielende. Neuer Button auf dem bestehenden Game-Over-Bildschirm
+("📖 Deine Geschichte ansehen"). Ein gefundener Bug behoben: die
+bestehende gameOver-Anzeige-Logik blendete das alte Overlay bei jedem
+Re-Render automatisch wieder ein — ein neues, bewusst nicht
+gespeichertes UI-Flag verhindert das jetzt für die laufende Sitzung.
+
+**World Log:** eigener, bewusst sachlicher Registerbereich, klar vom
+Buch-Layout unterschieden.
+
+**Zeitstrahl + Suche + Verlinkung:** dezente klickbare Zeitleiste,
+Text-Suche über Namen/Jahr (reine UI-Filterung), Personen-/
+Regionenverlinkung über bestehende Schnittstellen (8D/8B).
+
+**Getestet:** komplette bestehende Node-Testsuite weiterhin grün (bis
+auf `economy_test.js`, dessen unseeded Zufalls-Stichprobe unabhängig
+von dieser Phase gelegentlich einzelne Ausreißer zeigt). 33 neue
+Prüfungen in `tests/ui_viewmodel_test.js`. Playwright (23 Prüfungen):
+ein Herrscher, mindestens 4 echte Regentschaften mit Navigation,
+Herrschertod sichtbar, Story-Thread mit mehreren Beats, chronikwürdiger
+Krieg inkl. Kartenfragment und Regionenverlinkung, Save/Load-Rundlauf,
+Dynastieende-/Kaiserkrone-Schlussseite, Responsive bei 1920×1080 und
+1366×768.
+
+**Roadmap-Idee (nicht implementiert, nur dokumentiert):** Chronik als
+exportierbares Buch (PDF/Share-Card/Familienchronik-Export) — für eine
+spätere, experimentelle Phase, bewusst außerhalb von 8H.
+
+**Bewusst NICHT Teil dieser Teilphase:** exportierbares Chronikbuch/PDF,
+neue Kriegs-/Frieden-Mechanik, neue Story-Thread-Typen, veränderte
+Drama-Director-/Story-Thread-Logik. Bundle-Größe 818.576 → 870.312
+Bytes (+6,3 %). Battle Engine unverändert, Kartenwerk aus 8C.2
+unverändert, keine neue SAVE_VERSION, 0 neue `rnd()`-Aufrufe in
+irgendeinem ViewModel.

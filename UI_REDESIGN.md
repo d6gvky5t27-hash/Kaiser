@@ -1177,7 +1177,148 @@ Outcomes im Node-Test mitgeprüft). Bundle-Größe 785.147 → 818.576 Bytes
 leer), Kriegskarten-Mechanik (`js/war-map.js`) unverändert, keine neue
 SAVE_VERSION, 0 neue `rnd()`-Aufrufe in irgendeinem ViewModel.
 
-## 12. Screen Inventory (Status nach Phase 8A + 8B + 8C + 8C.1 + 8C.2 + 8D + 8E + 8F + 8G)
+## 12. Phase 8H: Chronicle Book Redesign
+
+"Die Geschichte der Dynastie wird zum illustrierten Buch." Chronicle 2.0
+(`js/chronicle.js`: `computeDynastyChronicle`, `getRulerEras`,
+`buildRulerBiography`, `computeDynastyMilestones`, `computeDynastySummary`,
+`isChronicleWorthy`) bleibt vollständig unverändert und ist Source of
+Truth — keine neue Erzähl-Engine, keine neuen Scores, keine
+Text-KI. `computeDynastyChronicle()` bleibt pure/on-demand, kein neuer
+inkrementeller Chronicle-State.
+
+**Buchmetapher (§4-8):** neue `#chronikPage` (Sidenav "📖 CHRONIK"),
+Papier in warmem Elfenbein (`--panel`), Tinte in dunklem Anthrazit
+(`--ink`), Akzente Burgunder/Gold/Bronze (`--accent`/`--gold`/`--purple`)
+— exakt die bereits bestehenden Design-Tokens, keine neue Palette. Eine
+Doppelseite (`.chronikSpread`, CSS-Grid) mit dezentem Mittelfalz-Schatten
+trägt die Herrscher-Kapitel; kein Page-Curl, kein WebGL, nur ein kurzer
+Fade beim Seitenwechsel (`prefers-reduced-motion`-respektiert).
+
+**Navigation (§13):** DYNASTIE / HERRSCHER / GESCHICHTEN / KRIEGE /
+MEILENSTEINE / WORLD LOG, plus DYNASTIEENDE/KAISERKRONE nur bei echtem
+`state.gameOver`. Leere Bereiche werden nicht künstlich gefüllt (§13,
+z.B. "Noch keine abgeschlossenen Geschichten"). Beim ersten Öffnen
+Standardansicht = aktuelle Regentschaft (§53), danach merkt sich reiner
+UI-State (keine neue Save-Version) die letzte Position (§54).
+
+**Titelseite + Dynasty Summary (§9-12):** `getChronicleTitlePageViewModel`/
+`getDynastySummaryViewModel` (neu in `js/ui-viewmodels.js`) reichen die
+bereits reale `computeDynastySummary()` durch — Wappen
+(`getHeraldryViewModel`, 8D-Wiederverwendung), Gründungsjahr, aktueller
+Herrscher, Generationen, höchster Titel als historische Eckdaten statt
+Achievement-Badges (§12).
+
+**Herrscher-Doppelseite (§14-21):** `getRulerChapterViewModel` ergänzt
+`buildRulerBiography()` um Portrait (`buildPortraitSvg`, 8D-Wiederver-
+wendung, deutlich größer als die normale Character Card), Ehepartner/
+Kinder-Verlinkung, die wichtigsten 2-3 Traits (`card.topTraits`) sowie
+eine kurze, templatebasierte Fließtext-Biografie aus denselben realen
+Feldern (kein neuer Text erfunden). Verstorbene Herrscher werden dezent
+entsättigt (leichtes Sepia statt hartem Graustufen-Filter, §15) statt
+wie ein deaktivierter Button dargestellt. Ein während der Umsetzung
+gefundenes Problem behoben: `bio.highlights` enthielt für Thread-
+Sammel-Einträge die volle mehrzeilige `summarizeStoryThread()`-Ausgabe
+statt eines kurzen Titels — `getRulerChapterViewModel` baut die
+Highlight-Liste jetzt direkt aus `getChronicleForRuler()` und verwendet
+bei Thread-Einträgen (`entry.threadId` gesetzt) den echten, kurzen
+Thread-Titel statt des vollen Texts.
+
+**Story-/Kriegskapitel (§23-33):** `getStoryChapterListViewModel`/
+`getStoryChapterViewModel` zeigen nur real abgeschlossene, hinreichend
+bedeutende Threads (dieselbe `CONFIG.chronicle.threadSummaryThreshold`,
+die Chronicle 2.0 selbst für die Dedup-Grenze nutzt — Dedup bleibt
+unverändert bestehen, §66/67). Bis zu 6 Beats werden deterministisch
+ausgewählt (Anfang/Ende + gleichmäßig verteilte Zwischenpunkte bei
+längerer Historie). Illustration: dieselbe `renderEventIllustration()`
+aus 8F, Thread-Typen 1:1 auf bestehende `EVENT_CATEGORY_INFO`-Kategorien
+gemappt (SUCCESSION_CONFLICT→succession, PERSONAL_RIVALRY→rivalry,
+FOOD_CRISIS→famine, FOREIGN_CONFLICT→war, RELIGIOUS_CONFLICT→religion,
+IMPERIAL_AMBITION→imperial, DYNASTIC_ALLIANCE→marriage) — keine zweite
+Bildsprache. Resolution-Tonalität (PEACEFUL/CONFLICT/TRAGIC/TRIUMPHANT/
+AMBIGUOUS) nur als dezenter Rand, immer zusätzlich Text, keine
+moralische Wertung (§28). `getWarChapterListViewModel`/
+`getWarChapterViewModel` bauen Kriegskapitel ausschließlich aus echten
+`WAR_DECLARED`/`PEACE_SIGNED`/`MAJOR_BATTLE_WON`/`MAJOR_BATTLE_LOST`-
+Memories, nur chronikwürdige Schlachten (`isChronicleWorthy`), plus ein
+auf die beteiligten Regionen zugeschnittenes Kartenfragment aus
+`MAP_GEOMETRY` (8C.2-Wiederverwendung, keine zweite Karte, §31).
+
+**Meilensteine + Familiengeschichte (§34/35/40/41):**
+`getMilestoneListViewModel` reicht `computeDynastyMilestones()` durch,
+als Siegel-Randnotiz statt Achievement-Popup dargestellt.
+`getFamilyMilestonesViewModel` filtert `computeDynastyChronicle()` auf
+die bereits vorhandene Kategorie "DYNASTIE" (Geburt/Heirat/Tod/
+Nachfolge) — keine Zweitquelle.
+
+**Dynastieende / Kaiserkrone (§38/39/103/104):** eigene Schlussseiten
+nur bei echtem `state.gameOver`. Ein neuer Button auf dem bestehenden
+`#gameover`-Bildschirm ("📖 Deine Geschichte ansehen") öffnet die
+passende Seite. Ein während der Umsetzung gefundener Bug behoben:
+`render()`s bestehende gameOver-Anzeige-Logik blendete das alte
+Overlay bei jedem Re-Render automatisch wieder ein, solange
+`state.gameOver` gesetzt war, und überdeckte damit die frisch geöffnete
+Chronik — ein neues, bewusst nicht gespeichertes UI-Flag
+(`chronikDismissedGameOver`) verhindert das jetzt dauerhaft für die
+laufende Sitzung.
+
+**World Log (§47/48):** eigener, bewusst sachlicher Registerbereich
+(`getWorldLogViewModel`, volles `state.chronicle`) — klar vom
+Buch-Layout unterschieden, kein zweites Buch-Highlight.
+
+**Zeitstrahl + Suche + Verlinkung (§42-51):** dezente, klickbare
+Zeitleiste am Buchrand springt zur jeweiligen Regentschaft. Text-Suche
+über Namen/Jahr (reine UI-Filterung, kein Save-Zwang) — das Suchfeld
+selbst wird bei jedem Tastendruck bewusst nur über `renderChronikPage()`
+statt der vollen `render()` aktualisiert, damit Fokus/Cursor nicht
+verlorengehen. Personen-/Regionenverlinkung über die bestehenden
+`openCharacterDetail()`/`selectMapTerritory()`-Schnittstellen (8D/8B),
+keine neue Mechanik.
+
+**Visuelle Bedeutungsstufen (§72-75):** `chronicleEntryTier()` bucketet
+die bereits reale Chronicle-Importance in NOTE/ENTRY/FEATURE/CHAPTER
+(keine neue Kennzahl, kein sichtbarer 51-vs-52-Unterschied, kein
+technisches Label spielerseitig).
+
+**ViewModel-Schicht (§81/82, neu in `js/ui-viewmodels.js`):**
+`getChronicleTitlePageViewModel`, `getDynastySummaryViewModel`,
+`getChronicleRulerListViewModel`, `getRulerChapterViewModel`,
+`getStoryChapterListViewModel`/`getStoryChapterViewModel`,
+`getWarChapterListViewModel`/`getWarChapterViewModel`,
+`getFamilyMilestonesViewModel`, `getMilestoneListViewModel`,
+`getWorldLogViewModel`, `getDynastyEndingViewModel`/
+`getImperialEndingViewModel`, `chronicleEntryTier` — reine
+Transformation bereits vorhandener Chronicle-2.0-/State-Daten, keine
+Gameplay-Logik, 0 neue `rnd()`/`Math.random()`-Aufrufe (per Node-Test
+verifiziert, RNG-Delta 0).
+
+**Getestet:** komplette bestehende Node-Testsuite weiterhin grün (bis
+auf `economy_test.js`, dessen unseeded Zufalls-Stichprobe unabhängig
+von dieser Phase gelegentlich einzelne "Preis nahe Obergrenze"-Ausreißer
+zeigt — bestätigt durch mehrfachen Re-Lauf ohne jede Code-Änderung an
+Wirtschaftslogik). `tests/ui_viewmodel_test.js` um 33 neue Prüfungen
+ergänzt (Titelseite/Summary, Mehrfach-Nachfolge-Navigation, Regressionstest
+für den Highlight-Text-Bug, Story-/Kriegskapitel nur bei echten/
+hinreichend bedeutenden Daten, Meilensteine/Familiengeschichte,
+World Log, Dynastieende/Kaiserkrone, Tier-Bucketing, RNG-Neutralität).
+Playwright (23 Prüfungen, 7 Testblöcke): ein Herrscher (Chronik bleibt
+funktionsfähig), mindestens 4 echte Regentschaften mit korrekter
+Vorwärts-/Rückwärts-/Tastatur-Navigation, Herrschertod sichtbar, Story-
+Thread mit mehreren Beats vollständig, chronikwürdiger Krieg korrekt
+dargestellt inkl. Kartenfragment und Regionenverlinkung, Save/Load-
+Rundlauf ohne Bruch, Dynastieende- und Kaiserkrone-Schlussseite (inkl.
+Bugfix-Verifikation), Responsive bei 1920×1080 (echte Doppelseite) und
+1366×768 (Einzelseiten-Modus, kein horizontaler Overflow).
+
+**Bewusst NICHT Teil dieser Teilphase:** exportierbares Chronikbuch/PDF/
+Share-Card (§105/106 — als Roadmap-Idee dokumentiert, siehe
+DEVELOPMENT.md), neue Kriegs-/Frieden-Mechanik, neue Story-Thread-Typen,
+veränderte Drama-Director-/Story-Thread-Logik. Bundle-Größe 818.576 →
+870.312 Bytes (+6,3 %). Battle Engine unverändert, Kartenwerk aus 8C.2
+unverändert, keine neue SAVE_VERSION, 0 neue `rnd()`-Aufrufe in
+irgendeinem ViewModel.
+
+## 13. Screen Inventory (Status nach Phase 8A + 8B + 8C + 8C.1 + 8C.2 + 8D + 8E + 8F + 8G + 8H)
 
 | Screen/Bereich | Status | Anmerkung |
 |---|---|---|
@@ -1204,7 +1345,8 @@ SAVE_VERSION, 0 neue `rnd()`-Aufrufe in irgendeinem ViewModel.
 | Character Card / Character Detail | **REDESIGNED** | 8D — neue `#characterDetailModal`, Skills als Grid, Traits als Badges mit echtem Effekttext, echte Beziehungs-/Loyalitäts-Aufschlüsselung, Erinnerungs-Zeitleiste, siehe Abschnitt 8 |
 | Dynastie-/Stammbaum-Ansicht | **REDESIGNED** | 8D — neuer `#dynastiePage`, genealogische Generationenreihen statt Node-Graph, Thronfolgeliste, frühere Herrscher, siehe Abschnitt 8 |
 | Story-Thread-Spieler-UI | **REDESIGNED** | 8F — neue `#storyViewModal` ("Geschichten am Hof"), erreichbar über die jetzt klickbare Story Card aus 8B, siehe Abschnitt 10 |
-| Chronik-als-Buch-Ansicht | **LEGACY** | noch nicht begonnen (8H, bestehende `#chronicle`-Liste bleibt) |
+| Chronik-als-Buch-Ansicht | **REDESIGNED** | 8H — neue `#chronikPage` ("Das große Buch der Dynastie"), Titelseite/Dynasty Summary, Herrscher-Doppelseiten, Story-/Kriegskapitel, Meilensteine, Dynastieende/Kaiserkrone, siehe Abschnitt 12 |
+| World Log (bestehende `#chronicle`-Liste auf PROVINZ) | **REDESIGNED** (Tokens) / **LEGACY** (Struktur) | bewusst unverändert als sachliches Register belassen, zusätzlich jetzt auch als eigener Tab im Chronikbuch erreichbar (8H, klare Trennung Buch vs. Log) |
 | Game Over / Dynastie-Ende-Inszenierung | **REDESIGNED** (Tokens) | Struktur unverändert |
 | Debug-Panel | **REDESIGNED** (Tokens) | bewusst weiterhin optisch als Debug erkennbar (§146), keine Graphic-Novel-Anmutung gewünscht |
 | Responsive/Accessibility-Politur (8I) | **PARTIAL** | 8B bereits bei 3 Pflichtauflösungen getestet und angepasst (siehe Abschnitt 5), ein finaler Accessibility-/Polish-Pass über ALLE Screens bleibt 8I vorbehalten |
