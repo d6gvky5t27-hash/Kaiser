@@ -1,0 +1,79 @@
+{
+  "regions": [
+    "player",
+    "burgund",
+    "england",
+    "venedig",
+    "mailand"
+  ],
+  "agents": [
+    "verwalter",
+    "kaufmann",
+    "kriegsherr",
+    "diplomat"
+  ],
+  "seeds": [
+    3000,
+    10919,
+    18838,
+    26757,
+    34676,
+    42595,
+    50514,
+    58433,
+    66352,
+    74271,
+    82190,
+    90109,
+    98028,
+    105947,
+    113866
+  ],
+  "summary": {
+    "player": {
+      "n": 60,
+      "avgYearsSimulated": 69.7,
+      "survivedFull100Share": 0.333,
+      "bankruptShare": 0.25,
+      "noHeirShare": 0.433,
+      "avgFinalTreasury": 22376,
+      "avgFinalPopulation": 4628
+    },
+    "burgund": {
+      "n": 60,
+      "avgYearsSimulated": 75.2,
+      "survivedFull100Share": 0.367,
+      "bankruptShare": 0.217,
+      "noHeirShare": 0.4,
+      "avgFinalTreasury": 31396,
+      "avgFinalPopulation": 4982
+    },
+    "england": {
+      "n": 60,
+      "avgYearsSimulated": 77.4,
+      "survivedFull100Share": 0.5,
+      "bankruptShare": 0.183,
+      "noHeirShare": 0.283,
+      "avgFinalTreasury": 30839,
+      "avgFinalPopulation": 5097
+    },
+    "venedig": {
+      "n": 60,
+      "avgYearsSimulated": 76.2,
+      "survivedFull100Share": 0.417,
+      "bankruptShare": 0.25,
+      "noHeirShare": 0.333,
+      "avgFinalTreasury": 22696,
+      "avgFinalPopulation": 4686
+    },
+    "mailand": {
+      "n": 60,
+      "avgYearsSimulated": 78.2,
+      "survivedFull100Share": 0.45,
+      "bankruptShare": 0.233,
+      "noHeirShare": 0.317,
+      "avgFinalTreasury": 44458,
+      "avgFinalPopulation": 5751
+    }
+  }
+}
