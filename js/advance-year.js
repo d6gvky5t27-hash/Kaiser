@@ -274,7 +274,13 @@ function applyMonthlyFinances(state) {
     if (!state.vassals[aiId]) continue;
     const region = state.regions[aiId];
     const totalPop = Object.values(region.population).reduce((s, g) => s + g.count, 0);
-    const tribute = Math.round(totalPop * vcfg.vassalizeTributeShare * 0.02 / 12);
+    // Phase 10C (War Economy Audit): entfernter Faktor `* 0.02` — machte
+    // den Tribut für jede realistische Regionsgröße (~2.000-3.000 Einwohner)
+    // auf 0 Taler/Monat runden (0,08 * 0,02 / 12 verlangt >3.750 Einwohner
+    // für auch nur 1 Taler), sodass Vasallentribut der einzige dauerhafte
+    // wirtschaftliche Eroberungsertrag praktisch nie floss — siehe
+    // BALANCE_CHANGELOG.md 10C.
+    const tribute = Math.round(totalPop * vcfg.vassalizeTributeShare / 12);
     state.treasury += tribute;
     vassalTribute += tribute;
   }
