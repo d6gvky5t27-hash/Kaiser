@@ -1,0 +1,51 @@
+{
+  "generatedAt": "2026-09-03T21:36:24.842Z",
+  "agentPolicyVersion": "phase10-v1",
+  "agentList": [
+    "passive",
+    "verwalter",
+    "kaufmann",
+    "kriegsherr",
+    "diplomat",
+    "dynast",
+    "machtpolitiker",
+    "opportunist",
+    "hardliner",
+    "versoehner",
+    "minmaxer",
+    "anfaenger"
+  ],
+  "seeds": [
+    500000,
+    507919,
+    515838,
+    523757,
+    531676,
+    539595,
+    547514,
+    555433,
+    563352,
+    571271,
+    579190,
+    587109,
+    595028,
+    602947,
+    610866,
+    618785,
+    626704,
+    634623,
+    642542,
+    650461
+  ],
+  "curatedSeeds": [
+    500000,
+    507919,
+    515838
+  ],
+  "years": 100,
+  "startRegion": "player",
+  "totalCampaigns": 240,
+  "crashCount": 0,
+  "crashes": [],
+  "wallMs": 45109
+}
