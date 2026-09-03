@@ -310,6 +310,27 @@ function considerBuildKathedrale(ctx, minBuffer, reason) {
   return !!(res && res.ok);
 }
 
+// ---------- Palast (König-Titelvoraussetzung, entdeckt in Phase 10A) ----------
+// checkTitleProgress() (js/politics.js) gated "König" zusätzlich zu
+// Bevölkerung/Vermögen/Prestige hinter einem gebauten Palast — genau
+// dasselbe Muster wie die in Phase 9 gefundene Kathedrale-Voraussetzung
+// für die Kaiserwahl. Ohne diese Ergänzung bliebe die König-/Kaiser-
+// Erreichbarkeitsmessung in Phase 10 durch eine Testcode-Lücke verzerrt
+// (kein Agent baute je einen Palast), nicht durch echte Spielschwierigkeit.
+function considerBuildPalast(ctx, minBuffer, reason) {
+  const state = ctx.state;
+  const region = state.regions.player;
+  if (hasBuilding(region, "palast")) return false;
+  const b = BUILDINGS.palast;
+  if (state.treasury < b.cost + minBuffer) return false;
+  for (const gid in b.materialCost) {
+    const need = b.materialCost[gid] - (region.warehouse[gid] || 0);
+    if (need > 0) act(ctx, buyGoodFromMarket, [region, gid, need], { category: "ECONOMY", action: "buy_building_material_" + gid, reason: "materials for palast", meaningful: false });
+  }
+  const res = act(ctx, buildNewBuilding, [region, "palast"], { category: "TITLE", action: "build_palast", reason, expectedGoal: "unlock König title eligibility", meaningful: true });
+  return !!(res && res.ok);
+}
+
 // ---------- Kaiserwahl ----------
 function handleElection(ctx, briberyBudgetPerElector, minBuffer, reason) {
   const state = ctx.state;

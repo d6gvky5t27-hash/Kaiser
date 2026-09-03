@@ -7,7 +7,9 @@ const path = require("path");
 const { loadSandboxSource } = require("./run-campaign.js");
 const { summarizeCampaign } = require("./metrics.js");
 
-const OUT_DIR = path.join(__dirname, "..", "output", "phase9");
+function parseArgs(argv) { const out = {}; for (const a of argv) { const m = /^--([^=]+)=(.*)$/.exec(a); if (m) out[m[1]] = m[2]; } return out; }
+const cliArgs = parseArgs(process.argv.slice(2));
+const OUT_DIR = path.join(__dirname, "..", "output", cliArgs.outDir || "phase9");
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
 const REGIONS = ["player", "burgund", "england", "venedig", "mailand"];

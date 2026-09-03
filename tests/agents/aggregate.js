@@ -1,9 +1,11 @@
-// Phase 9 — cross-campaign aggregation over tests/output/phase9/campaign_summaries.json.
-// Plain Node, no sandbox. Usage: node tests/agents/aggregate.js
+// Cross-campaign aggregation over tests/output/<dir>/campaign_summaries.json.
+// Plain Node, no sandbox. Usage: node tests/agents/aggregate.js [--outDir=phase9|phase10]
 "use strict";
 const fs = require("fs");
 const path = require("path");
-const OUT_DIR = path.join(__dirname, "..", "output", "phase9");
+function parseArgs(argv) { const out = {}; for (const a of argv) { const m = /^--([^=]+)=(.*)$/.exec(a); if (m) out[m[1]] = m[2]; } return out; }
+const cliArgs = parseArgs(process.argv.slice(2));
+const OUT_DIR = path.join(__dirname, "..", "output", cliArgs.outDir || "phase9");
 const summaries = JSON.parse(fs.readFileSync(path.join(OUT_DIR, "campaign_summaries.json"), "utf8"));
 const manifest = JSON.parse(fs.readFileSync(path.join(OUT_DIR, "manifest.json"), "utf8"));
 

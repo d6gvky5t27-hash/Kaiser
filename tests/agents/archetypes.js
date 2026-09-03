@@ -46,6 +46,9 @@ AGENTS.verwalter = {
       considerInfrastructure(ctx, 600, "steady infrastructure growth");
     });
     tradeSurplusGoods(ctx, 400, "avoid waste, ensure food security");
+    considerBuildPalast(ctx, 400, "a well-run realm eventually earns a palace, and König requires one");
+    considerBuildKathedrale(ctx, 400, "the crown requires a kathedrale, and a well-run realm can eventually afford one");
+    handleElection(ctx, CONFIG.election.bribeCost, 400, "if the crown becomes reachable through sheer good governance, take it");
     recruitPreferred(ctx, ["pikeniere", "miliz"], 0.15, 400, "minimal defensive garrison only", "deterrence, not conquest", 80);
     warCampaign(ctx, { minBuffer: 400, allowDeclareWar: false, allowPeace: true, peaceAfterYears: 3, reason: "defensive only" });
   },
@@ -105,6 +108,7 @@ AGENTS.diplomat = {
     });
     maintainDiplomacy(ctx, ["gift", "nonaggr", "trade", "alliance", "guarantee"], 60, 300, "build durable alliances");
     considerBuildKathedrale(ctx, 300, "the crown requires a kathedrale first");
+    considerBuildPalast(ctx, 300, "König requires a palace");
     handleElection(ctx, CONFIG.election.bribeCost, 300, "diplomatic path to the crown");
     recruitPreferred(ctx, ["pikeniere"], 0.05, 500, "token defense only", "credibility, not aggression", 40);
     warCampaign(ctx, { minBuffer: 500, allowDeclareWar: false, allowPeace: true, peaceAfterYears: 1, reason: "war is a diplomatic failure" });
@@ -147,6 +151,7 @@ AGENTS.machtpolitiker = {
     });
     maintainDiplomacy(ctx, ["gift", "nonaggr", "alliance", "guarantee"], 55, 300, "diplomatic standing supports the crown");
     considerBuildKathedrale(ctx, 300, "prestige building and Kaiserwahl prerequisite");
+    considerBuildPalast(ctx, 300, "König requires a palace");
     handleElection(ctx, CONFIG.election.bribeCost, 300, "the crown is the ultimate prestige goal");
     recruitPreferred(ctx, ["ritter", "pikeniere"], 0.25, 300, "credible but selective military", "power projection", 200);
     warCampaign(ctx, {
@@ -180,6 +185,7 @@ AGENTS.opportunist = {
     tradeSurplusGoods(ctx, 250, "opportunistic liquidation of surplus");
     if (ctx.rng() < 0.5) regionalArbitrageScan(ctx, 0.12, 250, "chase the best margin this month");
     considerBuildKathedrale(ctx, 250, "the crown is worth grabbing if it becomes reachable");
+    considerBuildPalast(ctx, 250, "König requires a palace");
     recruitPreferred(ctx, ["schwere_kavallerie", "pikeniere", "miliz"], 0.3, 250, "whichever unit currently looks strongest", "flexible power", 400);
     warCampaign(ctx, {
       minBuffer: 250, allowDeclareWar: true, opportunistic: true, strengthMargin: 1.2,
@@ -275,6 +281,7 @@ AGENTS.minmaxer = {
       }
     });
     considerBuildKathedrale(ctx, 100, "exploit test: build the Kaiserwahl prerequisite early so the bribery-rush phase can actually trigger an election");
+    considerBuildPalast(ctx, 100, "exploit test: König also requires a palace");
     if (phase.name === "kaiserwahl_bribery_rush") {
       handleElection(ctx, CONFIG.election.bribeCost, 100, "exploit test: rush the crown via bribery");
     }

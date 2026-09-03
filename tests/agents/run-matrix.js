@@ -13,8 +13,6 @@ const { loadSandboxSource } = require("./run-campaign.js");
 const { summarizeCampaign } = require("./metrics.js");
 
 const ROOT = path.join(__dirname, "..", "..");
-const OUT_DIR = path.join(ROOT, "tests", "output", "phase9");
-const LOGS_DIR = path.join(OUT_DIR, "decision_logs");
 
 function parseArgs(argv) {
   const out = {};
@@ -22,12 +20,18 @@ function parseArgs(argv) {
   return out;
 }
 const args = parseArgs(process.argv.slice(2));
+// Phase 10 note: --outDir lets 10E write into tests/output/phase10/ without
+// ever touching the archived Phase 9 baseline (tests/output/phase9/), per
+// the master prompt's explicit "Phase-9-Baseline nicht überschreiben" rule.
+const OUT_DIR = path.join(ROOT, "tests", "output", args.outDir || "phase9");
+const LOGS_DIR = path.join(OUT_DIR, "decision_logs");
 const N_SEEDS = args.seeds !== undefined ? Number(args.seeds) : 30;
 const YEARS = args.years !== undefined ? Number(args.years) : 100;
 const START_REGION = args.startRegion || "player";
 const N_CURATED_SEEDS = 3; // first N seeds get their full decision log saved, for every agent
+const SEED_BASE = args.seedBase !== undefined ? Number(args.seedBase) : 1000; // Phase 10E holdout run uses a disjoint base, e.g. 500000
 
-const SEEDS = Array.from({ length: N_SEEDS }, (_, i) => 1000 + i * 7919);
+const SEEDS = Array.from({ length: N_SEEDS }, (_, i) => SEED_BASE + i * 7919);
 
 fs.mkdirSync(LOGS_DIR, { recursive: true });
 

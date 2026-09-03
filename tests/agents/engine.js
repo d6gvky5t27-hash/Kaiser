@@ -18,7 +18,23 @@
 // any tie-breaking choice it needs to make. Same agent + same seed always
 // produces an identical decision log and identical final state.
 
-const AGENT_POLICY_VERSION = "phase9-v1";
+// phase10-v1 (was phase9-v1): added considerBuildPalast() to
+// verwalter/diplomat/machtpolitiker/opportunist/minmaxer. Phase 10A's
+// title-progression audit found checkTitleProgress() gates "König" behind
+// a built palast — analogous to the Phase 9 kathedrale/Kaiserwahl gate —
+// which no agent built, artificially zeroing the König/Kaiser
+// reachability measurement. This is the SAME category of fix as Phase
+// 9's kathedrale addition (closing a test-agent competence gap, not a
+// balance change) — see PHASE10_BALANCE_COMPARISON.md §G. Also added
+// considerBuildKathedrale()+handleElection() to verwalter specifically:
+// with the recalibrated TITLES ladder verwalter now regularly reaches
+// Kurfürst+ rank, which per checkElectionTrigger() is the actual (only)
+// path to Kaiser — checkTitleProgress() explicitly excludes "kaiser"
+// (`if (next.id === "kaiser") return null`), so the Kaiser row in TITLES
+// is display-only; the real gate is kurfuerst rank + kathedrale +
+// resolveElection(), unrelated to reqPop/reqWealth/reqPrestige. All
+// other archetype behavior is byte-for-byte unchanged from phase9-v1.
+const AGENT_POLICY_VERSION = "phase10-v1";
 
 // ---------- Deterministic agent-private RNG (never touches state.rng) ----------
 function hashSeedString(str) {
