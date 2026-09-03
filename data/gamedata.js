@@ -1285,6 +1285,13 @@ const POP_GROUPS = {
 // stehende Armee: Vasallentruppen erfordern Lehenstreue (Adelszufriedenheit),
 // Söldner sind jederzeit gegen Gold verfügbar, aber unzuverlässig (Fahnenflucht
 // bei ausbleibendem Sold oder wackliger Herrschaft).
+// Truppenwerte — `strength` (nur von armyStrength() in js/military.js
+// gelesen, siehe dortiger Kommentar) und `cost` in Phase 10B rekalibriert
+// (PHASE10_BALANCE_COMPARISON.md §H-N, BALANCE_CHANGELOG.md). Die
+// Battle Engine (battle-engine/*.js) hat ihr eigenes, unabhängiges
+// Einheitenstatsystem und liest diese beiden Felder nicht — beide
+// Änderungen wirken ausschließlich auf die strategische Schätzung und
+// die Rekrutierungskosten, nicht auf reale Schlachtergebnisse.
 const TROOP_TYPES = {
   "miliz": {
     "name": "Bauernmiliz",
@@ -1297,19 +1304,19 @@ const TROOP_TYPES = {
     "name": "Bogenschützen",
     "cost": 90,
     "upkeep": 3,
-    "strength": 2,
+    "strength": 1.8,
     "source": "vasall"
   },
   "armbrustschuetzen": {
     "name": "Armbrustschützen",
     "cost": 130,
     "upkeep": 4,
-    "strength": 2.5,
+    "strength": 2.3,
     "source": "vasall"
   },
   "pikeniere": {
     "name": "Pikeniere",
-    "cost": 110,
+    "cost": 140,
     "upkeep": 4,
     "strength": 3,
     "source": "vasall"
@@ -1318,7 +1325,7 @@ const TROOP_TYPES = {
     "name": "Ritter",
     "cost": 400,
     "upkeep": 12,
-    "strength": 8,
+    "strength": 5,
     "source": "vasall",
     "minAdelSatisfaction": 45
   },
@@ -1326,7 +1333,7 @@ const TROOP_TYPES = {
     "name": "Schwere Kavallerie",
     "cost": 650,
     "upkeep": 18,
-    "strength": 12,
+    "strength": 6,
     "source": "vasall",
     "minAdelSatisfaction": 55
   },
@@ -1334,7 +1341,7 @@ const TROOP_TYPES = {
     "name": "Söldner",
     "cost": 200,
     "upkeep": 15,
-    "strength": 4,
+    "strength": 4.5,
     "source": "soeldner"
   }
 };
@@ -1721,6 +1728,24 @@ const STRINGS = {
 let currentLocale = "de";
 function t(key) { return (STRINGS[currentLocale] && STRINGS[currentLocale][key]) || key; }
 
+// Titelanforderungen — rekalibriert in Phase 10A (Title Progression Audit,
+// siehe PHASE10_BALANCE_COMPARISON.md §B-G und BALANCE_CHANGELOG.md).
+// Iteration 10A.1: `reqPop` drastisch gesenkt (alte Werte 3.000-90.000
+// unerreichbar für 10/12 Archetypen, die meisten stagnieren zwischen
+// ~1.500 und 3.500 Einwohnern) und `reqPrestige` ab "Fürst" auf den
+// über alle 360 Baseline-Kampagnen tatsächlich beobachteten Höchstwert
+// (235) hin rekalibriert (alte Werte 380/500/650 wurden nie erreicht).
+// Iteration 10A.2: `reqWealth` zusätzlich in den unteren Stufen deutlich
+// gesenkt — der 10A.1-Audit zeigte, dass aktiv-diplomatische/politische
+// Archetypen (Diplomat/Machtpolitiker/Dynast) trotz ausreichender
+// Bevölkerung an der alten 500er-Baron-Schwelle scheiterten: ihre
+// Staatskasse pendelt strukturell zwischen ~150 und ~700 Talern (Median
+// ~220-260 über alle simulierten Jahre), da sie aktiv in Diplomatie/Hof
+// investieren statt zu horten. Ziel: dieselben Archetypen, die der
+// Auftrag (§20) ausdrücklich als titelaufstiegsfähig sieht, sollen die
+// ersten Stufen tatsächlich erreichen können, nicht nur der reine
+// Kassenhorter. Kaiser-Obergrenze unverändert nahe der wirtschaftlichen
+// Realität der bislang stärksten Spielweise gehalten (nicht automatisch).
 const TITLES = [
   {
     "id": "freiherr",
@@ -1732,65 +1757,65 @@ const TITLES = [
   {
     "id": "baron",
     "name": "Baron",
-    "reqPop": 3000,
-    "reqWealth": 1000,
-    "reqPrestige": 20
+    "reqPop": 1500,
+    "reqWealth": 150,
+    "reqPrestige": 10
   },
   {
     "id": "graf",
     "name": "Graf",
-    "reqPop": 6000,
-    "reqWealth": 3000,
-    "reqPrestige": 50
+    "reqPop": 1900,
+    "reqWealth": 250,
+    "reqPrestige": 25
   },
   {
     "id": "landgraf",
     "name": "Landgraf",
-    "reqPop": 10000,
-    "reqWealth": 6000,
-    "reqPrestige": 90
+    "reqPop": 3200,
+    "reqWealth": 500,
+    "reqPrestige": 45
   },
   {
     "id": "markgraf",
     "name": "Markgraf",
-    "reqPop": 15000,
-    "reqWealth": 10000,
-    "reqPrestige": 140
+    "reqPop": 4800,
+    "reqWealth": 900,
+    "reqPrestige": 70
   },
   {
     "id": "fuerst",
     "name": "Fürst",
-    "reqPop": 22000,
-    "reqWealth": 16000,
-    "reqPrestige": 200
+    "reqPop": 7000,
+    "reqWealth": 2000,
+    "reqPrestige": 95
   },
   {
     "id": "herzog",
     "name": "Herzog",
-    "reqPop": 32000,
-    "reqWealth": 25000,
-    "reqPrestige": 280
+    "reqPop": 10000,
+    "reqWealth": 12000,
+    "reqPrestige": 115
   },
   {
     "id": "kurfuerst",
     "name": "Kurfürst",
-    "reqPop": 45000,
-    "reqWealth": 40000,
-    "reqPrestige": 380
+    "reqPop": 13500,
+    "reqWealth": 22000,
+    "reqPrestige": 135
   },
   {
     "id": "koenig",
     "name": "König",
-    "reqPop": 65000,
-    "reqWealth": 60000,
-    "reqPrestige": 500
+    "reqPop": 17000,
+    "reqWealth": 40000,
+    "reqPrestige": 150
   },
   {
     "id": "kaiser",
     "name": "Kaiser",
-    "reqPop": 90000,
-    "reqWealth": 90000,
-    "reqPrestige": 650
+    "reqPop": 20000,
+    "reqWealth": 65000,
+    "reqPrestige": 165
   }
 ];
 
