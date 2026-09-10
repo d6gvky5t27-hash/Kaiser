@@ -2081,16 +2081,69 @@ const CONFIG = {
     geistlicherSatBonus: 3,          // Zufriedenheitsbonus pro Stufe
     tenureBonusPerLevel: 0.15,       // §Phase-3 Character Core: Amtserfahrungsbonus statt reiner ×Stufe-Skalierung (Stufe 3 = +30% statt +200%) — die eigentliche Wirkung kommt jetzt primär aus Skill/Traits/Loyalität des Beraters (advisorEffectBonus() in js/military.js)
   },
+  // ---------- Phase 12 "Imperial Politics": Kaiserwahl 2.0 (§4/§18 —
+  // vollständig konfigurierbare, additive Score-Gewichte statt verstreuter
+  // Magic Numbers, jede Komponente in computeElectorScoreBreakdown()
+  // (js/imperial-politics.js) 1:1 nachvollziehbar, dasselbe Muster wie
+  // CONFIG.drama.tensionWeights/CONFIG.estates.influenceWeights). Die 7
+  // Electors sind jetzt state.diplomacy (ai1-ai7, siehe newGame()) — keine
+  // abstrakten, nicht an eine Region gebundenen Stimmen mehr (§12/§31).
+  // votesNeededForMajority bleibt bei 4 — das war schon vorher exakt die
+  // Mehrheit von 7 Stimmen, nur bislang 3 echte + 4 abstrakte statt 7 echter.
   election: {
-    triggerChancePerYear: 0.25,
+    triggerChancePerYear: 0.25, // nach Ablauf der Mindest-Vorbereitungszeit: jährliche Chance, dass die Wahl tatsächlich stattfindet (§38/§39)
+    candidacyPrepYearsMin: 3,   // §38: 3-8 Jahre Wahlvorphase nach erklärter Kandidatur, bevor überhaupt gewürfelt wird
+    candidacyPrepYearsMax: 8,   // danach erzwungen (kein endloses Hinauszögern)
     cooldownYearsAfterLoss: 8,
-    knownElectorVoteRelationThreshold: 40,
-    bribeCost: 400,
-    bribeRelationGain: 20,
-    abstractVotePrestigeThresholds: [150, 250, 350, 450], // 4 weitere, nicht direkt beeinflussbare Kurfürsten
-    votesNeededForMajority: 4, // von insgesamt 7 Stimmen (3 bekannte + 4 abstrakte)
+    votesNeededForMajority: 4,  // von 7 Stimmen (state.diplomacy: ai1-ai7)
     lossPrestigePenalty: 10,
     lossRelationPenalty: -10,
+    // §20/§73/§76/§77: Bestechung wird zu einem gedeckelten, abklingenden
+    // diplomatischen Geschenk während der laufenden Kandidatur (ersetzt das
+    // alte bribed[aiId]=true-Autowin) -- bewegt eine Stimme, kauft nie die
+    // ganze Wahl. giftDiminishingReturnsFactor: jedes weitere Geschenk an
+    // DENSELBEN Elector in DERSELBEN Kandidatur wirkt um diesen Faktor schwächer.
+    giftDuringCandidacyRelationGain: 12,
+    giftDiminishingReturnsFactor: 0.55,
+    giftCost: 400, // wie der bisherige bribeCost, thematisch jetzt "diplomatisches Geschenk" statt Bestechung
+    // §45/§47/§52: Wahlversprechen
+    promise: {
+      defaultDurationYears: 10,
+      brokenRelationPenalty: -25,
+      fulfilledRelationBonus: 12,
+      activePromiseScoreBonus: 8,   // ein noch offenes, glaubwürdiges Versprechen wirkt schon vor Erfüllung leicht positiv
+    },
+    // §18/§19: Score-Gewichte -- jeder Faktor einzeln gedeckelt (§19 "kein
+    // Einzelfaktor darf alles dominieren"), Gesamtscore zusätzlich geklammert.
+    scoreWeights: {
+      relationFactor: 0.5,           // * state.diplomacy[aiId].relation (-100..100) -> max ±50
+      personalRelationFactor: 0.3,   // * Charakterbeziehung Kandidat<->Elector-Herrscher (-100..100) -> max ±30
+      allianceBonus: 20, nonAggressionBonus: 8,
+      warPenalty: -40,               // Elector-Region befindet sich im Krieg mit dem Kandidaten (nur beim Spieler auswertbar, s. war-map)
+      memoryFactorCap: 30,           // Deckel für die Summe aller Kriegs-/Friedens-/Hilfe-Memory-Beiträge zusammen
+      prestigeFactor: 0.05, prestigeFactorCap: 15,
+      legitimacyFactor: 0.2, legitimacyFactorCap: 10,
+      titleFactor: 2, titleFactorCap: 10,
+      candidateStrengthFactorCap: 15, // vergleichende Kandidatenstärke (§34), relativ zum stärksten Rivalen
+      giftFactorCap: 20,
+      brokenPromiseFactorCap: -35,
+      sharedEnemyBonus: 10,          // nur für den Spieler auswertbar (keine KI-KI-Beziehungen im bestehenden Modell, §3)
+      dynasticBonus: 15,             // nur wirksam, wenn eine ECHTE Character-Core-Verbindung existiert (§140, i.d.R. 0)
+      totalCap: 100,                 // Gesamtscore geklammert auf -100..100
+    },
+    // §15: Stance-Kategorien aus dem geklammerten Gesamtscore.
+    stanceThresholds: { sicherFuer: 50, geneigt: 15, geneigtGegen: -15, sicherGegen: -50 },
+    // §30-33: Rivalen-Kandidatur -- reale, bereits vorhandene Voraussetzungen
+    // (keine erfundene AI-Prestige-/Legitimitäts-Kennzahl, die es für
+    // KI-Regionen nie gab): dieselbe Bevölkerungsschwelle wie beim Spieler
+    // (TITLES.kurfuerst.reqPop), eine tatsächlich errichtete Kathedrale
+    // (hasBuilding(), exakt derselbe Gebäudetyp/dieselbe Funktion wie beim
+    // Spieler-Gate in checkElectionTrigger()) und derselbe Wohlstands-Proxy,
+    // den aiRegionDevelops() (js/economy.js) bereits für KI-Bauentscheidungen
+    // verwendet -- hier nur ein höheres Vielfaches von CONFIG.ai.buildWealthThreshold
+    // statt eines neu erfundenen Schwellenwerts.
+    candidateEligibility: { wealthProxyMultiplier: 3 },
+    maxRivalCandidates: 3, // §33: 2-4 ernsthafte Kandidaten insgesamt (Spieler + max. 3 Rivalen)
   },
   intrigue: {
     sabotageCost: 250,
@@ -3811,6 +3864,17 @@ const MEMORY_TYPES = {
   // Stand, keine Einzelbeziehung), decayRate 0 (verblasst nicht, wie
   // TITLE_GAINED/MARRIAGE).
   ESTATE_PRIVILEGE_GRANTED:  { importance: 60, decayRate: 0, direction: "none", tags: ["politics", "estates"] },
+  // --- neu in Phase 12 (§115/§116 — Memory-Audit zuerst: ELECTION_SUPPORT_GIVEN
+  // und ELECTION_PROMISE_BROKEN existierten bereits seit Phase 4/5, waren aber
+  // nie tatsächlich verkabelt bzw. bezogen sich nur auf die Region, nicht auf
+  // den echten Kurfürsten-Charakter — s. PHASE12-Bericht §Audit. Ein Sieg
+  // verwendet weiterhin TITLE_GAINED (kein neuer Typ nötig); nur für eine
+  // verlorene Wahl gibt es bislang keinerlei Memory-Äquivalent.
+  IMPERIAL_CANDIDACY_DECLARED: { importance: 55, decayRate: 0.02, direction: "none", tags: ["politics", "election"] },
+  ELECTOR_PLEDGED_SUPPORT:     { importance: 35, decayRate: 0.05, direction: "target_to_actor", tags: ["politics", "election", "gratitude"] },
+  ELECTION_PROMISE_MADE:       { importance: 40, decayRate: 0.03, direction: "target_to_actor", tags: ["politics", "election"] },
+  ELECTION_PROMISE_FULFILLED:  { importance: 45, decayRate: 0.02, direction: "target_to_actor", tags: ["politics", "election", "gratitude"] },
+  IMPERIAL_ELECTION_LOST:      { importance: 75, decayRate: 0,    direction: "none", tags: ["politics", "election"] },
 };
 
 // Event-System: TRIGGER/BEDINGUNGEN/TEXT/ENTSCHEIDUNGEN/KONSEQUENZEN (§38)
@@ -3844,7 +3908,7 @@ const TRAITS = [
   { id: "ehrgeizig",     name: "ehrgeizig",     effects: { prestigeGain: 0.15, loyaltyMod: -10, claimAggression: 15 } },
   { id: "grosszuegig",   name: "großzügig",     effects: { satisfactionBonus: 5, treasuryDrain: 0.05, loyaltyMod: 5 } },
   { id: "geizig",        name: "geizig",        effects: { treasuryDrain: -0.05, satisfactionBonus: -5, loyaltyMod: -5 } },
-  { id: "gerecht",       name: "gerecht",       effects: { satisfactionBonus: 8 } },
+  { id: "gerecht",       name: "gerecht",       effects: { satisfactionBonus: 8, giftEffectMod: -0.3 } },
   { id: "grausam",       name: "grausam",       effects: { satisfactionBonus: -10, prestigeGain: 0.05, loyaltyMod: -8 } },
   { id: "fleissig",      name: "fleißig",       effects: { productionBonus: 0.05 } },
   { id: "faul",          name: "faul",          effects: { productionBonus: -0.05 } },
@@ -3862,7 +3926,7 @@ const TRAITS = [
   { id: "paranoid",      name: "paranoid",      effects: { loyaltyMod: -10, memoryWeightAmplifierNegative: 0.3 } },
   { id: "arrogant",      name: "arrogant",      effects: { loyaltyMod: -8, claimAggression: 8 } },
   { id: "bescheiden",    name: "bescheiden",    effects: { loyaltyMod: 8, claimAggression: -10 } },
-  { id: "korrupt",       name: "korrupt",       effects: { advisorEffectMod: -0.1 } },
+  { id: "korrupt",       name: "korrupt",       effects: { advisorEffectMod: -0.1, giftEffectMod: 0.4 } },
   { id: "rachsuechtig",  name: "rachsüchtig",   effects: { claimAggression: 10, memoryDecayModNegative: -0.4 } },
 ];
 
@@ -4543,6 +4607,21 @@ function newGame(options) {
     state.regions[ext.id] = makeRegion(ext.name, false, ext.fertility, ext.pop);
   }
 
+  // §Phase-12 "Imperial Politics" (§7-13): die vier bislang nur wirtschaftlich
+  // simulierten EXTRA_REGIONS (ai4-ai7) bekommen jetzt ebenfalls eine echte
+  // diplomatische Beziehung -- exakt dieselbe Form wie ai1-ai3 (state.diplomacy),
+  // damit sie als reale, region-/herrschergebundene Kaiserwahl-Electors taugen
+  // (§9/§12), ohne ein zweites Diplomatiesystem zu erfinden (§3): jede
+  // bestehende, generisch über state.diplomacy iterierende Funktion (Geschenke,
+  // Bündnisse, Verträge, Sabotage, Gerüchte, checkForeignRulerDeaths, ...)
+  // funktioniert dadurch automatisch auch für sie. BEWUSST NICHT kriegsfähig
+  // (keine TERRITORIES/state.warState-Einträge, siehe initTerritories() und
+  // den expliziten Schutz in checkAiWarInitiative(), js/military.js) --
+  // Kriegskarte/Militärbalance bleiben unverändert auf ai1-ai3 begrenzt.
+  for (const ext of EXTRA_REGIONS) {
+    state.diplomacy[ext.id] = { relation: startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } };
+  }
+
   const gender = options.gender || (rnd() < 0.5 ? "m" : "f");
   const age = options.age || (24 + Math.floor(rnd()*12));
   const ruler = createCharacter(gender, age, dynastyName);
@@ -4555,9 +4634,10 @@ function newGame(options) {
   state.rulerId = id;
   snapshotRulerEraStart(state, id); // §Phase-7-Punkt 74: Ausgangswerte für die spätere Regentschaftszusammenfassung
 
-  // §Phase-8E-Punkt 10/11: die drei diplomatisch erreichbaren KI-Regionen
-  // (state.diplomacy) bekommen jetzt jeweils EINEN echten Character-Core-
-  // Charakter als Herrscher (region.rulerId) -- über dieselbe createCharacter()
+  // §Phase-8E-Punkt 10/11 (seit Phase 12 auf alle sieben state.diplomacy-
+  // Regionen erweitert, s.o.): jede diplomatisch erreichbare KI-Region
+  // bekommt jeweils EINEN echten Character-Core-Charakter als Herrscher
+  // (region.rulerId) -- über dieselbe createCharacter()
   // wie jeder andere Charakter im Spiel, kein zweites Modell. Bewusst OHNE
   // Familie (parentId/spouseId/childrenIds bleiben leer) -- das wäre
   // erfundene Genealogie; ein eigenständiger Charakter ist alles, was
@@ -4599,7 +4679,7 @@ function logLedger(state, label, amount) {
 
 // ---------- Landwirtschaft (§18/§19) ----------
 
-const SAVE_VERSION = 8;
+const SAVE_VERSION = 9;
 
 function serializeSave(state) {
   return JSON.stringify({
@@ -4750,18 +4830,60 @@ function migrateSaveV7ToV8(parsed) {
   return parsed;
 }
 
+// §Phase-12 "Imperial Politics": die vier bislang rein wirtschaftlichen
+// EXTRA_REGIONS (ai4-ai7) werden zu echten Kaiserwahl-Electors -- Altspielstände
+// bekommen dieselbe state.diplomacy-Anbindung samt Herrscher-Charakter wie neue
+// Partien (s. newGame()). KEIN rnd() hier: Migrationen laufen in
+// deserializeSave() VOR dem Reseeding/Replay des Zufallsstroms dieses
+// Spielstands, ein rnd()-Aufruf an dieser Stelle wäre für denselben Save bei
+// jedem Laden unterschiedlich und verletzte damit §67 (Determinismus) --
+// Geschlecht/Alter der vier neuen Herrscher werden daher deterministisch aus
+// ihrer Position in EXTRA_REGIONS abgeleitet statt gewürfelt. Das alte
+// state.pendingElection ({bribed:{...}}) wird auf die neue, einfache
+// Boolean-Form abgebildet (js/imperial-politics.js kennt kein bribed mehr).
+function migrateSaveV8ToV9(parsed) {
+  const s = parsed.state;
+  if (!s.imperialCandidacy) s.imperialCandidacy = null;
+  if (!s.electionPromises) s.electionPromises = { byId: {}, nextId: 1 };
+  if (s.pendingElection && typeof s.pendingElection === "object") s.pendingElection = true;
+  EXTRA_REGIONS.forEach((ext, idx) => {
+    if (!s.diplomacy[ext.id]) {
+      s.diplomacy[ext.id] = { relation: CONFIG.diplomacy.startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } };
+    }
+    const region = s.regions[ext.id];
+    if (region && !region.rulerId) {
+      const baseHouseName = region.name.replace(/\s*\(.*\)$/, "");
+      const foreignRuler = createCharacter(idx % 2 === 0 ? "m" : "f", 45, "von " + baseHouseName);
+      const fid = nextCharId();
+      s.characters[fid] = foreignRuler;
+      region.rulerId = fid;
+    }
+  });
+  parsed.saveVersion = 9;
+  return parsed;
+}
+
 function deserializeSave(json) {
   let parsed = JSON.parse(json);
+  // §Phase-12: __charIdCounter wird VOR den Migrationen synchronisiert (statt
+  // wie zuvor erst danach), da migrateSaveV8ToV9() selbst neue Charaktere
+  // per nextCharId() anlegen kann -- ohne diese Umstellung würde sie den noch
+  // unsynchronisierten, aus einer anderen Partie stammenden Zähler verwenden
+  // und riskierte damit ID-Kollisionen mit bereits im Save vorhandenen
+  // Charakteren. Nach den Migrationen wird der ggf. weitergezählte Stand
+  // zurück in parsed geschrieben, damit die laufende Partie nahtlos anschließt.
+  __charIdCounter = parsed.charIdCounter;
   if (parsed.saveVersion === 2) parsed = migrateSaveV2ToV3(parsed);
   if (parsed.saveVersion === 3) parsed = migrateSaveV3ToV4(parsed);
   if (parsed.saveVersion === 4) parsed = migrateSaveV4ToV5(parsed);
   if (parsed.saveVersion === 5) parsed = migrateSaveV5ToV6(parsed);
   if (parsed.saveVersion === 6) parsed = migrateSaveV6ToV7(parsed);
   if (parsed.saveVersion === 7) parsed = migrateSaveV7ToV8(parsed);
+  if (parsed.saveVersion === 8) parsed = migrateSaveV8ToV9(parsed);
   if (parsed.saveVersion !== SAVE_VERSION) {
     throw new Error("Inkompatible Spielstand-Version: " + parsed.saveVersion);
   }
-  __charIdCounter = parsed.charIdCounter;
+  parsed.charIdCounter = __charIdCounter;
   // Deterministische Simulation (§67): RNG mit demselben Seed neu starten und
   // exakt so viele Schritte vorspulen, wie beim Speichern bereits verbraucht waren —
   // der Zufallsstrom setzt sich dadurch nahtlos fort.
@@ -6348,6 +6470,496 @@ function getAllEstatesSummary(state) {
   const out = {};
   for (const id of ESTATE_IDS) out[id] = getEstateSummary(state, id);
   return out;
+}
+
+// ============================================================
+// IMPERIAL POLITICS — Phase 12 "Kaiserwahl 2.0": aus einer Schwellenprüfung
+// + Bestechungs-Autowin wird der politische Höhepunkt einer Kampagne.
+//
+// Architekturregeln dieses Moduls (§2/§3 des Auftrags):
+//  - KEIN zweites Diplomatiesystem. Die sieben Electors SIND
+//    state.diplomacy (ai1-ai7, seit dieser Phase alle sieben — s. newGame()
+//    in js/core.js) — jede bestehende Diplomatiefunktion (Geschenke,
+//    Bündnisse, Verträge, Sabotage, checkForeignRulerDeaths) wirkt
+//    automatisch auch auf die vier neuen Electors, ohne dass dieses Modul
+//    sie dupliziert.
+//  - Stance/Score werden bei Bedarf berechnet (computeElectorScoreBreakdown),
+//    nicht laufend fortgeschrieben — dasselbe additive Breakdown-Muster wie
+//    computeDramaTensionBreakdown()/computeEstateInfluenceBreakdown().
+//  - state.imperialCandidacy trägt NUR, was für die laufende Kandidatur
+//    wirklich transient ist (Rivalen-Auswahl bei Kandidaturerklärung
+//    festgelegt, Geschenk-Zähler für abklingende Wirkung). state.electionPromises
+//    ist die DAUERHAFTE Zusagen-Ablage — überlebt Wahlsieg/-niederlage, damit
+//    ein gebrochenes Versprechen Jahre später noch nachwirken kann (§50/§128).
+//  - Rivalen-Kandidaten sind ausschließlich echte region.rulerId-Charaktere
+//    (Phase 8E) — kein erfundener NPC, keine KI-KI-Beziehungen (die es im
+//    bestehenden Modell nicht gibt, §3) werden vorgetäuscht: Faktoren, die
+//    das erfordern würden (z.B. diplomatische Beziehung), tragen bei
+//    Rivalen-Kandidaten ehrlich 0 bei, statt geschätzt zu werden.
+// ============================================================
+
+// ---------- Electors (§7-13) ----------
+function getElectorIds(state) { return Object.keys(state.diplomacy); }
+
+function isWarCapableElector(state, aiId) { return !!(state.warState && (aiId in state.warState)); }
+
+// ---------- Wohlstands-Proxy für KI-Regionen (§30: reale, bereits
+// vorhandene Voraussetzungen statt einer erfundenen AI-Prestige-Kennzahl —
+// dieselbe Formel, die aiRegionDevelops() (js/economy.js) bereits für
+// KI-Bauentscheidungen verwendet, hier nur wiederverwendet, nicht neu erfunden). ----------
+function computeRegionWealthProxy(region) {
+  const totalPop = Object.values(region.population).reduce((s, g) => s + g.count, 0);
+  return (region.warehouse.getreide || 0) + (region.warehouse.eisen || 0) * 3 + (region.warehouse.werkzeuge || 0) * 4 + totalPop * 0.15;
+}
+
+// ---------- Rivalen-Kandidaten (§28-34) ----------
+function checkRivalCandidateEligibility(state, aiId) {
+  const region = state.regions[aiId];
+  const kurfuerst = TITLES.find(t => t.id === "kurfuerst");
+  const totalPop = Object.values(region.population).reduce((s, g) => s + g.count, 0);
+  const wealthProxy = computeRegionWealthProxy(region);
+  const minWealth = CONFIG.ai.buildWealthThreshold * CONFIG.election.candidateEligibility.wealthProxyMultiplier;
+  const checks = [
+    { label: `Bevölkerung ${Math.round(totalPop)}: erfüllt (>= ${kurfuerst.reqPop}, dieselbe Schwelle wie beim Spieler)`, passed: totalPop >= kurfuerst.reqPop },
+    { label: "Kathedrale errichtet", passed: hasBuilding(region, "kathedrale") },
+    { label: `Wohlstand ${Math.round(wealthProxy)}: erfüllt (>= ${Math.round(minWealth)})`, passed: wealthProxy >= minWealth },
+    { label: "Herrscher lebt", passed: !!(region.rulerId && state.characters[region.rulerId] && state.characters[region.rulerId].alive) },
+  ];
+  return { checks, eligible: checks.every(c => c.passed) };
+}
+
+// Deterministisch (kein RNG): sortiert nach Wohlstands-Proxy, gedeckelt auf
+// maxRivalCandidates (§33: politische Lesbarkeit vor Simulationsexzess).
+function getEligibleRivalCandidates(state) {
+  const out = [];
+  for (const aiId of getElectorIds(state)) {
+    const elig = checkRivalCandidateEligibility(state, aiId);
+    if (elig.eligible) out.push({ aiId, rulerId: state.regions[aiId].rulerId, wealthProxy: computeRegionWealthProxy(state.regions[aiId]) });
+  }
+  out.sort((a, b) => b.wealthProxy - a.wealthProxy || a.aiId.localeCompare(b.aiId));
+  return out.slice(0, CONFIG.election.maxRivalCandidates);
+}
+
+// ---------- Kandidatur des Spielers (§28-43) ----------
+function checkImperialCandidacyEligibility(state) {
+  const titleRank = state.titleIndex;
+  const kurfuerstRank = TITLES.findIndex(t => t.id === "kurfuerst");
+  const checks = [
+    { label: `Titel (Index ${titleRank}): erfüllt (>= Kurfürst)`, passed: titleRank >= kurfuerstRank },
+    { label: "Kathedrale errichtet", passed: hasBuilding(state.regions.player, "kathedrale") },
+    { label: "Keine Kandidatur bereits erklärt", passed: !state.imperialCandidacy },
+    { label: "Keine Wahl derzeit anhängig", passed: !state.pendingElection },
+    { label: `Kein Nachwahl-Cooldown (${state.electionCooldown || 0} Jahre verbleibend)`, passed: (state.electionCooldown || 0) <= 0 },
+  ];
+  return { checks, eligible: checks.every(c => c.passed) };
+}
+
+// Spielerseitige, bewusste Entscheidung (§42) statt automatischem Trigger --
+// öffnet die 3-8-jährige Wahlvorphase (§38) und legt die Rivalen-Kandidaten
+// FEST (nicht bei jeder Score-Abfrage neu gewürfelt/neu bestimmt), damit
+// eine Kandidatur eine erkennbare, stabile politische Lage beschreibt.
+function declareImperialCandidacy(state) {
+  const elig = checkImperialCandidacyEligibility(state);
+  if (!elig.eligible) return { ok: false, reason: "Voraussetzungen für eine Kandidatur nicht erfüllt.", checks: elig.checks };
+  const cfg = CONFIG.election;
+  const rivals = getEligibleRivalCandidates(state);
+  state.imperialCandidacy = {
+    declaredYear: state.year,
+    rivalCandidateIds: rivals.map(r => r.rulerId),
+    giftsGivenThisCandidacy: {},
+  };
+  if (!state.electionPromises) state.electionPromises = { byId: {}, nextId: 1 };
+  const ruler = state.characters[state.rulerId];
+  addChronicle(state, `${ruler.name} ${ruler.surname || ""} erhebt Anspruch auf die Kaiserkrone.`.replace(/\s+/g, " "));
+  recordWorldEvent(state, {
+    type: "IMPERIAL_CANDIDACY_DECLARED", actorIds: [state.rulerId], targetIds: [],
+    emotionalWeight: 30, metadata: { rivalCount: rivals.length },
+    description: `${ruler.name} ${ruler.surname || ""} erhebt Anspruch auf die Kaiserkrone.`.replace(/\s+/g, " "),
+  });
+  return { ok: true, rivalCandidateIds: state.imperialCandidacy.rivalCandidateIds };
+}
+
+// ---------- Geschenke während der Kandidatur (§20/§73-79: ersetzt das alte
+// bribed[aiId]=true-Autowin) ----------
+function giftElector(state, aiId) {
+  if (!state.imperialCandidacy) return { ok: false, reason: "Derzeit läuft keine Kandidatur." };
+  const cfg = CONFIG.election;
+  if (state.treasury < cfg.giftCost) return { ok: false, reason: "Nicht genug Taler für ein Geschenk." };
+  state.treasury -= cfg.giftCost;
+  logLedger(state, `Diplomatisches Geschenk an ${state.regions[aiId].name} (Kaiserwahl)`, -cfg.giftCost);
+  const prevCount = state.imperialCandidacy.giftsGivenThisCandidacy[aiId] || 0;
+  state.imperialCandidacy.giftsGivenThisCandidacy[aiId] = prevCount + 1;
+  // §77/§78: abklingende Wirkung je wiederholtem Geschenk, durch "gierig"
+  // (giftEffectMod, s. TRAITS in data/gamedata.js) verstärkbar.
+  const electorRuler = state.characters[state.regions[aiId].rulerId];
+  const traitMod = electorRuler ? traitEffectSum(electorRuler, "giftEffectMod") : 0;
+  const decayed = cfg.giftDuringCandidacyRelationGain * Math.pow(cfg.giftDiminishingReturnsFactor, prevCount) * (1 + traitMod);
+  state.diplomacy[aiId].relation = clamp(state.diplomacy[aiId].relation + decayed, -100, 100);
+  addChronicle(state, `${state.regions[aiId].name} erhielt ein diplomatisches Geschenk vor der Kaiserwahl.`);
+  return { ok: true, relationGain: Math.round(decayed * 10) / 10 };
+}
+
+// ---------- Wahlversprechen (§44-60) ----------
+// Nur Typen, die auf echten, bereits bestehenden Mechaniken beruhen (§45/§46):
+//   no_war_target    — dem Elector zugesagt, ein bestimmtes drittes ai-Gebiet
+//                       nicht anzugreifen (echte declareWar()-Handlung)
+//   maintain_alliance — die BEREITS bestehende Allianz mit dem Elector selbst
+//                       nicht aufzukündigen (echtes treaties.allianz)
+//   maintain_treaty  — einen bestimmten Vertrag (nichtangriff/handel) mit
+//                       einem dritten ai-Gebiet aufrechtzuerhalten
+//   pay_tribute      — eine zugesagte Zahlung bis zu einer Frist zu leisten
+// "Unterstützung in einem Konflikt" (§45-Beispiel) entfällt bewusst -- es
+// gibt in der bestehenden Architektur keine KI-gegen-KI-Kriege, die der
+// Spieler unterstützen könnte (§3: keine neue Diplomatiemechanik erfinden).
+function createElectionPromise(state, aiId, type, conditions) {
+  if (!state.imperialCandidacy) return { ok: false, reason: "Derzeit läuft keine Kandidatur." };
+  if (type === "maintain_alliance" && !state.diplomacy[aiId].treaties.allianz) {
+    return { ok: false, reason: "Es besteht noch kein Bündnis, das aufrechterhalten werden könnte." };
+  }
+  const cfg = CONFIG.election.promise;
+  if (!state.electionPromises) state.electionPromises = { byId: {}, nextId: 1 };
+  const id = "promise" + state.electionPromises.nextId++;
+  const promise = {
+    id, electorRegionId: aiId, electorRulerId: state.regions[aiId].rulerId,
+    type, createdYear: state.year, deadlineYear: state.year + (conditions.durationYears || cfg.defaultDurationYears),
+    status: "PROMISED", conditions: Object.assign({}, conditions), memoryIds: [],
+  };
+  state.electionPromises.byId[id] = promise;
+  const electorRuler = state.characters[promise.electorRulerId];
+  const desc = describeElectionPromise(state, promise);
+  const memory = recordWorldEvent(state, {
+    type: "ELECTION_PROMISE_MADE", actorIds: [state.rulerId], targetIds: [promise.electorRulerId],
+    emotionalWeight: 20, metadata: { promiseId: id, promiseType: type },
+    description: desc,
+  });
+  promise.memoryIds.push(memory.id);
+  if (electorRuler) refreshRelationship(state, promise.electorRulerId, state.rulerId);
+  addChronicle(state, desc);
+  return { ok: true, promiseId: id };
+}
+
+function describeElectionPromise(state, promise) {
+  const electorRuler = state.characters[promise.electorRulerId];
+  const electorName = electorRuler ? `${electorRuler.name} ${electorRuler.surname || ""}`.trim() : state.regions[promise.electorRegionId].name;
+  const targetName = promise.conditions.targetRegionId ? state.regions[promise.conditions.targetRegionId].name : null;
+  if (promise.type === "no_war_target") return `${electorName} erhielt das Versprechen, ${targetName} nicht anzugreifen.`;
+  if (promise.type === "maintain_alliance") return `${electorName} erhielt das Versprechen, das Bündnis aufrechtzuerhalten.`;
+  if (promise.type === "maintain_treaty") return `${electorName} erhielt das Versprechen, den Vertrag mit ${targetName} aufrechtzuerhalten.`;
+  if (promise.type === "pay_tribute") return `${electorName} wurde eine Zahlung von ${promise.conditions.amount} Talern zugesagt.`;
+  return `${electorName} erhielt ein politisches Versprechen.`;
+}
+
+function breakElectionPromise(state, promiseId, reasonNote) {
+  const promise = state.electionPromises.byId[promiseId];
+  if (!promise || promise.status !== "PROMISED") return;
+  promise.status = "BROKEN";
+  const cfg = CONFIG.election.promise;
+  const dip = state.diplomacy[promise.electorRegionId];
+  if (dip) dip.relation = clamp(dip.relation + cfg.brokenRelationPenalty, -100, 100);
+  const memory = recordWorldEvent(state, {
+    type: "ELECTION_PROMISE_BROKEN", actorIds: [state.rulerId], targetIds: [promise.electorRulerId],
+    emotionalWeight: -45, metadata: { promiseId, promiseType: promise.type },
+    description: `${describeElectionPromise(state, promise).replace("erhielt das Versprechen,", "wurde das Versprechen gebrochen,").replace("wurde eine Zahlung", "erhielt nicht die zugesagte Zahlung")} (${reasonNote || "gebrochen"})`,
+  });
+  promise.memoryIds.push(memory.id);
+  if (state.characters[promise.electorRulerId]) refreshRelationship(state, promise.electorRulerId, state.rulerId);
+  addChronicle(state, memory.description);
+}
+
+function fulfillElectionPromise(state, promiseId) {
+  const promise = state.electionPromises.byId[promiseId];
+  if (!promise || promise.status !== "PROMISED") return { ok: false, reason: "Kein offenes Versprechen mit dieser ID." };
+  if (promise.type === "pay_tribute") {
+    if (state.treasury < promise.conditions.amount) return { ok: false, reason: "Nicht genug Taler, um die Zusage einzulösen." };
+    state.treasury -= promise.conditions.amount;
+    logLedger(state, "Wahlversprechen eingelöst (Zahlung)", -promise.conditions.amount);
+  }
+  promise.status = "FULFILLED";
+  const cfg = CONFIG.election.promise;
+  const dip = state.diplomacy[promise.electorRegionId];
+  if (dip) dip.relation = clamp(dip.relation + cfg.fulfilledRelationBonus, -100, 100);
+  const memory = recordWorldEvent(state, {
+    type: "ELECTION_PROMISE_FULFILLED", actorIds: [state.rulerId], targetIds: [promise.electorRulerId],
+    emotionalWeight: 25, metadata: { promiseId, promiseType: promise.type },
+    description: describeElectionPromise(state, promise).replace("erhielt das Versprechen,", "erhielt die Einlösung des Versprechens,").replace("wurde eine Zahlung", "erhielt die zugesagte Zahlung"),
+  });
+  promise.memoryIds.push(memory.id);
+  if (state.characters[promise.electorRulerId]) refreshRelationship(state, promise.electorRulerId, state.rulerId);
+  addChronicle(state, memory.description);
+  return { ok: true };
+}
+
+// Jährliche Prüfung ALLER offenen Versprechen (§52/§128: kann Jahre nach
+// der Wahl zurückkehren -- läuft daher unabhängig davon, ob gerade eine
+// Kandidatur aktiv ist). Verletzung wird ereignisnah erkannt (Vertrags-
+// abwesenheit), nicht erst rückwirkend zur Frist.
+function updateElectionPromises(state) {
+  if (!state.electionPromises) return;
+  for (const id in state.electionPromises.byId) {
+    const p = state.electionPromises.byId[id];
+    if (p.status !== "PROMISED") continue;
+    if (p.type === "maintain_alliance") {
+      if (!state.diplomacy[p.electorRegionId] || !state.diplomacy[p.electorRegionId].treaties.allianz) {
+        breakElectionPromise(state, id, "Bündnis nicht aufrechterhalten"); continue;
+      }
+    } else if (p.type === "maintain_treaty") {
+      const dip = state.diplomacy[p.conditions.targetRegionId];
+      if (!dip || !dip.treaties[p.conditions.treatyType]) { breakElectionPromise(state, id, "Vertrag nicht aufrechterhalten"); continue; }
+    }
+    // no_war_target wird ereignisnah in checkPromiseViolationOnWarDeclared()
+    // erkannt (js/military.js declareWar()-Aufrufstelle), nicht hier gepollt.
+    if (state.year >= p.deadlineYear) {
+      if (p.type === "pay_tribute") { breakElectionPromise(state, id, "Frist verstrichen, Zahlung nie geleistet"); }
+      else { fulfillElectionPromise(state, id); }
+    }
+  }
+}
+
+// Wird von declareWar() (js/military.js) aufgerufen, BEVOR der Krieg
+// tatsächlich beginnt -- bricht jedes no_war_target-Versprechen, das genau
+// dieses Ziel schützt. Ereignisnah statt gepollt, weil ein einzelner
+// Kriegsbeginn sofort und eindeutig ist.
+function checkPromiseViolationOnWarDeclared(state, targetAiId) {
+  if (!state.electionPromises) return;
+  for (const id in state.electionPromises.byId) {
+    const p = state.electionPromises.byId[id];
+    if (p.status === "PROMISED" && p.type === "no_war_target" && p.conditions.targetRegionId === targetAiId) {
+      breakElectionPromise(state, id, "Krieg trotz gegebenem Wort erklärt");
+    }
+  }
+}
+
+// ---------- Elector-Score (§18/§19/§21-27) ----------
+// candidateId: state.rulerId (Spieler) ODER ein rivalCandidateId (region.rulerId
+// eines Rivalen). Vollständig deterministisch, jede Komponente einzeln
+// gedeckelt (§19), Gesamtscore auf CONFIG.election.scoreWeights.totalCap geklammert.
+function computeElectorScoreBreakdown(state, aiId, candidateId) {
+  const w = CONFIG.election.scoreWeights;
+  const isPlayer = candidateId === state.rulerId;
+  const components = [];
+  let total = 0;
+  const add = (label, value) => { if (value) { components.push({ label, value: Math.round(value * 10) / 10 }); total += value; } };
+
+  const dip = state.diplomacy[aiId];
+  const electorRulerId = state.regions[aiId].rulerId;
+  const electorRuler = state.characters[electorRulerId];
+
+  // §22: diplomatische Beziehung -- nur für den Spieler auswertbar (keine
+  // KI-KI-Beziehungen im bestehenden Modell, §3).
+  if (isPlayer) add("Diplomatische Beziehung", dip.relation * w.relationFactor);
+
+  // §21: persönliche Beziehung zwischen Kandidat und Kurfürst — funktioniert
+  // für JEDEN Kandidaten (Spieler oder Rivale), solange beide echte
+  // Character-Core-Charaktere sind.
+  if (electorRuler && state.characters[candidateId]) {
+    const rel = computeRelationshipBreakdown(state, electorRulerId, candidateId);
+    add("Persönliche Beziehung", rel.total * w.personalRelationFactor);
+  }
+
+  if (isPlayer) {
+    add(dip.treaties.allianz ? "Bündnis" : (dip.treaties.nichtangriff ? "Nichtangriffspakt" : ""), dip.treaties.allianz ? w.allianceBonus : (dip.treaties.nichtangriff ? w.nonAggressionBonus : 0));
+    if (isWarCapableElector(state, aiId) && state.warState && state.warState[aiId]) add("Krieg mit dem Kandidaten", w.warPenalty);
+  }
+
+  // §23-25: World Memory als Source of Truth für Krieg/Frieden/Hilfe --
+  // dieselbe computeEffectiveWeight()-Verfallsformel wie überall sonst,
+  // inkl. Trait-Modulation des ELECTORS (rachsüchtig hält länger nach,
+  // barmherzig/loyal verzeiht schneller) -- kein neuer Trait-Code nötig,
+  // computeEffectiveWeight liest diese Schlüssel bereits generisch.
+  let memorySum = 0;
+  for (const m of allMemories(state)) {
+    if (!m.regionIds.includes(aiId)) continue;
+    if (!m.tags.includes("war") && m.type !== "AID_GRANTED" && m.type !== "AID_REFUSED") continue;
+    if (isPlayer !== (m.actorIds.includes(state.rulerId) || m.targetIds.includes(state.rulerId))) continue;
+    memorySum += computeEffectiveWeight(state, m, electorRulerId);
+  }
+  add("Krieg/Frieden/Hilfe (World Memory)", clamp(memorySum, -w.memoryFactorCap, w.memoryFactorCap));
+
+  // §52/§54/§128: offene und gebrochene Wahlversprechen an GENAU diesen
+  // Elector. Gebrochene Versprechen nutzen die ECHTE, bereits aufgezeichnete
+  // ELECTION_PROMISE_BROKEN-Memory (computeEffectiveWeight() liefert damit
+  // denselben abklingenden, traitmodulierten Wert wie jede andere Memory --
+  // kein zweites Verfallsmodell).
+  if (state.electionPromises) {
+    let promiseSum = 0;
+    for (const id in state.electionPromises.byId) {
+      const p = state.electionPromises.byId[id];
+      if (p.electorRulerId !== electorRulerId) continue;
+      if (p.status === "PROMISED") { promiseSum += CONFIG.election.promise.activePromiseScoreBonus; continue; }
+      if (p.status === "BROKEN") {
+        const lastMemoryId = p.memoryIds[p.memoryIds.length - 1];
+        const brokenMemory = lastMemoryId ? state.memories.byId[lastMemoryId] : null;
+        if (brokenMemory && brokenMemory.type === "ELECTION_PROMISE_BROKEN") promiseSum += computeEffectiveWeight(state, brokenMemory, electorRulerId);
+      }
+    }
+    add("Wahlversprechen", clamp(promiseSum, w.brokenPromiseFactorCap, 40));
+  }
+
+  // §20/§73-79: laufende Geschenke dieser Kandidatur (nur Spieler -- Rivalen
+  // machen in diesem Umfang keine Geschenke, s. Moduldoc).
+  if (isPlayer && state.imperialCandidacy) {
+    const giftCount = state.imperialCandidacy.giftsGivenThisCandidacy[aiId] || 0;
+    if (giftCount > 0) {
+      const cfg = CONFIG.election;
+      let giftSum = 0;
+      for (let i = 0; i < giftCount; i++) giftSum += cfg.giftDuringCandidacyRelationGain * Math.pow(cfg.giftDiminishingReturnsFactor, i);
+      add("Diplomatische Geschenke", clamp(giftSum * 0.4, 0, w.giftFactorCap)); // 0.4: die Geschenkwirkung fließt bereits über relationFactor mit ein, hier nur der zusätzliche, direkt erinnerte Anteil
+    }
+  }
+
+  if (isPlayer) {
+    add("Prestige", clamp(state.prestige * w.prestigeFactor, 0, w.prestigeFactorCap));
+    add("Legitimität", clamp((state.legitimacy - 50) * w.legitimacyFactor, -w.legitimacyFactorCap, w.legitimacyFactorCap));
+    add("Titel", clamp(state.titleIndex * w.titleFactor, 0, w.titleFactorCap));
+    // §23-Analogon: gemeinsame Gegner -- nur beim Spieler auswertbar (echte
+    // state.warState/Beziehungsdaten vorhanden, s. Moduldoc zu KI-KI-Beziehungen).
+    const sharedEnemy = getElectorIds(state).some(otherId => otherId !== aiId && state.diplomacy[otherId].relation < -30 && isWarCapableElector(state, otherId) && state.warState[otherId] && dip.relation < -10);
+    add("Gemeinsame Gegner", sharedEnemy ? w.sharedEnemyBonus : 0);
+  } else {
+    // §30/§34: Rivalen-"Ausstrahlung" aus denselben realen Kennzahlen wie
+    // die Kandidatur-Eignung (Wohlstands-Proxy/Bevölkerung), auf eine mit
+    // Spieler-Prestige/Legitimität/Titel vergleichbare Größenordnung skaliert.
+    const region = state.regions[getRegionIdForRulerId(state, candidateId)];
+    if (region) {
+      const wealthProxy = computeRegionWealthProxy(region);
+      add("Ansehen des Rivalen", clamp((wealthProxy / 40), 0, w.prestigeFactorCap + w.legitimacyFactorCap + w.titleFactorCap));
+    }
+  }
+
+  // §139/§140: echte dynastische Verbindung -- prüft eine TATSÄCHLICHE
+  // Character-Core-Familienbeziehung (Kind/Ehepartner/Geschwister/gleiches
+  // Haus) zwischen Kandidat und Elector-Herrscher. Im bestehenden Modell so
+  // gut wie nie wahr (Auslandsherrscher haben laut Phase 8E bewusst KEINE
+  // Familie, s. js/core.js) -- trägt deshalb i.d.R. 0 bei, wird aber ehrlich
+  // (nicht erfunden) berechnet, falls sich das künftig ändert.
+  if (electorRuler && state.characters[candidateId]) {
+    const isFamily = electorRuler.parentId === candidateId || electorRuler.spouseId === candidateId ||
+      (electorRuler.parentId && electorRuler.parentId === state.characters[candidateId].parentId);
+    add("Dynastische Verbindung", isFamily ? w.dynasticBonus : 0);
+  }
+
+  return { components, total: clamp(Math.round(total), -w.totalCap, w.totalCap) };
+}
+
+function getRegionIdForRulerId(state, rulerId) {
+  for (const aiId of getElectorIds(state)) if (state.regions[aiId].rulerId === rulerId) return aiId;
+  return null;
+}
+
+// ---------- Stance (§15/§16) ----------
+function computeElectorStance(state, aiId, candidateId) {
+  const score = computeElectorScoreBreakdown(state, aiId, candidateId).total;
+  const t = CONFIG.election.stanceThresholds;
+  if (score >= t.sicherFuer) return "SICHER_FUER";
+  if (score >= t.geneigt) return "GENEIGT";
+  if (score > t.geneigtGegen) return "UNENTSCHLOSSEN";
+  if (score > t.sicherGegen) return "GENEIGT_GEGEN";
+  return "SICHER_GEGEN";
+}
+
+// ---------- Kandidaten-Liste & Wahlablauf (§35-43, §93-98) ----------
+function getActiveCandidates(state) {
+  const out = [{ id: state.rulerId, isPlayer: true }];
+  if (state.imperialCandidacy) {
+    for (const rid of state.imperialCandidacy.rivalCandidateIds) {
+      if (state.characters[rid] && state.characters[rid].alive) out.push({ id: rid, isPlayer: false });
+    }
+  }
+  return out;
+}
+
+// Ersetzt das alte checkElectionTrigger(): löst NICHT mehr automatisch aus,
+// sobald Voraussetzungen erfüllt sind (§42), sondern erst NACH einer per
+// declareImperialCandidacy() erklärten Kandidatur, frühestens nach
+// candidacyPrepYearsMin, spätestens erzwungen nach candidacyPrepYearsMax.
+function checkImperialElectionTiming(state) {
+  if (state.pendingElection) return;
+  if (!state.imperialCandidacy) return; // §42: keine Wahl ohne erklärte Kandidatur
+  if (state.electionCooldown > 0) { state.electionCooldown--; return; }
+  const cfg = CONFIG.election;
+  const yearsSinceDeclared = state.year - state.imperialCandidacy.declaredYear;
+  if (yearsSinceDeclared < cfg.candidacyPrepYearsMin) return;
+  const forced = yearsSinceDeclared >= cfg.candidacyPrepYearsMax;
+  if (forced || rnd() < cfg.triggerChancePerYear) {
+    state.pendingElection = true;
+    addChronicle(state, "Die Kurfürsten versammeln sich: Die Kaiserwahl steht bevor!");
+  }
+}
+
+// §93-98: deterministisch bei gleichem Zustand -- der einzige rnd()-Verbrauch
+// bleibt der bereits bestehende, dokumentierte Zufallswurf in
+// checkImperialElectionTiming() (OB die Wahl dieses Jahr stattfindet), nicht
+// WER sie gewinnt. explainImperialElectionResult() (Debug) liefert exakt
+// dieselben Scores, die hier tatsächlich über Sieg/Niederlage entscheiden.
+function resolveImperialElection(state) {
+  if (!state.pendingElection) return { ok: false, reason: "Keine Wahl anhängig." };
+  const candidates = getActiveCandidates(state);
+  const electorIds = getElectorIds(state);
+  const voteCounts = {}; candidates.forEach(c => voteCounts[c.id] = 0);
+  const perElectorResult = [];
+  for (const aiId of electorIds) {
+    let bestId = candidates[0].id, bestScore = -Infinity;
+    const scores = {};
+    for (const c of candidates) {
+      const s = computeElectorScoreBreakdown(state, aiId, c.id).total;
+      scores[c.id] = s;
+      if (s > bestScore || (s === bestScore && c.id === state.rulerId)) { bestScore = s; bestId = c.id; }
+    }
+    voteCounts[bestId]++;
+    perElectorResult.push({ aiId, votedFor: bestId, scores });
+    // §98/§166: nicht unterstützte Beziehung leidet (Spieler-Bezug wie bisher).
+    if (bestId !== state.rulerId) state.diplomacy[aiId].relation = clamp(state.diplomacy[aiId].relation + CONFIG.election.lossRelationPenalty, -100, 100);
+    else recordWorldEvent(state, {
+      type: "ELECTION_SUPPORT_GIVEN", actorIds: [state.rulerId], targetIds: [state.regions[aiId].rulerId], regionIds: [aiId],
+      emotionalWeight: 20, metadata: {},
+      description: `${state.regions[aiId].name} unterstützte dich bei der Kaiserwahl.`,
+    });
+  }
+  const playerVotes = voteCounts[state.rulerId] || 0;
+  const won = playerVotes >= CONFIG.election.votesNeededForMajority;
+  const winnerId = Object.keys(voteCounts).reduce((best, id) => voteCounts[id] > voteCounts[best] ? id : best, state.rulerId);
+
+  state.pendingElection = null;
+  const detailText = perElectorResult.map(r => `${state.regions[r.aiId].name}: ${r.votedFor === state.rulerId ? "für dich" : "dagegen"}`).join(", ");
+  addChronicle(state, `Kaiserwahl: ${playerVotes} von ${electorIds.length} Stimmen für dich (${detailText}).`);
+
+  if (won) {
+    state.titleIndex = TITLES.findIndex(t => t.id === "kaiser");
+    state.gameOver = "victory";
+    addChronicle(state, "Die Kurfürsten haben entschieden: Du wurdest zum Kaiser gewählt!");
+    recordWorldEvent(state, {
+      type: "TITLE_GAINED", actorIds: [state.rulerId], targetIds: [],
+      importance: 100, emotionalWeight: 50, metadata: { titleId: "kaiser" },
+      description: `${state.characters[state.rulerId].name} wurde von den Kurfürsten zum Kaiser gewählt.`,
+    });
+  } else {
+    state.electionCooldown = CONFIG.election.cooldownYearsAfterLoss;
+    state.prestige = Math.max(0, state.prestige - CONFIG.election.lossPrestigePenalty);
+    const winnerRegionId = getRegionIdForRulerId(state, winnerId);
+    const winnerName = winnerId === state.rulerId ? null : (state.characters[winnerId] ? `${state.characters[winnerId].name} ${state.characters[winnerId].surname || ""}`.trim() : null);
+    addChronicle(state, winnerName ? `Die Wahl ist verloren. ${winnerName} besteigt den Kaiserthron.` : "Die Wahl ist verloren.");
+    recordWorldEvent(state, {
+      type: "IMPERIAL_ELECTION_LOST", actorIds: [state.rulerId], targetIds: winnerId !== state.rulerId ? [winnerId] : [],
+      emotionalWeight: -40, metadata: { playerVotes, totalVotes: electorIds.length, winnerRegionId },
+      description: winnerName ? `${state.characters[state.rulerId].name} unterlag ${winnerName} bei der Kaiserwahl.` : `${state.characters[state.rulerId].name} verlor die Kaiserwahl.`,
+    });
+  }
+  state.imperialCandidacy = null; // die Kandidatur selbst endet; state.electionPromises bleibt bestehen (§50/§128)
+  return { ok: true, won, playerVotes, totalVotes: electorIds.length, perElectorResult };
+}
+
+// ---------- Debug/Erklärung (§17/§181/§228-230) ----------
+function explainImperialCandidacyEligibility(state) { return checkImperialCandidacyEligibility(state); }
+function explainElectorScore(state, aiId, candidateId) { return computeElectorScoreBreakdown(state, aiId, candidateId); }
+function explainImperialElection(state) {
+  const candidates = getActiveCandidates(state);
+  const electorIds = getElectorIds(state);
+  return electorIds.map(aiId => ({
+    aiId, regionName: state.regions[aiId].name,
+    rulerId: state.regions[aiId].rulerId,
+    stance: computeElectorStance(state, aiId, state.rulerId),
+    scores: candidates.map(c => ({ candidateId: c.id, isPlayer: c.isPlayer, breakdown: computeElectorScoreBreakdown(state, aiId, c.id) })),
+  }));
 }
 
 // ============================================================
@@ -8908,87 +9520,13 @@ function checkAlternativeVictory(state) {
   }
 }
 
-// ---------- Staatsschulden (§24) ----------
-
-function checkElectionTrigger(state) {
-  if (state.pendingElection) return;
-  if (state.electionCooldown > 0) { state.electionCooldown--; return; }
-  const currentTitleId = TITLES[state.titleIndex].id;
-  const titleRank = TITLES.findIndex(t => t.id === currentTitleId);
-  const kurfuerstRank = TITLES.findIndex(t => t.id === "kurfuerst");
-  if (titleRank < kurfuerstRank) return; // erst ab Kurfürst wahlberechtigt
-  // §Original "Kaiser" (C64): Kaiserwürde nur, wenn die Kathedrale fertiggestellt ist
-  if (!hasBuilding(state.regions.player, "kathedrale")) return;
-  if (rnd() < CONFIG.election.triggerChancePerYear) {
-    state.pendingElection = { bribed: { ai1: false, ai2: false, ai3: false } };
-    addChronicle(state, "Der amtierende Kaiser ist verstorben oder abgesetzt worden: Eine Kaiserwahl steht bevor!");
-  }
-}
-
-function bribeElector(state, aiId) {
-  if (!state.pendingElection) return { ok: false, reason: "Derzeit steht keine Wahl an." };
-  if (state.pendingElection.bribed[aiId]) return { ok: false, reason: "Dieser Kurfürst wurde bereits bestochen." };
-  const cfg = CONFIG.election;
-  if (state.treasury < cfg.bribeCost) return { ok: false, reason: "Nicht genug Taler für die Bestechung." };
-  state.treasury -= cfg.bribeCost;
-  state.pendingElection.bribed[aiId] = true;
-  state.diplomacy[aiId].relation = clamp(state.diplomacy[aiId].relation + cfg.bribeRelationGain, -100, 100);
-  addChronicle(state, `${state.regions[aiId].name} wurde vor der Kaiserwahl bestochen.`);
-  return { ok: true };
-}
-
-function resolveElection(state) {
-  if (!state.pendingElection) return { ok: false, reason: "Keine Wahl anhängig." };
-  const cfg = CONFIG.election;
-  let votesFor = 0;
-  const details = [];
-  for (const aiId in state.diplomacy) {
-    const dip = state.diplomacy[aiId];
-    const votedFor = state.pendingElection.bribed[aiId] || dip.relation >= cfg.knownElectorVoteRelationThreshold;
-    if (votedFor) {
-      votesFor++;
-      // §Punkt 79: Kaiserwahl-Unterstützung als Memory festhalten (regionsbasiert,
-      // da KI-Regionen aktuell keinen individuellen Herrscher-Charakter besitzen —
-      // KEINE Kaiserwahl 2.0, nur eine Beobachtung des bestehenden Ergebnisses).
-      recordWorldEvent(state, {
-        type: "ELECTION_SUPPORT_GIVEN", actorIds: [state.rulerId], regionIds: [aiId],
-        emotionalWeight: 20, metadata: { bribed: !!state.pendingElection.bribed[aiId] },
-        description: `${state.regions[aiId].name} unterstützte dich bei der Kaiserwahl.`,
-      });
-    } else {
-      dip.relation = clamp(dip.relation + cfg.lossRelationPenalty, -100, 100);
-    }
-    details.push(`${state.regions[aiId].name}: ${votedFor ? "dafür" : "dagegen"}`);
-  }
-  for (const threshold of cfg.abstractVotePrestigeThresholds) {
-    if (state.prestige >= threshold) votesFor++;
-  }
-  const totalVotes = 3 + cfg.abstractVotePrestigeThresholds.length;
-  const won = votesFor >= cfg.votesNeededForMajority;
-
-  state.pendingElection = null;
-  addChronicle(state, `Kaiserwahl: ${votesFor} von ${totalVotes} Stimmen für dich (${details.join(", ")}).`);
-
-  if (won) {
-    state.titleIndex = TITLES.findIndex(t => t.id === "kaiser");
-    state.gameOver = "victory";
-    addChronicle(state, "Die Kurfürsten haben entschieden: Du wurdest zum Kaiser gewählt!");
-    // §Phase-7-Punkt 21: die Kaiserkrönung bekam bisher KEINE Memory (dieser
-    // Pfad setzt titleIndex direkt statt über checkTitleProgress()) — ohne
-    // Memory wäre sie für die Dynasty Chronicle unsichtbar. Wiederverwendet
-    // TITLE_GAINED (kein neuer Typ nötig, §Punkt 19-Analogon aus Phase 4).
-    recordWorldEvent(state, {
-      type: "TITLE_GAINED", actorIds: [state.rulerId], targetIds: [],
-      importance: 100, emotionalWeight: 50, metadata: { titleId: "kaiser" },
-      description: `${state.characters[state.rulerId].name} wurde von den Kurfürsten zum Kaiser gewählt.`,
-    });
-  } else {
-    state.electionCooldown = cfg.cooldownYearsAfterLoss;
-    state.prestige = Math.max(0, state.prestige - cfg.lossPrestigePenalty);
-    addChronicle(state, "Die Wahl ist verloren. Ein anderer Fürst besteigt vorerst den Kaiserthron.");
-  }
-  return { ok: true, won, votesFor, totalVotes };
-}
+// ---------- Kaiserwahl (§Phase-12 "Imperial Politics") ----------
+// checkElectionTrigger()/bribeElector()/resolveElection() sind seit Phase 12
+// nach js/imperial-politics.js verschoben und dort durch ein echtes,
+// mehrkandidatenfähiges Score-Modell ersetzt (checkImperialCandidacyEligibility/
+// declareImperialCandidacy/giftElector/checkImperialElectionTiming/
+// resolveImperialElection) -- s. dort für die vollständige Herleitung
+// (PHASE12_IMPERIAL_POLITICS_REPORT.md, Abschnitt "Election 1.0 Audit").
 
 // ---------- Intrigen (§32) ----------
 
@@ -9790,11 +10328,19 @@ function checkAiWarInitiative(state) {
   const diffCfg = CONFIG.difficulty[state.difficulty] || CONFIG.difficulty.normal;
   if (!state.aiWarCooldown) state.aiWarCooldown = {};
   for (const aiId in state.diplomacy) {
+    // §Phase-12: seit Phase 12 hat state.diplomacy sieben Einträge (ai1-ai7,
+    // s. newGame()), aber nur ai1-ai3 sind je kriegsfähig (TERRITORIES/
+    // state.warState kennen nur diese drei, s. initTerritories()) -- die
+    // vier zusätzlichen Kaiserwahl-Electors (ai4-ai7) dürfen dem Spieler
+    // nicht den Krieg erklären können, dafür existiert schlicht keine
+    // Kriegskarten-Infrastruktur (Militärbalance/Kriegsökonomie bleiben
+    // unverändert auf die ursprünglichen drei begrenzt, §145/§146).
+    if (!state.warState || !(aiId in state.warState)) continue;
     // Kriegskarte: eine bereits andauernde Kampagne (state.warState) läuft über
     // die Gebietsangriffe (aiTerritoryCounterAttack), kein zweites "erklärt
     // Krieg"-Ereignis nötig; ebenso keine neue Kriegserklärung gegen eine
     // bereits vollständig eroberte (vasallisierte) Region.
-    if (state.warState && state.warState[aiId]) continue;
+    if (state.warState[aiId]) continue;
     if (state.regions[aiId] && state.regions[aiId].conquered) continue;
     if ((state.aiWarCooldown[aiId] || 0) > 0) { state.aiWarCooldown[aiId] -= 1; continue; }
     // Militärische Schwäche allein reicht nicht — es braucht auch eine wirklich
@@ -9847,6 +10393,7 @@ function declareWar(state, aiId) {
   if (hadPact) state.prestige = Math.max(0, state.prestige - cfg.breakPactPrestigePenalty);
 
   state.warState[aiId] = true;
+  checkPromiseViolationOnWarDeclared(state, aiId); // §Phase-12: bricht ggf. ein "no_war_target"-Wahlversprechen
   const report = `Krieg gegen ${region.name} erklärt! Die Kampagne beginnt — erobere ihre Gebiete auf der Kriegskarte.\n${allyLines.join(" ")}`;
   addChronicle(state, report.replace(/\n/g, " "));
 
@@ -10394,7 +10941,8 @@ function applyRulerAndDynastyEffects(state) {
 function updatePoliticsAndWar(state) {
   const r = state.regions.player;
   checkTitleProgress(state);
-  checkElectionTrigger(state);
+  checkImperialElectionTiming(state);
+  updateElectionPromises(state);
   updateIntel(state);
   updateReligion(state, r);
   checkAiWarInitiative(state); // §31: KI wägt nicht nur ab, sondern erklärt ggf. tatsächlich Krieg
@@ -12699,24 +13247,22 @@ function getMilitaryAssessmentLabel(state, aiId) {
   return "ETWA GLEICH";
 }
 
-// ---------- §23/24: Kaiserwahl-Informationen -- ausschließlich die reale,
-// bereits in resolveElection()/checkElectionTrigger() verwendete Schwelle
-// gespiegelt, keine neuen Deals/Versprechen. Alle drei state.diplomacy-
-// Regionen sind bereits im bestehenden Wahlcode gleichberechtigte
-// Kurfürsten (siehe resolveElection()), daher hier uniform true. ----------
+// ---------- §Phase-12 "Imperial Politics": Kaiserwahl-Informationen --
+// jede der sieben state.diplomacy-Regionen ist seither ein echter Elector
+// (js/imperial-politics.js). Player-UI zeigt nur die qualitative Haltung
+// (§15/§16/§90/§92 "keine exakte Wahrscheinlichkeit") -- die vollständige
+// Score-Aufschlüsselung bleibt dem Debug-Panel vorbehalten
+// (explainElectorScore(), §17/§228-230). ----------
+const ELECTOR_STANCE_LABELS = {
+  SICHER_FUER: "Sichere Stimme für euch", GENEIGT: "Geneigt, euch zu unterstützen",
+  UNENTSCHLOSSEN: "Unentschlossen", GENEIGT_GEGEN: "Geneigt zum Rivalen",
+  SICHER_GEGEN: "Sichere Stimme gegen euch",
+};
 function getElectorInfoViewModel(state, aiId) {
-  const cfg = CONFIG.election;
   const dip = state.diplomacy[aiId];
   if (!dip) return null;
-  let leaning;
-  if (state.pendingElection) {
-    const bribed = !!state.pendingElection.bribed[aiId];
-    const wouldVote = bribed || dip.relation >= cfg.knownElectorVoteRelationThreshold;
-    leaning = wouldVote ? (bribed ? "Unterstützt aktuell: Spieler (bestochen)" : "Unterstützt aktuell: Spieler") : "Unterstützt aktuell: nicht den Spieler";
-  } else {
-    leaning = dip.relation >= cfg.knownElectorVoteRelationThreshold ? "Würde derzeit den Spieler unterstützen" : "Würde derzeit nicht den Spieler unterstützen";
-  }
-  return { isElector: true, leaning };
+  const stance = computeElectorStance(state, aiId, state.rulerId);
+  return { isElector: true, stance, leaning: ELECTOR_STANCE_LABELS[stance] };
 }
 
 // ---------- §7: "Warum stehen wir so zueinander?" -- die diplomatische
@@ -14300,16 +14846,20 @@ function render() {
   }
   document.getElementById('techPanel').innerHTML = techHtml;
 
-  // Kaiserwahl-Banner
+  // Kaiserwahl-Banner (§Phase-12 "Imperial Politics": vorläufige, funktionsfähige
+  // Minimalanzeige -- die vollständige Kaiserkrone-Unteransicht mit Kandidatur-
+  // Erklärung, Geschenken und Wahlversprechen entsteht erst in einer späteren
+  // Ausbaustufe; hier nur so viel wie nötig, damit nichts mehr auf die entfernte
+  // bribeElector()/resolveElection()-API zugreift.)
   const banner = document.getElementById('electionBanner');
   if (state.pendingElection) {
     banner.style.display = 'block';
-    let bribeHtml = '';
-    for (const aiId in state.diplomacy) {
-      const bribed = state.pendingElection.bribed[aiId];
-      bribeHtml += `${state.regions[aiId].name}: ${bribed ? '<i>bestochen</i>' : `<button onclick="doBribeElector('${aiId}')">Bestechen (${CONFIG.election.bribeCost} Taler)</button>`} `;
+    let stanceHtml = '';
+    for (const aiId of getElectorIds(state)) {
+      const stance = computeElectorStance(state, aiId, state.rulerId);
+      stanceHtml += `${state.regions[aiId].name}: <i>${ELECTOR_STANCE_LABELS[stance]}</i> `;
     }
-    document.getElementById('electionBribeRow').innerHTML = bribeHtml;
+    document.getElementById('electionBribeRow').innerHTML = stanceHtml;
   } else {
     banner.style.display = 'none';
   }
@@ -15043,15 +15593,22 @@ function doSabotage(aiId) {
   render();
 }
 
-function doBribeElector(aiId) {
-  const result = bribeElector(state, aiId);
+function doGiftElector(aiId) {
+  const result = giftElector(state, aiId);
   if (!result.ok) { alert(result.reason); return; }
   playBeep(440, 0.1);
   render();
 }
 
+function doDeclareImperialCandidacy() {
+  const result = declareImperialCandidacy(state);
+  if (!result.ok) { alert(result.reason); return; }
+  playBeep(660, 0.15);
+  render();
+}
+
 function doResolveElection() {
-  const result = resolveElection(state);
+  const result = resolveImperialElection(state);
   if (!result.ok) { alert(result.reason); return; }
   playBeep(result.won ? 880 : 220, 0.25);
   render();

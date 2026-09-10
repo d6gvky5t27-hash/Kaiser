@@ -272,6 +272,21 @@ function newGame(options) {
     state.regions[ext.id] = makeRegion(ext.name, false, ext.fertility, ext.pop);
   }
 
+  // §Phase-12 "Imperial Politics" (§7-13): die vier bislang nur wirtschaftlich
+  // simulierten EXTRA_REGIONS (ai4-ai7) bekommen jetzt ebenfalls eine echte
+  // diplomatische Beziehung -- exakt dieselbe Form wie ai1-ai3 (state.diplomacy),
+  // damit sie als reale, region-/herrschergebundene Kaiserwahl-Electors taugen
+  // (§9/§12), ohne ein zweites Diplomatiesystem zu erfinden (§3): jede
+  // bestehende, generisch über state.diplomacy iterierende Funktion (Geschenke,
+  // Bündnisse, Verträge, Sabotage, Gerüchte, checkForeignRulerDeaths, ...)
+  // funktioniert dadurch automatisch auch für sie. BEWUSST NICHT kriegsfähig
+  // (keine TERRITORIES/state.warState-Einträge, siehe initTerritories() und
+  // den expliziten Schutz in checkAiWarInitiative(), js/military.js) --
+  // Kriegskarte/Militärbalance bleiben unverändert auf ai1-ai3 begrenzt.
+  for (const ext of EXTRA_REGIONS) {
+    state.diplomacy[ext.id] = { relation: startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } };
+  }
+
   const gender = options.gender || (rnd() < 0.5 ? "m" : "f");
   const age = options.age || (24 + Math.floor(rnd()*12));
   const ruler = createCharacter(gender, age, dynastyName);
@@ -284,9 +299,10 @@ function newGame(options) {
   state.rulerId = id;
   snapshotRulerEraStart(state, id); // §Phase-7-Punkt 74: Ausgangswerte für die spätere Regentschaftszusammenfassung
 
-  // §Phase-8E-Punkt 10/11: die drei diplomatisch erreichbaren KI-Regionen
-  // (state.diplomacy) bekommen jetzt jeweils EINEN echten Character-Core-
-  // Charakter als Herrscher (region.rulerId) -- über dieselbe createCharacter()
+  // §Phase-8E-Punkt 10/11 (seit Phase 12 auf alle sieben state.diplomacy-
+  // Regionen erweitert, s.o.): jede diplomatisch erreichbare KI-Region
+  // bekommt jeweils EINEN echten Character-Core-Charakter als Herrscher
+  // (region.rulerId) -- über dieselbe createCharacter()
   // wie jeder andere Charakter im Spiel, kein zweites Modell. Bewusst OHNE
   // Familie (parentId/spouseId/childrenIds bleiben leer) -- das wäre
   // erfundene Genealogie; ein eigenständiger Charakter ist alles, was
@@ -328,7 +344,7 @@ function logLedger(state, label, amount) {
 
 // ---------- Landwirtschaft (§18/§19) ----------
 
-const SAVE_VERSION = 8;
+const SAVE_VERSION = 9;
 
 function serializeSave(state) {
   return JSON.stringify({
@@ -479,18 +495,60 @@ function migrateSaveV7ToV8(parsed) {
   return parsed;
 }
 
+// §Phase-12 "Imperial Politics": die vier bislang rein wirtschaftlichen
+// EXTRA_REGIONS (ai4-ai7) werden zu echten Kaiserwahl-Electors -- Altspielstände
+// bekommen dieselbe state.diplomacy-Anbindung samt Herrscher-Charakter wie neue
+// Partien (s. newGame()). KEIN rnd() hier: Migrationen laufen in
+// deserializeSave() VOR dem Reseeding/Replay des Zufallsstroms dieses
+// Spielstands, ein rnd()-Aufruf an dieser Stelle wäre für denselben Save bei
+// jedem Laden unterschiedlich und verletzte damit §67 (Determinismus) --
+// Geschlecht/Alter der vier neuen Herrscher werden daher deterministisch aus
+// ihrer Position in EXTRA_REGIONS abgeleitet statt gewürfelt. Das alte
+// state.pendingElection ({bribed:{...}}) wird auf die neue, einfache
+// Boolean-Form abgebildet (js/imperial-politics.js kennt kein bribed mehr).
+function migrateSaveV8ToV9(parsed) {
+  const s = parsed.state;
+  if (!s.imperialCandidacy) s.imperialCandidacy = null;
+  if (!s.electionPromises) s.electionPromises = { byId: {}, nextId: 1 };
+  if (s.pendingElection && typeof s.pendingElection === "object") s.pendingElection = true;
+  EXTRA_REGIONS.forEach((ext, idx) => {
+    if (!s.diplomacy[ext.id]) {
+      s.diplomacy[ext.id] = { relation: CONFIG.diplomacy.startRelation, treaties: { nichtangriff: false, handel: false, allianz: false } };
+    }
+    const region = s.regions[ext.id];
+    if (region && !region.rulerId) {
+      const baseHouseName = region.name.replace(/\s*\(.*\)$/, "");
+      const foreignRuler = createCharacter(idx % 2 === 0 ? "m" : "f", 45, "von " + baseHouseName);
+      const fid = nextCharId();
+      s.characters[fid] = foreignRuler;
+      region.rulerId = fid;
+    }
+  });
+  parsed.saveVersion = 9;
+  return parsed;
+}
+
 function deserializeSave(json) {
   let parsed = JSON.parse(json);
+  // §Phase-12: __charIdCounter wird VOR den Migrationen synchronisiert (statt
+  // wie zuvor erst danach), da migrateSaveV8ToV9() selbst neue Charaktere
+  // per nextCharId() anlegen kann -- ohne diese Umstellung würde sie den noch
+  // unsynchronisierten, aus einer anderen Partie stammenden Zähler verwenden
+  // und riskierte damit ID-Kollisionen mit bereits im Save vorhandenen
+  // Charakteren. Nach den Migrationen wird der ggf. weitergezählte Stand
+  // zurück in parsed geschrieben, damit die laufende Partie nahtlos anschließt.
+  __charIdCounter = parsed.charIdCounter;
   if (parsed.saveVersion === 2) parsed = migrateSaveV2ToV3(parsed);
   if (parsed.saveVersion === 3) parsed = migrateSaveV3ToV4(parsed);
   if (parsed.saveVersion === 4) parsed = migrateSaveV4ToV5(parsed);
   if (parsed.saveVersion === 5) parsed = migrateSaveV5ToV6(parsed);
   if (parsed.saveVersion === 6) parsed = migrateSaveV6ToV7(parsed);
   if (parsed.saveVersion === 7) parsed = migrateSaveV7ToV8(parsed);
+  if (parsed.saveVersion === 8) parsed = migrateSaveV8ToV9(parsed);
   if (parsed.saveVersion !== SAVE_VERSION) {
     throw new Error("Inkompatible Spielstand-Version: " + parsed.saveVersion);
   }
-  __charIdCounter = parsed.charIdCounter;
+  parsed.charIdCounter = __charIdCounter;
   // Deterministische Simulation (§67): RNG mit demselben Seed neu starten und
   // exakt so viele Schritte vorspulen, wie beim Speichern bereits verbraucht waren —
   // der Zufallsstrom setzt sich dadurch nahtlos fort.

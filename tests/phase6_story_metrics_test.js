@@ -8,7 +8,7 @@ const fs = require("fs");
 const path = require("path");
 
 const gamedata = fs.readFileSync(path.join(__dirname, "..", "data/gamedata.js"), "utf8");
-const simModules = ["core", "economy", "population-dynasty", "memory", "characters", "estates", "story-threads", "drama-director", "event-chains", "chronicle", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
+const simModules = ["core", "economy", "population-dynasty", "memory", "characters", "estates", "imperial-politics", "story-threads", "drama-director", "event-chains", "chronicle", "politics", "diplomacy", "military", "debug", "war-map", "advance-year"];
 const sim = simModules.map(m => fs.readFileSync(path.join(__dirname, "..", "js", m + ".js"), "utf8")).join("\n");
 
 const testBody = `

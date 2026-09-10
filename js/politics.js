@@ -61,87 +61,13 @@ function checkAlternativeVictory(state) {
   }
 }
 
-// ---------- Staatsschulden (§24) ----------
-
-function checkElectionTrigger(state) {
-  if (state.pendingElection) return;
-  if (state.electionCooldown > 0) { state.electionCooldown--; return; }
-  const currentTitleId = TITLES[state.titleIndex].id;
-  const titleRank = TITLES.findIndex(t => t.id === currentTitleId);
-  const kurfuerstRank = TITLES.findIndex(t => t.id === "kurfuerst");
-  if (titleRank < kurfuerstRank) return; // erst ab Kurfürst wahlberechtigt
-  // §Original "Kaiser" (C64): Kaiserwürde nur, wenn die Kathedrale fertiggestellt ist
-  if (!hasBuilding(state.regions.player, "kathedrale")) return;
-  if (rnd() < CONFIG.election.triggerChancePerYear) {
-    state.pendingElection = { bribed: { ai1: false, ai2: false, ai3: false } };
-    addChronicle(state, "Der amtierende Kaiser ist verstorben oder abgesetzt worden: Eine Kaiserwahl steht bevor!");
-  }
-}
-
-function bribeElector(state, aiId) {
-  if (!state.pendingElection) return { ok: false, reason: "Derzeit steht keine Wahl an." };
-  if (state.pendingElection.bribed[aiId]) return { ok: false, reason: "Dieser Kurfürst wurde bereits bestochen." };
-  const cfg = CONFIG.election;
-  if (state.treasury < cfg.bribeCost) return { ok: false, reason: "Nicht genug Taler für die Bestechung." };
-  state.treasury -= cfg.bribeCost;
-  state.pendingElection.bribed[aiId] = true;
-  state.diplomacy[aiId].relation = clamp(state.diplomacy[aiId].relation + cfg.bribeRelationGain, -100, 100);
-  addChronicle(state, `${state.regions[aiId].name} wurde vor der Kaiserwahl bestochen.`);
-  return { ok: true };
-}
-
-function resolveElection(state) {
-  if (!state.pendingElection) return { ok: false, reason: "Keine Wahl anhängig." };
-  const cfg = CONFIG.election;
-  let votesFor = 0;
-  const details = [];
-  for (const aiId in state.diplomacy) {
-    const dip = state.diplomacy[aiId];
-    const votedFor = state.pendingElection.bribed[aiId] || dip.relation >= cfg.knownElectorVoteRelationThreshold;
-    if (votedFor) {
-      votesFor++;
-      // §Punkt 79: Kaiserwahl-Unterstützung als Memory festhalten (regionsbasiert,
-      // da KI-Regionen aktuell keinen individuellen Herrscher-Charakter besitzen —
-      // KEINE Kaiserwahl 2.0, nur eine Beobachtung des bestehenden Ergebnisses).
-      recordWorldEvent(state, {
-        type: "ELECTION_SUPPORT_GIVEN", actorIds: [state.rulerId], regionIds: [aiId],
-        emotionalWeight: 20, metadata: { bribed: !!state.pendingElection.bribed[aiId] },
-        description: `${state.regions[aiId].name} unterstützte dich bei der Kaiserwahl.`,
-      });
-    } else {
-      dip.relation = clamp(dip.relation + cfg.lossRelationPenalty, -100, 100);
-    }
-    details.push(`${state.regions[aiId].name}: ${votedFor ? "dafür" : "dagegen"}`);
-  }
-  for (const threshold of cfg.abstractVotePrestigeThresholds) {
-    if (state.prestige >= threshold) votesFor++;
-  }
-  const totalVotes = 3 + cfg.abstractVotePrestigeThresholds.length;
-  const won = votesFor >= cfg.votesNeededForMajority;
-
-  state.pendingElection = null;
-  addChronicle(state, `Kaiserwahl: ${votesFor} von ${totalVotes} Stimmen für dich (${details.join(", ")}).`);
-
-  if (won) {
-    state.titleIndex = TITLES.findIndex(t => t.id === "kaiser");
-    state.gameOver = "victory";
-    addChronicle(state, "Die Kurfürsten haben entschieden: Du wurdest zum Kaiser gewählt!");
-    // §Phase-7-Punkt 21: die Kaiserkrönung bekam bisher KEINE Memory (dieser
-    // Pfad setzt titleIndex direkt statt über checkTitleProgress()) — ohne
-    // Memory wäre sie für die Dynasty Chronicle unsichtbar. Wiederverwendet
-    // TITLE_GAINED (kein neuer Typ nötig, §Punkt 19-Analogon aus Phase 4).
-    recordWorldEvent(state, {
-      type: "TITLE_GAINED", actorIds: [state.rulerId], targetIds: [],
-      importance: 100, emotionalWeight: 50, metadata: { titleId: "kaiser" },
-      description: `${state.characters[state.rulerId].name} wurde von den Kurfürsten zum Kaiser gewählt.`,
-    });
-  } else {
-    state.electionCooldown = cfg.cooldownYearsAfterLoss;
-    state.prestige = Math.max(0, state.prestige - cfg.lossPrestigePenalty);
-    addChronicle(state, "Die Wahl ist verloren. Ein anderer Fürst besteigt vorerst den Kaiserthron.");
-  }
-  return { ok: true, won, votesFor, totalVotes };
-}
+// ---------- Kaiserwahl (§Phase-12 "Imperial Politics") ----------
+// checkElectionTrigger()/bribeElector()/resolveElection() sind seit Phase 12
+// nach js/imperial-politics.js verschoben und dort durch ein echtes,
+// mehrkandidatenfähiges Score-Modell ersetzt (checkImperialCandidacyEligibility/
+// declareImperialCandidacy/giftElector/checkImperialElectionTiming/
+// resolveImperialElection) -- s. dort für die vollständige Herleitung
+// (PHASE12_IMPERIAL_POLITICS_REPORT.md, Abschnitt "Election 1.0 Audit").
 
 // ---------- Intrigen (§32) ----------
 

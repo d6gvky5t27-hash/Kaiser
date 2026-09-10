@@ -10,7 +10,7 @@ const ROOT = path.join(__dirname, "..");
 const gamedata = fs.readFileSync(path.join(ROOT, "data/gamedata.js"), "utf8");
 const mapGeometry = fs.readFileSync(path.join(ROOT, "js/map-geometry.js"), "utf8");
 const simModules = [
-  "core", "economy", "population-dynasty", "memory", "characters", "estates", "story-threads",
+  "core", "economy", "population-dynasty", "memory", "characters", "estates", "imperial-politics", "story-threads",
   "drama-director", "event-chains", "chronicle", "politics", "diplomacy", "military",
   "debug", "war-map", "advance-year",
 ];
@@ -202,7 +202,7 @@ console.log('--- Jahreswechsel-Hinweis ---');
   const vm1 = getYearTransitionViewModel(state);
   check('ohne offene Entscheidung: "keine dringenden Angelegenheiten"', vm1.pendingCount === 0 && vm1.pendingLabel.includes('Keine'));
 
-  state.pendingElection = { bribed: {} };
+  state.pendingElection = true;
   const vm2 = getYearTransitionViewModel(state);
   check('offene Kaiserwahl zaehlt als offene Entscheidung', vm2.pendingCount === 1);
 })();
@@ -464,7 +464,11 @@ console.log('--- Phase 8E: foreign rulers sind echte Character-Core-Charaktere -
 (function() {
   const state = newGame({ seed: 200 });
   const aiIds = Object.keys(state.diplomacy);
-  check('genau 3 diplomatisch erreichbare Regionen (ai1-3)', aiIds.length === 3);
+  // §Phase-12 "Imperial Politics": seither sieben diplomatisch erreichbare
+  // Regionen (ai1-ai7, s. js/core.js newGame()) statt drei -- alle sieben
+  // sind gleichermaßen echte Character-Core-Herrscher (js/imperial-politics.js
+  // Electors), s. dazu auch die Kaiserwahl-Tests weiter unten.
+  check('genau 7 diplomatisch erreichbare Regionen (ai1-7)', aiIds.length === 7);
   for (const aiId of aiIds) {
     const region = state.regions[aiId];
     check(aiId + ' hat eine echte rulerId', !!region.rulerId && !!state.characters[region.rulerId]);

@@ -148,7 +148,8 @@ function applyRulerAndDynastyEffects(state) {
 function updatePoliticsAndWar(state) {
   const r = state.regions.player;
   checkTitleProgress(state);
-  checkElectionTrigger(state);
+  checkImperialElectionTiming(state);
+  updateElectionPromises(state);
   updateIntel(state);
   updateReligion(state, r);
   checkAiWarInitiative(state); // §31: KI wägt nicht nur ab, sondern erklärt ggf. tatsächlich Krieg

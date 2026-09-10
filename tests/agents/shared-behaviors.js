@@ -331,19 +331,30 @@ function considerBuildPalast(ctx, minBuffer, reason) {
   return !!(res && res.ok);
 }
 
-// ---------- Kaiserwahl ----------
-function handleElection(ctx, briberyBudgetPerElector, minBuffer, reason) {
+// ---------- Kaiserwahl (§Phase-12 "Imperial Politics": Kandidatur erklären,
+// unentschlossene/gegnerische Electors während der Vorbereitungszeit
+// beschenken, Wahl abhalten sobald sie ansteht -- ersetzt das alte
+// bestechen+auflösen 1:1 durch die neue mehrkandidatenfähige API.) ----------
+function handleElection(ctx, giftBudgetPerElector, minBuffer, reason) {
   const state = ctx.state;
-  if (!state.pendingElection) return false;
+  if (state.pendingElection) {
+    act(ctx, resolveImperialElection, [], { category: "TITLE", action: "resolve_election", reason: "cast the vote", meaningful: true });
+    return true;
+  }
+  if (!state.imperialCandidacy) {
+    const elig = checkImperialCandidacyEligibility(state);
+    if (!elig.eligible) return false;
+    act(ctx, declareImperialCandidacy, [], { category: "TITLE", action: "declare_imperial_candidacy", reason, meaningful: true });
+    return true;
+  }
   let acted = false;
   for (const aiId of neighborIds(state)) {
-    if (state.pendingElection.bribed[aiId]) continue;
-    if (state.treasury - CONFIG.election.bribeCost < minBuffer) continue;
-    const res = act(ctx, bribeElector, [aiId], { category: "TITLE", action: "bribe_elector", reason, meaningful: true });
+    if (computeElectorStance(state, aiId, state.rulerId) === "SICHER_FUER") continue;
+    if (state.treasury - CONFIG.election.giftCost < minBuffer) continue;
+    const res = act(ctx, giftElector, [aiId], { category: "TITLE", action: "gift_elector", reason, meaningful: true });
     if (res.ok) acted = true;
   }
-  act(ctx, resolveElection, [], { category: "TITLE", action: "resolve_election", reason: "cast the vote", meaningful: true });
-  return true;
+  return acted;
 }
 
 // ---------- Misc systems (kept in the loop so "ignored system" measurement is honest) ----------

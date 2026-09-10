@@ -1129,24 +1129,22 @@ function getMilitaryAssessmentLabel(state, aiId) {
   return "ETWA GLEICH";
 }
 
-// ---------- §23/24: Kaiserwahl-Informationen -- ausschließlich die reale,
-// bereits in resolveElection()/checkElectionTrigger() verwendete Schwelle
-// gespiegelt, keine neuen Deals/Versprechen. Alle drei state.diplomacy-
-// Regionen sind bereits im bestehenden Wahlcode gleichberechtigte
-// Kurfürsten (siehe resolveElection()), daher hier uniform true. ----------
+// ---------- §Phase-12 "Imperial Politics": Kaiserwahl-Informationen --
+// jede der sieben state.diplomacy-Regionen ist seither ein echter Elector
+// (js/imperial-politics.js). Player-UI zeigt nur die qualitative Haltung
+// (§15/§16/§90/§92 "keine exakte Wahrscheinlichkeit") -- die vollständige
+// Score-Aufschlüsselung bleibt dem Debug-Panel vorbehalten
+// (explainElectorScore(), §17/§228-230). ----------
+const ELECTOR_STANCE_LABELS = {
+  SICHER_FUER: "Sichere Stimme für euch", GENEIGT: "Geneigt, euch zu unterstützen",
+  UNENTSCHLOSSEN: "Unentschlossen", GENEIGT_GEGEN: "Geneigt zum Rivalen",
+  SICHER_GEGEN: "Sichere Stimme gegen euch",
+};
 function getElectorInfoViewModel(state, aiId) {
-  const cfg = CONFIG.election;
   const dip = state.diplomacy[aiId];
   if (!dip) return null;
-  let leaning;
-  if (state.pendingElection) {
-    const bribed = !!state.pendingElection.bribed[aiId];
-    const wouldVote = bribed || dip.relation >= cfg.knownElectorVoteRelationThreshold;
-    leaning = wouldVote ? (bribed ? "Unterstützt aktuell: Spieler (bestochen)" : "Unterstützt aktuell: Spieler") : "Unterstützt aktuell: nicht den Spieler";
-  } else {
-    leaning = dip.relation >= cfg.knownElectorVoteRelationThreshold ? "Würde derzeit den Spieler unterstützen" : "Würde derzeit nicht den Spieler unterstützen";
-  }
-  return { isElector: true, leaning };
+  const stance = computeElectorStance(state, aiId, state.rulerId);
+  return { isElector: true, stance, leaning: ELECTOR_STANCE_LABELS[stance] };
 }
 
 // ---------- §7: "Warum stehen wir so zueinander?" -- die diplomatische

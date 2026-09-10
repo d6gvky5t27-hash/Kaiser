@@ -18,6 +18,7 @@ const SIM_FILES = [
   "js/memory.js",
   "js/characters.js",
   "js/estates.js",
+  "js/imperial-politics.js",
   "js/story-threads.js",
   "js/drama-director.js",
   "js/event-chains.js",

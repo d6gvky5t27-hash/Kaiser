@@ -203,16 +203,69 @@ const CONFIG = {
     geistlicherSatBonus: 3,          // Zufriedenheitsbonus pro Stufe
     tenureBonusPerLevel: 0.15,       // §Phase-3 Character Core: Amtserfahrungsbonus statt reiner ×Stufe-Skalierung (Stufe 3 = +30% statt +200%) — die eigentliche Wirkung kommt jetzt primär aus Skill/Traits/Loyalität des Beraters (advisorEffectBonus() in js/military.js)
   },
+  // ---------- Phase 12 "Imperial Politics": Kaiserwahl 2.0 (§4/§18 —
+  // vollständig konfigurierbare, additive Score-Gewichte statt verstreuter
+  // Magic Numbers, jede Komponente in computeElectorScoreBreakdown()
+  // (js/imperial-politics.js) 1:1 nachvollziehbar, dasselbe Muster wie
+  // CONFIG.drama.tensionWeights/CONFIG.estates.influenceWeights). Die 7
+  // Electors sind jetzt state.diplomacy (ai1-ai7, siehe newGame()) — keine
+  // abstrakten, nicht an eine Region gebundenen Stimmen mehr (§12/§31).
+  // votesNeededForMajority bleibt bei 4 — das war schon vorher exakt die
+  // Mehrheit von 7 Stimmen, nur bislang 3 echte + 4 abstrakte statt 7 echter.
   election: {
-    triggerChancePerYear: 0.25,
+    triggerChancePerYear: 0.25, // nach Ablauf der Mindest-Vorbereitungszeit: jährliche Chance, dass die Wahl tatsächlich stattfindet (§38/§39)
+    candidacyPrepYearsMin: 3,   // §38: 3-8 Jahre Wahlvorphase nach erklärter Kandidatur, bevor überhaupt gewürfelt wird
+    candidacyPrepYearsMax: 8,   // danach erzwungen (kein endloses Hinauszögern)
     cooldownYearsAfterLoss: 8,
-    knownElectorVoteRelationThreshold: 40,
-    bribeCost: 400,
-    bribeRelationGain: 20,
-    abstractVotePrestigeThresholds: [150, 250, 350, 450], // 4 weitere, nicht direkt beeinflussbare Kurfürsten
-    votesNeededForMajority: 4, // von insgesamt 7 Stimmen (3 bekannte + 4 abstrakte)
+    votesNeededForMajority: 4,  // von 7 Stimmen (state.diplomacy: ai1-ai7)
     lossPrestigePenalty: 10,
     lossRelationPenalty: -10,
+    // §20/§73/§76/§77: Bestechung wird zu einem gedeckelten, abklingenden
+    // diplomatischen Geschenk während der laufenden Kandidatur (ersetzt das
+    // alte bribed[aiId]=true-Autowin) -- bewegt eine Stimme, kauft nie die
+    // ganze Wahl. giftDiminishingReturnsFactor: jedes weitere Geschenk an
+    // DENSELBEN Elector in DERSELBEN Kandidatur wirkt um diesen Faktor schwächer.
+    giftDuringCandidacyRelationGain: 12,
+    giftDiminishingReturnsFactor: 0.55,
+    giftCost: 400, // wie der bisherige bribeCost, thematisch jetzt "diplomatisches Geschenk" statt Bestechung
+    // §45/§47/§52: Wahlversprechen
+    promise: {
+      defaultDurationYears: 10,
+      brokenRelationPenalty: -25,
+      fulfilledRelationBonus: 12,
+      activePromiseScoreBonus: 8,   // ein noch offenes, glaubwürdiges Versprechen wirkt schon vor Erfüllung leicht positiv
+    },
+    // §18/§19: Score-Gewichte -- jeder Faktor einzeln gedeckelt (§19 "kein
+    // Einzelfaktor darf alles dominieren"), Gesamtscore zusätzlich geklammert.
+    scoreWeights: {
+      relationFactor: 0.5,           // * state.diplomacy[aiId].relation (-100..100) -> max ±50
+      personalRelationFactor: 0.3,   // * Charakterbeziehung Kandidat<->Elector-Herrscher (-100..100) -> max ±30
+      allianceBonus: 20, nonAggressionBonus: 8,
+      warPenalty: -40,               // Elector-Region befindet sich im Krieg mit dem Kandidaten (nur beim Spieler auswertbar, s. war-map)
+      memoryFactorCap: 30,           // Deckel für die Summe aller Kriegs-/Friedens-/Hilfe-Memory-Beiträge zusammen
+      prestigeFactor: 0.05, prestigeFactorCap: 15,
+      legitimacyFactor: 0.2, legitimacyFactorCap: 10,
+      titleFactor: 2, titleFactorCap: 10,
+      candidateStrengthFactorCap: 15, // vergleichende Kandidatenstärke (§34), relativ zum stärksten Rivalen
+      giftFactorCap: 20,
+      brokenPromiseFactorCap: -35,
+      sharedEnemyBonus: 10,          // nur für den Spieler auswertbar (keine KI-KI-Beziehungen im bestehenden Modell, §3)
+      dynasticBonus: 15,             // nur wirksam, wenn eine ECHTE Character-Core-Verbindung existiert (§140, i.d.R. 0)
+      totalCap: 100,                 // Gesamtscore geklammert auf -100..100
+    },
+    // §15: Stance-Kategorien aus dem geklammerten Gesamtscore.
+    stanceThresholds: { sicherFuer: 50, geneigt: 15, geneigtGegen: -15, sicherGegen: -50 },
+    // §30-33: Rivalen-Kandidatur -- reale, bereits vorhandene Voraussetzungen
+    // (keine erfundene AI-Prestige-/Legitimitäts-Kennzahl, die es für
+    // KI-Regionen nie gab): dieselbe Bevölkerungsschwelle wie beim Spieler
+    // (TITLES.kurfuerst.reqPop), eine tatsächlich errichtete Kathedrale
+    // (hasBuilding(), exakt derselbe Gebäudetyp/dieselbe Funktion wie beim
+    // Spieler-Gate in checkElectionTrigger()) und derselbe Wohlstands-Proxy,
+    // den aiRegionDevelops() (js/economy.js) bereits für KI-Bauentscheidungen
+    // verwendet -- hier nur ein höheres Vielfaches von CONFIG.ai.buildWealthThreshold
+    // statt eines neu erfundenen Schwellenwerts.
+    candidateEligibility: { wealthProxyMultiplier: 3 },
+    maxRivalCandidates: 3, // §33: 2-4 ernsthafte Kandidaten insgesamt (Spieler + max. 3 Rivalen)
   },
   intrigue: {
     sabotageCost: 250,
@@ -1933,6 +1986,17 @@ const MEMORY_TYPES = {
   // Stand, keine Einzelbeziehung), decayRate 0 (verblasst nicht, wie
   // TITLE_GAINED/MARRIAGE).
   ESTATE_PRIVILEGE_GRANTED:  { importance: 60, decayRate: 0, direction: "none", tags: ["politics", "estates"] },
+  // --- neu in Phase 12 (§115/§116 — Memory-Audit zuerst: ELECTION_SUPPORT_GIVEN
+  // und ELECTION_PROMISE_BROKEN existierten bereits seit Phase 4/5, waren aber
+  // nie tatsächlich verkabelt bzw. bezogen sich nur auf die Region, nicht auf
+  // den echten Kurfürsten-Charakter — s. PHASE12-Bericht §Audit. Ein Sieg
+  // verwendet weiterhin TITLE_GAINED (kein neuer Typ nötig); nur für eine
+  // verlorene Wahl gibt es bislang keinerlei Memory-Äquivalent.
+  IMPERIAL_CANDIDACY_DECLARED: { importance: 55, decayRate: 0.02, direction: "none", tags: ["politics", "election"] },
+  ELECTOR_PLEDGED_SUPPORT:     { importance: 35, decayRate: 0.05, direction: "target_to_actor", tags: ["politics", "election", "gratitude"] },
+  ELECTION_PROMISE_MADE:       { importance: 40, decayRate: 0.03, direction: "target_to_actor", tags: ["politics", "election"] },
+  ELECTION_PROMISE_FULFILLED:  { importance: 45, decayRate: 0.02, direction: "target_to_actor", tags: ["politics", "election", "gratitude"] },
+  IMPERIAL_ELECTION_LOST:      { importance: 75, decayRate: 0,    direction: "none", tags: ["politics", "election"] },
 };
 
 // Event-System: TRIGGER/BEDINGUNGEN/TEXT/ENTSCHEIDUNGEN/KONSEQUENZEN (§38)
@@ -1966,7 +2030,7 @@ const TRAITS = [
   { id: "ehrgeizig",     name: "ehrgeizig",     effects: { prestigeGain: 0.15, loyaltyMod: -10, claimAggression: 15 } },
   { id: "grosszuegig",   name: "großzügig",     effects: { satisfactionBonus: 5, treasuryDrain: 0.05, loyaltyMod: 5 } },
   { id: "geizig",        name: "geizig",        effects: { treasuryDrain: -0.05, satisfactionBonus: -5, loyaltyMod: -5 } },
-  { id: "gerecht",       name: "gerecht",       effects: { satisfactionBonus: 8 } },
+  { id: "gerecht",       name: "gerecht",       effects: { satisfactionBonus: 8, giftEffectMod: -0.3 } },
   { id: "grausam",       name: "grausam",       effects: { satisfactionBonus: -10, prestigeGain: 0.05, loyaltyMod: -8 } },
   { id: "fleissig",      name: "fleißig",       effects: { productionBonus: 0.05 } },
   { id: "faul",          name: "faul",          effects: { productionBonus: -0.05 } },
@@ -1984,7 +2048,7 @@ const TRAITS = [
   { id: "paranoid",      name: "paranoid",      effects: { loyaltyMod: -10, memoryWeightAmplifierNegative: 0.3 } },
   { id: "arrogant",      name: "arrogant",      effects: { loyaltyMod: -8, claimAggression: 8 } },
   { id: "bescheiden",    name: "bescheiden",    effects: { loyaltyMod: 8, claimAggression: -10 } },
-  { id: "korrupt",       name: "korrupt",       effects: { advisorEffectMod: -0.1 } },
+  { id: "korrupt",       name: "korrupt",       effects: { advisorEffectMod: -0.1, giftEffectMod: 0.4 } },
   { id: "rachsuechtig",  name: "rachsüchtig",   effects: { claimAggression: 10, memoryDecayModNegative: -0.4 } },
 ];
 

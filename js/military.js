@@ -317,11 +317,19 @@ function checkAiWarInitiative(state) {
   const diffCfg = CONFIG.difficulty[state.difficulty] || CONFIG.difficulty.normal;
   if (!state.aiWarCooldown) state.aiWarCooldown = {};
   for (const aiId in state.diplomacy) {
+    // §Phase-12: seit Phase 12 hat state.diplomacy sieben Einträge (ai1-ai7,
+    // s. newGame()), aber nur ai1-ai3 sind je kriegsfähig (TERRITORIES/
+    // state.warState kennen nur diese drei, s. initTerritories()) -- die
+    // vier zusätzlichen Kaiserwahl-Electors (ai4-ai7) dürfen dem Spieler
+    // nicht den Krieg erklären können, dafür existiert schlicht keine
+    // Kriegskarten-Infrastruktur (Militärbalance/Kriegsökonomie bleiben
+    // unverändert auf die ursprünglichen drei begrenzt, §145/§146).
+    if (!state.warState || !(aiId in state.warState)) continue;
     // Kriegskarte: eine bereits andauernde Kampagne (state.warState) läuft über
     // die Gebietsangriffe (aiTerritoryCounterAttack), kein zweites "erklärt
     // Krieg"-Ereignis nötig; ebenso keine neue Kriegserklärung gegen eine
     // bereits vollständig eroberte (vasallisierte) Region.
-    if (state.warState && state.warState[aiId]) continue;
+    if (state.warState[aiId]) continue;
     if (state.regions[aiId] && state.regions[aiId].conquered) continue;
     if ((state.aiWarCooldown[aiId] || 0) > 0) { state.aiWarCooldown[aiId] -= 1; continue; }
     // Militärische Schwäche allein reicht nicht — es braucht auch eine wirklich
@@ -374,6 +382,7 @@ function declareWar(state, aiId) {
   if (hadPact) state.prestige = Math.max(0, state.prestige - cfg.breakPactPrestigePenalty);
 
   state.warState[aiId] = true;
+  checkPromiseViolationOnWarDeclared(state, aiId); // §Phase-12: bricht ggf. ein "no_war_target"-Wahlversprechen
   const report = `Krieg gegen ${region.name} erklärt! Die Kampagne beginnt — erobere ihre Gebiete auf der Kriegskarte.\n${allyLines.join(" ")}`;
   addChronicle(state, report.replace(/\n/g, " "));
 
