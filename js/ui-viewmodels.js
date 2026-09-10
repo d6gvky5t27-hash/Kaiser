@@ -853,6 +853,14 @@ function getCharacterDetailViewModel(state, characterId) {
     stageText: THREAD_STAGE_TEXT[currentThread.status] || "Die Geschichte entwickelt sich weiter.",
   } : null;
 
+  // §Phase-11: "politische Rolle" -- ob dieser Charakter gerade Wortführer
+  // eines Standes ist (state.estates[*].leaderId, siehe js/estates.js).
+  // Nur in der ausführlichen Detailansicht (nicht auf der kleinen
+  // charCard, siehe getCharacterRoleLabel()) -- dort würde eine zweite
+  // Rollenzeile neben roleLabel eng.
+  const estateId = ESTATE_IDS.find(id => state.estates[id].leaderId === characterId);
+  const estateRole = estateId ? `Wortführer ${ESTATE_GENITIVE[estateId]}` : null;
+
   return {
     ...card,
     house: c.surname || "", health: c.alive ? Math.round(c.health) : null,
@@ -860,7 +868,7 @@ function getCharacterDetailViewModel(state, characterId) {
     relationship: (!isRuler && !isForeignRuler && c.alive) ? getRelationshipDisplayViewModel(state, characterId, state.rulerId) : null,
     loyaltyBreakdown: (!isForeignRuler && c.alive) ? getLoyaltyDisplayViewModel(state, characterId) : null,
     memoryTimeline, hiddenMemoryCount: hiddenCount, totalMemoryCount: allMems.length,
-    currentStory, isForeignRuler,
+    currentStory, isForeignRuler, estateRole,
     spouseId: c.spouseId, parentId: c.parentId, childrenIds: c.childrenIds.slice(),
   };
 }
@@ -888,6 +896,68 @@ function getCourtViewModel(state) {
     rulerCard: ruler ? getCharacterCardViewModel(state, state.rulerId) : null,
     spouseCard, heirCard: heirId ? getCharacterCardViewModel(state, heirId) : null,
     offices,
+  };
+}
+
+// ---------- Landstände (§Phase-11 "Living Realm") ----------
+// Reine Präsentationsschicht über js/estates.js's getEstateSummary() --
+// keine eigene Berechnung, nur menschenlesbare Labels für die dort bereits
+// vollständig berechneten Rohwerte (Interessen-Themen/Privileg-IDs sind in
+// js/estates.js/event-chains.js bewusst technische, kurze Bezeichner, siehe
+// dortige Kommentare -- hier nur die Übersetzung fürs UI).
+const ESTATE_INTEREST_LABELS = {
+  steuerlast: "Hohe Steuerlast", hofamt: "Fehlende Vertretung bei Hofe",
+  kriegsbeteiligung: "Im Krieg übergangen", kirchlicher_einfluss: "Schwindender kirchlicher Einfluss",
+  zoelle: "Hohe Zölle", wirtschaftlicher_einfluss: "Fehlender wirtschaftlicher Einfluss",
+  nahrungssicherheit: "Nahrungsmangel", steuererleichterung: "Drückende Abgaben",
+};
+const ESTATE_PRIVILEGE_LABELS = {
+  mitsprache: "Mitspracherecht bei Hofe", lehnsehre_bestaetigt: "Lehnsehre bestätigt",
+  handelsfreiheit: "Handelsfreiheit", abgabenerleichterung: "Abgabenerleichterung",
+  steuerbefreiung: "Steuerbefreiung der Kirche",
+};
+// Genitiv je Stand -- grammatisches Geschlecht unterscheidet sich ("des
+// Adels"/"des Bürgertums" vs. "der Geistlichkeit"/"der Bauernschaft"),
+// dieselbe Zuordnung wie getCharacterDetailViewModel()s estateRole-Feld.
+const ESTATE_GENITIVE = { adel: "des Adels", geistlichkeit: "der Geistlichkeit", buergertum: "des Bürgertums", bauernschaft: "der Bauernschaft" };
+
+function getEstateCardViewModel(state, estateId) {
+  const s = getEstateSummary(state, estateId);
+  const leaderCard = s.leaderId ? getCharacterCardViewModel(state, s.leaderId) : null;
+  const topInterest = s.interests.length
+    ? s.interests.slice().sort((a, b) => b.strength - a.strength)[0]
+    : null;
+  return {
+    id: estateId, name: s.name,
+    satisfaction: Math.round(s.satisfaction), influence: s.influence,
+    populationSharePct: Math.round(s.populationShare * 100),
+    leaderCard,
+    interestCount: s.interests.length,
+    topInterestLabel: topInterest ? (ESTATE_INTEREST_LABELS[topInterest.topic] || topInterest.topic) : null,
+    privilegeCount: s.privileges.length,
+    demandEligible: s.demandEligibility.eligible,
+    hasActiveChain: !!s.activeChainId,
+  };
+}
+
+function getEstatesOverviewViewModel(state) {
+  return ESTATE_IDS.map(id => getEstateCardViewModel(state, id));
+}
+
+function getEstateDetailViewModel(state, estateId) {
+  const s = getEstateSummary(state, estateId);
+  const leaderCard = s.leaderId ? getCharacterCardViewModel(state, s.leaderId) : null;
+  return {
+    id: estateId, name: s.name, genitiveName: ESTATE_GENITIVE[estateId],
+    satisfaction: Math.round(s.satisfaction),
+    populationSharePct: Math.round(s.populationShare * 100),
+    wealthSharePct: Math.round(s.wealthShare * 100),
+    influence: s.influence, influenceBreakdown: s.influenceBreakdown,
+    leaderCard, leaderId: s.leaderId,
+    interests: s.interests.map(i => ({ topic: i.topic, label: ESTATE_INTEREST_LABELS[i.topic] || i.topic, strength: i.strength })),
+    privileges: s.privileges.map(p => ESTATE_PRIVILEGE_LABELS[p] || p),
+    demandEligible: s.demandEligibility.eligible, demandChecks: s.demandEligibility.checks,
+    hasActiveChain: !!s.activeChainId,
   };
 }
 
@@ -1182,6 +1252,10 @@ const EVENT_CATEGORY_INFO = {
   religion:   { domainLabel: "GLAUBE",     accentVar: "--purple",     icon: "chapel" },
   war:        { domainLabel: "KRIEG",      accentVar: "--red-muted",  icon: "sword" },
   imperial:   { domainLabel: "POLITIK",    accentVar: "--gold",       icon: "crown" },
+  // §Phase-11: kein neues Icon gezeichnet -- "seal" (Siegel) passt inhaltlich
+  // bereits zu einer förmlichen Forderung/einem gewährten Privileg und
+  // existiert bereits (buildEventMotifSvg() fällt ohnehin auf "seal" zurück).
+  staende:    { domainLabel: "STÄNDE",     accentVar: "--accent",     icon: "seal" },
 };
 // §8/9: bestehende Eventtypen auf die Kategorien abgebildet -- keine
 // Kategorie ohne reales Vorbild erfunden; ohne sauberen Treffer bleibt es
@@ -1201,6 +1275,9 @@ const CHAIN_EVENT_CATEGORY = {
   famine_crisis: "famine", trade_conflict: "trade", border_conflict: "border",
   dynastic_marriage: "marriage", church_conflict: "religion", rising_rival: "rivalry",
   imperial_ambition: "imperial",
+  // §Phase-11: alle sechs Landstände-Ketten teilen sich die neue STÄNDE-Kategorie.
+  adel_hofamt: "staende", adel_krieg: "staende", staedte_handel: "staende",
+  bauern_nahrung: "staende", kirche_herrscher: "staende", staende_gegeneinander: "staende",
 };
 function getEventCategory(state, ev) {
   if (!ev) return null;
@@ -1243,8 +1320,16 @@ function getStoryContextViewModel(state, ev) {
   const thread = getThreadForChain(state, ev.chainId);
   const originMemoryId = chain.originatingMemoryIds && chain.originatingMemoryIds[0];
   const originMemory = originMemoryId ? state.memories.byId[originMemoryId] : null;
+  // §Phase-11-Fund: `chain.name` existiert nicht (startEventChain() speichert
+  // nur `templateId`, nie `name`, auf der Chain-Instanz selbst -- `name`
+  // lebt ausschließlich im CHAIN_TEMPLATES-Eintrag). Bisher unbemerkt, weil
+  // JEDE der 10 Phase-5-Ketten über CHAIN_THREAD_TYPE (js/story-threads.js)
+  // immer einen Thread bekam, `thread` also nie falsy war -- die neuen
+  // Stände-Ketten haben (noch) keinen Thread-Typ und waren die ersten, die
+  // diesen Pfad tatsächlich durchlaufen (zeigte zuvor "undefined" im UI).
+  const tpl = CHAIN_TEMPLATES[chain.templateId];
   return {
-    threadTitle: thread ? thread.title : chain.name,
+    threadTitle: thread ? thread.title : (tpl ? tpl.name : "Ereignis"),
     stageText: thread ? (THREAD_STAGE_TEXT[thread.status] || "Die Geschichte entwickelt sich weiter.") : null,
     // §20: max. 3-4 relevante Beats aus der echten Chain-Historie.
     timeline: chain.history.slice(-4).map(h => ({ year: h.year, note: h.note || h.choice || h.event })),

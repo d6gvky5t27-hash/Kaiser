@@ -758,6 +758,20 @@
   .diploActionsGroup button { margin: 2px 4px 2px 0; }
 
   /* ============================================================
+     §Phase-11 "Living Realm": Landstände -- dieselbe Karten-/Detail-
+     Zweiteilung wie DIPLOMATIE (.diploPowerRow/.diploDetailHead), nur als
+     Raster statt einer Liste (nur 4 Stände, keine Sortier-/Filterleiste
+     nötig). ============================================================ */
+  .staendeGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--sp-2); margin-bottom: var(--sp-3); }
+  .staendeCard {
+    cursor: pointer; background: rgba(242,230,201,0.5); border: 2px solid var(--ink); border-radius: var(--r-sm);
+    padding: var(--sp-2); transition: background 0.15s ease, box-shadow 0.15s ease;
+  }
+  .staendeCard:hover, .staendeCard:focus-visible, .staendeCard.selected { background: rgba(242,230,201,0.85); box-shadow: var(--shadow-sm); outline: 2px solid var(--gold); outline-offset: 1px; }
+  .staendeCard .staendeCardName { font-family: var(--font-display); font-weight: 600; font-size: var(--fs-body); margin-bottom: 4px; }
+  .staendeCard .popGroupBar { cursor: default; padding: 1px 0; }
+
+  /* ============================================================
      §Phase-8F "Events + Story Threads Redesign": aus Textboxen werden
      historische Szenen. Event-Hierarchie (§2), Illustrationssystem (§7-12),
      Entscheidungskarten statt Buttons (§23/24), Story-Kontext (§18-21).
@@ -1356,6 +1370,7 @@
       <button id="tabDiplomatie" class="pagetab">🤝<span data-i18n="tab_diplomatie_label">DIPLOMATIE</span></button>
       <button id="tabKarte" class="pagetab">🗺<span data-i18n="tab_karte_label">GEBÄUDE</span></button>
       <button id="tabMilitaer" class="pagetab">⚔<span data-i18n="tab_militaer_label">MILITÄR</span></button>
+      <button id="tabStaende" class="pagetab">⚖<span data-i18n="tab_staende_label">LANDSTÄNDE</span></button>
     </div>
 
     <div id="pagecontent">
@@ -1591,6 +1606,14 @@
     <div id="warMenu"></div>
   </div>
 
+  <div id="staendePage" style="display:none;">
+    <div class="panel">
+      <h2 class="title">LANDSTÄNDE</h2>
+      <div id="staendeGrid" class="staendeGrid"></div>
+      <div id="staendeDetailPanel"></div>
+    </div>
+  </div>
+
     </div>
   </div>
 
@@ -1675,6 +1698,11 @@
       <b>Drama-Director-Panel (§Phase-6-Punkt 54):</b><br>
       <button onclick="doShowDramaDebug()">Anzeigen</button>
       <div id="dramaDebugOutput" style="margin-top:var(--sp-2); white-space:pre-line; max-height:300px; overflow-y:auto; border:2px solid #0a0c11; padding:6px; background:rgba(0,0,0,0.05);"></div>
+    </div>
+    <div style="margin-top:var(--sp-2);">
+      <b>Landstände-Debug (§Phase-11 — Einfluss/Zufriedenheit/Interessen/Forderungsfähigkeit je Stand):</b><br>
+      <button onclick="doShowEstatesDebug()">Anzeigen</button>
+      <div id="estatesDebugOutput" style="margin-top:var(--sp-2); white-space:pre-line; max-height:300px; overflow-y:auto; border:2px solid #0a0c11; padding:6px; background:rgba(0,0,0,0.05);"></div>
     </div>
     <div style="margin-top:var(--sp-2);">
       <b>Chronik-Kandidaten (§Phase-7-Punkt 56-58 — Memory/Importance/Always?/Score/Aufgenommen?/Warum):</b><br>
@@ -12387,6 +12415,14 @@ function getCharacterDetailViewModel(state, characterId) {
     stageText: THREAD_STAGE_TEXT[currentThread.status] || "Die Geschichte entwickelt sich weiter.",
   } : null;
 
+  // §Phase-11: "politische Rolle" -- ob dieser Charakter gerade Wortführer
+  // eines Standes ist (state.estates[*].leaderId, siehe js/estates.js).
+  // Nur in der ausführlichen Detailansicht (nicht auf der kleinen
+  // charCard, siehe getCharacterRoleLabel()) -- dort würde eine zweite
+  // Rollenzeile neben roleLabel eng.
+  const estateId = ESTATE_IDS.find(id => state.estates[id].leaderId === characterId);
+  const estateRole = estateId ? `Wortführer ${ESTATE_GENITIVE[estateId]}` : null;
+
   return {
     ...card,
     house: c.surname || "", health: c.alive ? Math.round(c.health) : null,
@@ -12394,7 +12430,7 @@ function getCharacterDetailViewModel(state, characterId) {
     relationship: (!isRuler && !isForeignRuler && c.alive) ? getRelationshipDisplayViewModel(state, characterId, state.rulerId) : null,
     loyaltyBreakdown: (!isForeignRuler && c.alive) ? getLoyaltyDisplayViewModel(state, characterId) : null,
     memoryTimeline, hiddenMemoryCount: hiddenCount, totalMemoryCount: allMems.length,
-    currentStory, isForeignRuler,
+    currentStory, isForeignRuler, estateRole,
     spouseId: c.spouseId, parentId: c.parentId, childrenIds: c.childrenIds.slice(),
   };
 }
@@ -12422,6 +12458,68 @@ function getCourtViewModel(state) {
     rulerCard: ruler ? getCharacterCardViewModel(state, state.rulerId) : null,
     spouseCard, heirCard: heirId ? getCharacterCardViewModel(state, heirId) : null,
     offices,
+  };
+}
+
+// ---------- Landstände (§Phase-11 "Living Realm") ----------
+// Reine Präsentationsschicht über js/estates.js's getEstateSummary() --
+// keine eigene Berechnung, nur menschenlesbare Labels für die dort bereits
+// vollständig berechneten Rohwerte (Interessen-Themen/Privileg-IDs sind in
+// js/estates.js/event-chains.js bewusst technische, kurze Bezeichner, siehe
+// dortige Kommentare -- hier nur die Übersetzung fürs UI).
+const ESTATE_INTEREST_LABELS = {
+  steuerlast: "Hohe Steuerlast", hofamt: "Fehlende Vertretung bei Hofe",
+  kriegsbeteiligung: "Im Krieg übergangen", kirchlicher_einfluss: "Schwindender kirchlicher Einfluss",
+  zoelle: "Hohe Zölle", wirtschaftlicher_einfluss: "Fehlender wirtschaftlicher Einfluss",
+  nahrungssicherheit: "Nahrungsmangel", steuererleichterung: "Drückende Abgaben",
+};
+const ESTATE_PRIVILEGE_LABELS = {
+  mitsprache: "Mitspracherecht bei Hofe", lehnsehre_bestaetigt: "Lehnsehre bestätigt",
+  handelsfreiheit: "Handelsfreiheit", abgabenerleichterung: "Abgabenerleichterung",
+  steuerbefreiung: "Steuerbefreiung der Kirche",
+};
+// Genitiv je Stand -- grammatisches Geschlecht unterscheidet sich ("des
+// Adels"/"des Bürgertums" vs. "der Geistlichkeit"/"der Bauernschaft"),
+// dieselbe Zuordnung wie getCharacterDetailViewModel()s estateRole-Feld.
+const ESTATE_GENITIVE = { adel: "des Adels", geistlichkeit: "der Geistlichkeit", buergertum: "des Bürgertums", bauernschaft: "der Bauernschaft" };
+
+function getEstateCardViewModel(state, estateId) {
+  const s = getEstateSummary(state, estateId);
+  const leaderCard = s.leaderId ? getCharacterCardViewModel(state, s.leaderId) : null;
+  const topInterest = s.interests.length
+    ? s.interests.slice().sort((a, b) => b.strength - a.strength)[0]
+    : null;
+  return {
+    id: estateId, name: s.name,
+    satisfaction: Math.round(s.satisfaction), influence: s.influence,
+    populationSharePct: Math.round(s.populationShare * 100),
+    leaderCard,
+    interestCount: s.interests.length,
+    topInterestLabel: topInterest ? (ESTATE_INTEREST_LABELS[topInterest.topic] || topInterest.topic) : null,
+    privilegeCount: s.privileges.length,
+    demandEligible: s.demandEligibility.eligible,
+    hasActiveChain: !!s.activeChainId,
+  };
+}
+
+function getEstatesOverviewViewModel(state) {
+  return ESTATE_IDS.map(id => getEstateCardViewModel(state, id));
+}
+
+function getEstateDetailViewModel(state, estateId) {
+  const s = getEstateSummary(state, estateId);
+  const leaderCard = s.leaderId ? getCharacterCardViewModel(state, s.leaderId) : null;
+  return {
+    id: estateId, name: s.name, genitiveName: ESTATE_GENITIVE[estateId],
+    satisfaction: Math.round(s.satisfaction),
+    populationSharePct: Math.round(s.populationShare * 100),
+    wealthSharePct: Math.round(s.wealthShare * 100),
+    influence: s.influence, influenceBreakdown: s.influenceBreakdown,
+    leaderCard, leaderId: s.leaderId,
+    interests: s.interests.map(i => ({ topic: i.topic, label: ESTATE_INTEREST_LABELS[i.topic] || i.topic, strength: i.strength })),
+    privileges: s.privileges.map(p => ESTATE_PRIVILEGE_LABELS[p] || p),
+    demandEligible: s.demandEligibility.eligible, demandChecks: s.demandEligibility.checks,
+    hasActiveChain: !!s.activeChainId,
   };
 }
 
@@ -12716,6 +12814,10 @@ const EVENT_CATEGORY_INFO = {
   religion:   { domainLabel: "GLAUBE",     accentVar: "--purple",     icon: "chapel" },
   war:        { domainLabel: "KRIEG",      accentVar: "--red-muted",  icon: "sword" },
   imperial:   { domainLabel: "POLITIK",    accentVar: "--gold",       icon: "crown" },
+  // §Phase-11: kein neues Icon gezeichnet -- "seal" (Siegel) passt inhaltlich
+  // bereits zu einer förmlichen Forderung/einem gewährten Privileg und
+  // existiert bereits (buildEventMotifSvg() fällt ohnehin auf "seal" zurück).
+  staende:    { domainLabel: "STÄNDE",     accentVar: "--accent",     icon: "seal" },
 };
 // §8/9: bestehende Eventtypen auf die Kategorien abgebildet -- keine
 // Kategorie ohne reales Vorbild erfunden; ohne sauberen Treffer bleibt es
@@ -12735,6 +12837,9 @@ const CHAIN_EVENT_CATEGORY = {
   famine_crisis: "famine", trade_conflict: "trade", border_conflict: "border",
   dynastic_marriage: "marriage", church_conflict: "religion", rising_rival: "rivalry",
   imperial_ambition: "imperial",
+  // §Phase-11: alle sechs Landstände-Ketten teilen sich die neue STÄNDE-Kategorie.
+  adel_hofamt: "staende", adel_krieg: "staende", staedte_handel: "staende",
+  bauern_nahrung: "staende", kirche_herrscher: "staende", staende_gegeneinander: "staende",
 };
 function getEventCategory(state, ev) {
   if (!ev) return null;
@@ -12777,8 +12882,16 @@ function getStoryContextViewModel(state, ev) {
   const thread = getThreadForChain(state, ev.chainId);
   const originMemoryId = chain.originatingMemoryIds && chain.originatingMemoryIds[0];
   const originMemory = originMemoryId ? state.memories.byId[originMemoryId] : null;
+  // §Phase-11-Fund: `chain.name` existiert nicht (startEventChain() speichert
+  // nur `templateId`, nie `name`, auf der Chain-Instanz selbst -- `name`
+  // lebt ausschließlich im CHAIN_TEMPLATES-Eintrag). Bisher unbemerkt, weil
+  // JEDE der 10 Phase-5-Ketten über CHAIN_THREAD_TYPE (js/story-threads.js)
+  // immer einen Thread bekam, `thread` also nie falsy war -- die neuen
+  // Stände-Ketten haben (noch) keinen Thread-Typ und waren die ersten, die
+  // diesen Pfad tatsächlich durchlaufen (zeigte zuvor "undefined" im UI).
+  const tpl = CHAIN_TEMPLATES[chain.templateId];
   return {
-    threadTitle: thread ? thread.title : chain.name,
+    threadTitle: thread ? thread.title : (tpl ? tpl.name : "Ereignis"),
     stageText: thread ? (THREAD_STAGE_TEXT[thread.status] || "Die Geschichte entwickelt sich weiter.") : null,
     // §20: max. 3-4 relevante Beats aus der echten Chain-Historie.
     timeline: chain.history.slice(-4).map(h => ({ year: h.year, note: h.note || h.choice || h.event })),
@@ -13293,6 +13406,8 @@ let selectedRegionContextTab = 'overview';
 let selectedDiploPower = null;
 let diploFilter = 'all';
 let diploSort = 'relation';
+// §Phase-11: Landstände-Ansicht -- gewählter Stand fürs Detailpanel, rein UI-seitiger Zustand.
+let selectedEstateId = null;
 
 // ---------- Start-/Charaktererstellungsbildschirm (§8/§89) ----------
 function showTitleScreen() {
@@ -13843,6 +13958,37 @@ ELIGIBLE CHAINS MIT DIRECTOR-SCORE
 ${scoreLines}`;
 }
 
+// §Phase-11: Landstände-Debug — für jeden der 4 Stände dieselben Rohwerte,
+// die js/estates.js für die Spieler-UI und die 6 Eventketten berechnet
+// (getEstateSummary()) — keine zweite Debug-Berechnung, nur Textformatierung.
+function doShowEstatesDebug() {
+  const out = document.getElementById('estatesDebugOutput');
+  const blocks = ESTATE_IDS.map(id => {
+    const s = getEstateSummary(state, id);
+    const leader = s.leaderId ? state.characters[s.leaderId] : null;
+    const breakdownLines = s.influenceBreakdown.map(c => `    ${c.value >= 0 ? '+' : ''}${c.value}  ${c.label}`).join('\n');
+    const interestLines = s.interests.length ? s.interests.map(i => `    ${i.topic} (Stärke ${i.strength})`).join('\n') : '    (keine)';
+    const checkLines = s.demandEligibility.checks.map(c => `    ${c.passed ? '✓' : '✗'} ${c.label}`).join('\n');
+    return `=== ${s.name.toUpperCase()} (${id}) ===
+Zufriedenheit: ${s.satisfaction} · Bevölkerungsanteil: ${Math.round(s.populationShare * 100)}% · Wohlstandsanteil: ${Math.round(s.wealthShare * 100)}%
+Wortführer: ${leader ? (leader.name + ' ' + (leader.surname || '')).trim() : '(keiner)'}
+
+EINFLUSS: ${s.influence}
+${breakdownLines}
+
+INTERESSEN
+${interestLines}
+
+PRIVILEGIEN: ${s.privileges.length ? s.privileges.join(', ') : '(keine)'}
+LETZTE FORDERUNG: Jahr ${s.lastDemandYear || '(nie)'}
+AKTIVE KETTE: ${s.activeChainId || '(keine)'}
+
+FORDERUNGSFÄHIG: ${s.demandEligibility.eligible ? 'JA' : 'NEIN'}
+${checkLines}`;
+  });
+  out.textContent = blocks.join('\n\n');
+}
+
 // §Phase-7-Punkt 56-58: Chronik-Kandidaten-Debug — zeigt für eine gewählte
 // Memory exakt dieselbe isChronicleWorthy()-Logik wie computeDynastyChronicle()
 // selbst (eine Quelle der Wahrheit, keine zweite Debug-Logik).
@@ -13960,6 +14106,7 @@ function switchPage(page) {
   document.getElementById('diplomatiePage').style.display = page === 'diplomatie' ? 'block' : 'none';
   document.getElementById('mapview').style.display = page === 'karte' ? 'block' : 'none';
   document.getElementById('militaryview').style.display = page === 'militaer' ? 'block' : 'none';
+  document.getElementById('staendePage').style.display = page === 'staende' ? 'block' : 'none';
   document.getElementById('tabReich').classList.toggle('active', page === 'reich');
   document.getElementById('tabProvinz').classList.toggle('active', page === 'provinz');
   document.getElementById('tabHof').classList.toggle('active', page === 'hof');
@@ -13969,6 +14116,7 @@ function switchPage(page) {
   document.getElementById('tabDiplomatie').classList.toggle('active', page === 'diplomatie');
   document.getElementById('tabKarte').classList.toggle('active', page === 'karte');
   document.getElementById('tabMilitaer').classList.toggle('active', page === 'militaer');
+  document.getElementById('tabStaende').classList.toggle('active', page === 'staende');
   render();
 }
 document.getElementById('tabReich').addEventListener('click', () => switchPage('reich'));
@@ -13980,6 +14128,7 @@ document.getElementById('tabWirtschaft').addEventListener('click', () => switchP
 document.getElementById('tabDiplomatie').addEventListener('click', () => switchPage('diplomatie'));
 document.getElementById('tabKarte').addEventListener('click', () => switchPage('karte'));
 document.getElementById('tabMilitaer').addEventListener('click', () => switchPage('militaer'));
+document.getElementById('tabStaende').addEventListener('click', () => switchPage('staende'));
 
 // §Phase-8C.1-Punkt 34: Event-Delegation statt Pro-Render-Listener --
 // #worldMapTerritories wird bei jedem renderWorldMap() per innerHTML neu
@@ -14209,6 +14358,7 @@ function render() {
   // Diplomatie (§Phase-8E: eigene Render-Funktion wie Hof/Dynastie, nur bei
   // Bedarf gerendert -- siehe renderDiplomacyPage() weiter unten).
   if (currentPage === 'diplomatie') renderDiplomacyPage();
+  if (currentPage === 'staende') renderStaendePage();
 
   // Chronik
   document.getElementById('chronicle').innerHTML = state.chronicle.slice(0,30).map(l => `<div>${l}</div>`).join('');
@@ -15645,6 +15795,7 @@ function renderCharacterDetailHtml(vm) {
   html += `<div class="charDetailHead"><div class="${portraitCls}">${buildPortraitSvg(vm.portrait)}</div><div>
     <div class="charCardName" style="font-size:var(--fs-lg);">${vm.roleLabel}</div>
     <div class="charCardMeta">Haus ${vm.house || '–'} · ${vm.age} Jahre${vm.health !== null ? ' · Gesundheit ' + vm.health + '/100' : ''}</div>
+    ${vm.estateRole ? `<div class="charCardMeta" style="color:var(--accent);">${vm.estateRole}</div>` : ''}
     <div class="charCardBadges" style="margin-top:6px;">
       ${vm.loyalty !== null ? `<span class="loyaltyPill lvl-${vm.loyalty >= 65 ? 'hoch' : (vm.loyalty >= 35 ? 'mittel' : 'niedrig')}">Loyalität ${vm.loyalty}</span>` : ''}
       ${vm.claims.map(cl => `<span class="claimBadge strength-${cl.strength}" data-tip="${cl.reasonLabel}">${cl.strengthLabel}</span>`).join('')}
@@ -16422,6 +16573,78 @@ const BUILDING_ICONS = {
   kornmuehle: `<rect x="5" y="7" width="10" height="10" fill="${P.stein}"/><polygon points="5,7 15,7 10,2" fill="${P.steinDunkel}"/><circle cx="17" cy="12" r="4" fill="none" stroke="${P.wasserHell}" stroke-width="1.4"/><line x1="17" y1="8" x2="17" y2="16" stroke="${P.wasserHell}" stroke-width="1"/><line x1="13" y1="12" x2="21" y2="12" stroke="${P.wasserHell}" stroke-width="1"/>`,
   baeckerei: `<rect x="3" y="9" width="14" height="8" fill="${P.steinDunkel}"/><polygon points="2,9 10,4 18,9" fill="${P.dach}"/><ellipse cx="7" cy="14" rx="2.4" ry="1.5" fill="${P.stroh}"/><ellipse cx="12" cy="14" rx="2.4" ry="1.5" fill="${P.dach}"/>`,
 };
+
+// §Phase-11 "Living Realm": Landstände-Ansicht -- Kartenraster + Detailpanel,
+// derselbe Auswahl-Mechanismus wie renderDiplomacyPage()/selectDiploPower()
+// oben, nur ohne Filter/Sortierung (nur 4 Stände).
+function renderStaendePage() {
+  const overview = getEstatesOverviewViewModel(state);
+  if (!overview.find(e => e.id === selectedEstateId)) selectedEstateId = overview.length ? overview[0].id : null;
+
+  document.getElementById('staendeGrid').innerHTML = overview.map(e => {
+    const statusBadge = e.hasActiveChain
+      ? '<span class="warnBadge">Forderung läuft</span>'
+      : (e.demandEligible ? '<span class="warnBadge">unruhig</span>' : '');
+    return `<div class="staendeCard${selectedEstateId === e.id ? ' selected' : ''}" tabindex="0" role="button"
+        data-tip="${e.name} -- Zufriedenheit ${e.satisfaction}, Einfluss ${e.influence}"
+        onclick="selectEstate('${e.id}')" onkeydown="if(event.key==='Enter')selectEstate('${e.id}')">
+      <div class="staendeCardName">${e.name} ${statusBadge}</div>
+      <div class="popGroupBar">
+        <span class="popGroupBarName">Zufriedenheit</span>
+        <span class="popGroupBarTrack"><span class="popGroupBarFill" style="width:${e.satisfaction}%;"></span></span>
+        <span class="popGroupBarPct">${e.satisfaction}</span>
+      </div>
+      <div class="popGroupBar">
+        <span class="popGroupBarName">Einfluss</span>
+        <span class="popGroupBarTrack"><span class="popGroupBarFill" style="width:${e.influence}%; background:var(--gold);"></span></span>
+        <span class="popGroupBarPct">${e.influence}</span>
+      </div>
+      <div class="charCardMeta">${e.leaderCard ? 'Wortführer: ' + e.leaderCard.fullName : 'Kein Wortführer'}</div>
+      ${e.topInterestLabel ? `<div class="charCardMeta">Anliegen: ${e.topInterestLabel}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  if (!selectedEstateId) { document.getElementById('staendeDetailPanel').innerHTML = ''; return; }
+  const detail = getEstateDetailViewModel(state, selectedEstateId);
+  document.getElementById('staendeDetailPanel').innerHTML = renderEstateDetailHtml(detail);
+}
+function selectEstate(id) { selectedEstateId = id; render(); }
+
+function renderEstateDetailHtml(vm) {
+  let html = `<h3>${vm.name}</h3>`;
+  if (vm.leaderCard) {
+    const portraitCls = ['charPortrait', 'rank-' + vm.leaderCard.portrait.rank, !vm.leaderCard.alive ? 'dead' : ''].filter(Boolean).join(' ');
+    html += `<div class="charDetailHead" style="cursor:pointer;" onclick="openCharacterDetail('${vm.leaderId}')" data-tip="Charakterdetails öffnen">
+      <div class="${portraitCls}">${buildPortraitSvg(vm.leaderCard.portrait)}</div>
+      <div>
+        <div class="charCardName">${vm.leaderCard.fullName}</div>
+        <div class="charCardMeta">Wortführer ${vm.genitiveName}</div>
+      </div>
+    </div>`;
+  } else {
+    html += `<p><i>Dieser Stand hat derzeit keinen Wortführer bei Hofe.</i></p>`;
+  }
+
+  html += `<h4>Zufriedenheit &amp; Einfluss</h4>
+    <div class="popGroupBar"><span class="popGroupBarName">Zufriedenheit</span><span class="popGroupBarTrack"><span class="popGroupBarFill" style="width:${vm.satisfaction}%;"></span></span><span class="popGroupBarPct">${vm.satisfaction}</span></div>
+    <div class="popGroupBar"><span class="popGroupBarName">Einfluss</span><span class="popGroupBarTrack"><span class="popGroupBarFill" style="width:${vm.influence}%; background:var(--gold);"></span></span><span class="popGroupBarPct">${vm.influence}</span></div>
+    <div class="charCardMeta">Bevölkerungsanteil ${vm.populationSharePct}% · Wohlstandsanteil ${vm.wealthSharePct}%</div>
+    <details style="margin-top:var(--sp-1);"><summary>Einfluss-Aufschlüsselung</summary>
+      ${vm.influenceBreakdown.map(c => `<div>${c.value >= 0 ? '+' : ''}${c.value} — ${c.label}</div>`).join('')}
+    </details>`;
+
+  html += `<h4>Interessen</h4>`;
+  html += vm.interests.length
+    ? `<div class="charCardBadges">${vm.interests.map(i => `<span class="traitBadge" data-tip="Stärke ${i.strength}">${i.label}</span>`).join('')}</div>`
+    : `<p><i>Derzeit keine besonderen Anliegen.</i></p>`;
+
+  html += `<h4>Privilegien</h4>`;
+  html += vm.privileges.length
+    ? `<div class="charCardBadges">${vm.privileges.map(p => `<span class="traitBadge">${p}</span>`).join('')}</div>`
+    : `<p><i>Keine besonderen Privilegien gewährt.</i></p>`;
+
+  return html;
+}
 
 function renderBuildingIcon(type) {
   const shapes = BUILDING_ICONS[type] || `<rect x="4" y="8" width="12" height="9" fill="${P.stein}"/>`;

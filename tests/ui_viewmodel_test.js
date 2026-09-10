@@ -907,6 +907,38 @@ console.log('--- Phase 8H: RNG-Neutralitaet aller neuen ViewModels (§83) ---');
   check('kein einziger rnd()-Aufruf durch die Phase-8H-ViewModels', __rngCalls === before);
 })();
 
+// ---------- Phase 11: Landstände-ViewModels ----------
+console.log('--- Phase 11: Landstände-ViewModels ---');
+(function() {
+  const state = newGame({ seed: 2100 });
+  const overview = getEstatesOverviewViewModel(state);
+  check('getEstatesOverviewViewModel() liefert genau 4 Stände', overview.length === 4);
+  check('jede Karte hat name/satisfaction/influence als Zahl', overview.every(e => typeof e.name === 'string' && typeof e.satisfaction === 'number' && typeof e.influence === 'number'));
+  const detail = getEstateDetailViewModel(state, 'adel');
+  check('getEstateDetailViewModel() liefert einen korrekten Genitiv', detail.genitiveName === 'des Adels');
+  check('getEstateDetailViewModel(geistlichkeit) liefert einen korrekten Genitiv', getEstateDetailViewModel(state, 'geistlichkeit').genitiveName === 'der Geistlichkeit');
+  check('getEstateDetailViewModel(buergertum) liefert einen korrekten Genitiv', getEstateDetailViewModel(state, 'buergertum').genitiveName === 'des Bürgertums');
+  check('getEstateDetailViewModel(bauernschaft) liefert einen korrekten Genitiv', getEstateDetailViewModel(state, 'bauernschaft').genitiveName === 'der Bauernschaft');
+
+  const before = __rngCalls;
+  for (const id of ESTATE_IDS) { getEstateCardViewModel(state, id); getEstateDetailViewModel(state, id); }
+  check('kein einziger rnd()-Aufruf durch die Landstände-ViewModels', __rngCalls === before);
+})();
+
+// ---------- Phase 11-Fund: getStoryContextViewModel() bei Ketten ohne
+// Story-Thread (die neuen Stände-Ketten haben noch keinen CHAIN_THREAD_TYPE-
+// Eintrag) -- vorher lieferte dieser Pfad das literale JS-Wort "undefined"
+// (chain.name existiert nicht, nur CHAIN_TEMPLATES[templateId].name), weil
+// KEINE der zehn Phase-5-Ketten je threadlos war. ----------
+console.log('--- Phase 11: getStoryContextViewModel() ohne Story-Thread ---');
+(function() {
+  const state = newGame({ seed: 2101 });
+  const chain = startEventChain(state, 'bauern_nahrung', { actorIds: [], regionIds: ['player'], variables: { estateId: 'bauernschaft' } });
+  check('eine frisch gestartete Kette ohne CHAIN_THREAD_TYPE-Eintrag hat keinen Thread', chain.threadId === null);
+  const ctx = getStoryContextViewModel(state, { source: 'EVENT_CHAIN', chainId: chain.id });
+  check('threadTitle ist der echte Kettenname, nicht "undefined"', ctx.threadTitle === 'Die Bauern und die Nahrung');
+})();
+
 console.log('');
 if (failures > 0) { console.log(failures + ' Test(s) fehlgeschlagen.'); process.exit(1); }
 console.log('Alle UI-ViewModel-Tests bestanden.');
