@@ -206,12 +206,87 @@ console.log('--- Debug-Erklärung ---');
   check('nicht erfüllte Kette wird korrekt als "nicht eligible" markiert', explanation.eligible === false);
 })();
 
+// ---------- §Phase-12: Eligibility-Logik der fünf Kaiserwahl-Ketten ----------
+console.log('--- Phase 12: Kaiserwahl-Ketten Eligibility ---');
+function setupImperialCandidacy(seed) {
+  const state = newGame({ seed });
+  state.titleIndex = TITLES.findIndex(t => t.id === 'kurfuerst');
+  state.regions.player.buildings.push({ type: 'kathedrale', level: 1, plotIndex: -1 });
+  const res = declareImperialCandidacy(state);
+  if (!res.ok) throw new Error('setupImperialCandidacy fehlgeschlagen: ' + res.reason);
+  return state;
+}
+(function() {
+  const state = newGame({ seed: 40 });
+  check('unsicherer_kurfuerst ohne laufende Kandidatur: nicht eligible', !canStartUnsicherKurfuerstChain(state).eligible);
+})();
+(function() {
+  const state = setupImperialCandidacy(41);
+  for (const aiId of getElectorIds(state)) state.diplomacy[aiId].relation = 90; // klar dafür, nicht unentschlossen
+  check('unsicherer_kurfuerst ohne unentschlossenen Kurfürsten: nicht eligible', !canStartUnsicherKurfuerstChain(state).eligible);
+  state.diplomacy.ai1.relation = -20; // dämpft den Score unter die geneigt-Schwelle -> UNENTSCHLOSSEN
+  const elig = canStartUnsicherKurfuerstChain(state);
+  check('unsicherer_kurfuerst mit unentschlossenem Kurfürsten: eligible', elig.eligible && elig.payload.variables.aiId === 'ai1');
+})();
+(function() {
+  const state = setupImperialCandidacy(42);
+  check('teures_versprechen ohne baldige Zahlungsfrist: nicht eligible', !canStartTeuresVersprechenChain(state).eligible);
+  const res = createElectionPromise(state, 'ai1', 'pay_tribute', { amount: 100, durationYears: 5 });
+  check('teures_versprechen mit ferner Frist (5 Jahre): noch nicht eligible', !canStartTeuresVersprechenChain(state).eligible);
+  state.electionPromises.byId[res.promiseId].deadlineYear = state.year + 1;
+  const elig = canStartTeuresVersprechenChain(state);
+  check('teures_versprechen mit naher Frist (<=2 Jahre): eligible', elig.eligible && elig.payload.variables.promiseId === res.promiseId);
+})();
+(function() {
+  const state = setupImperialCandidacy(43);
+  check('rivalisierende_zusagen mit 0 aktiven Versprechen: nicht eligible', !canStartRivalisierendeZusagenChain(state).eligible);
+  createElectionPromise(state, 'ai1', 'pay_tribute', { amount: 50 });
+  check('rivalisierende_zusagen mit nur 1 aktivem Versprechen: nicht eligible', !canStartRivalisierendeZusagenChain(state).eligible);
+  createElectionPromise(state, 'ai2', 'pay_tribute', { amount: 50 });
+  const elig = canStartRivalisierendeZusagenChain(state);
+  check('rivalisierende_zusagen mit 2 aktiven Versprechen: eligible', elig.eligible && elig.payload.variables.promiseIds.length === 2);
+})();
+(function() {
+  const state = setupImperialCandidacy(44);
+  const res = createElectionPromise(state, 'ai1', 'no_war_target', { targetRegionId: 'ai2' });
+  check('gebrochenes_versprechen mit noch aktivem (nicht gebrochenem) Versprechen: nicht eligible', !canStartGebrochenesVersprechenChain(state).eligible);
+  breakElectionPromise(state, res.promiseId, 'Test');
+  const elig = canStartGebrochenesVersprechenChain(state);
+  check('gebrochenes_versprechen direkt nach einem Bruch: eligible', elig.eligible && elig.payload.variables.promiseId === res.promiseId);
+  state.electionPromises.byId[res.promiseId].grievanceHandled = true;
+  check('gebrochenes_versprechen nach bereits behandeltem Bruch: nicht mehr eligible (kein Dauerfeuer auf denselben Bruch)', !canStartGebrochenesVersprechenChain(state).eligible);
+})();
+(function() {
+  const state = setupImperialCandidacy(45);
+  check('deciding_vote ohne anstehende Wahl: nicht eligible', !canStartDecidingVoteChain(state).eligible);
+  state.pendingElection = true;
+  for (const aiId of getElectorIds(state)) state.diplomacy[aiId].relation = -100; // klare Niederlage, keine knappe Lage
+  check('deciding_vote bei klarer Niederlage (nicht knapp): nicht eligible', !canStartDecidingVoteChain(state).eligible);
+})();
+(function() {
+  // Eine knappe Lage braucht einen echten Rivalen -- ohne Gegenkandidat
+  // gewinnt der Spieler jede Stimme trivial (nichts, wogegen die Kurfürsten
+  // abwägen könnten, s. computeElectorScoreBreakdown()/resolveImperialElection()).
+  // Direkt über echte Diplomatie-Werte auf eine 4:3-Lage gebracht (drei
+  // Electors klar für den Rivalen, einer nur knapp), nicht künstlich simuliert.
+  const state = setupImperialCandidacy(46);
+  const rivalId = state.regions.ai1.rulerId;
+  state.imperialCandidacy.rivalCandidateIds = [rivalId];
+  state.pendingElection = true;
+  state.diplomacy.ai1.relation -= 60;
+  state.diplomacy.ai2.relation -= 60;
+  state.diplomacy.ai3.relation -= 22; // nur knapp zugunsten des Rivalen -- der eigentliche Wackelkandidat
+  const elig = canStartDecidingVoteChain(state);
+  check('deciding_vote bei einer 4:3-Lage: eligible und identifiziert den knappsten Wackelkandidaten', elig.eligible && elig.payload.variables.aiId === 'ai3');
+})();
+
 // ---------- Ergänzend: alle Templates + jede Option durchspielen ----------
 // Reines Passivspiel erreicht nur einen Teil der Ketten (siehe
 // phase5_event_chain_metrics_test.js) — dieser synthetische Smoke-Test
 // erzwingt für ALLE Templates (10 aus Phase 5 + 6 Landstände-Ketten aus
-// Phase 11) jede einzelne Entscheidungsoption, damit kein Code-Pfad
-// ungetestet bleibt, nur weil ihn passives Spiel nie erreicht.
+// Phase 11 + 5 Kaiserwahl-Ketten aus Phase 12) jede einzelne
+// Entscheidungsoption, damit kein Code-Pfad ungetestet bleibt, nur weil ihn
+// passives Spiel nie erreicht.
 console.log('--- Smoke-Test: alle Templates x alle Optionen ---');
 (function() {
   function freshRuler(seed) {
@@ -283,6 +358,36 @@ console.log('--- Smoke-Test: alle Templates x alle Optionen ---');
       return { actorIds: [id], regionIds: [], variables: { estateId: 'geistlichkeit' } };
     },
     staende_gegeneinander: (state) => ({ actorIds: [], regionIds: ['player'], variables: { estateIds: ['adel', 'buergertum'] } }),
+    // §Phase-12: die fünf Kaiserwahl-Ketten -- state.imperialCandidacy direkt
+    // im Shape von declareImperialCandidacy() gesetzt (dieselbe Isolationstechnik
+    // wie imperial_ambition oben), Versprechen über die ECHTEN CRUD-Funktionen
+    // aus js/imperial-politics.js erzeugt statt handgestrickter Objekte, damit
+    // der Smoke-Test dieselbe Form durchläuft wie im echten Spiel.
+    unsicherer_kurfuerst: (state) => {
+      state.imperialCandidacy = { declaredYear: state.year, rivalCandidateIds: [], giftsGivenThisCandidacy: {} };
+      return { actorIds: [state.regions.ai1.rulerId], regionIds: ['ai1'], variables: { aiId: 'ai1' } };
+    },
+    teures_versprechen: (state) => {
+      state.imperialCandidacy = { declaredYear: state.year, rivalCandidateIds: [], giftsGivenThisCandidacy: {} };
+      const res = createElectionPromise(state, 'ai1', 'pay_tribute', { amount: 100, durationYears: 2 });
+      return { actorIds: [state.regions.ai1.rulerId], regionIds: ['ai1'], variables: { promiseId: res.promiseId } };
+    },
+    rivalisierende_zusagen: (state) => {
+      state.imperialCandidacy = { declaredYear: state.year, rivalCandidateIds: [], giftsGivenThisCandidacy: {} };
+      const r1 = createElectionPromise(state, 'ai1', 'pay_tribute', { amount: 50 });
+      const r2 = createElectionPromise(state, 'ai2', 'pay_tribute', { amount: 50 });
+      return { actorIds: [state.regions.ai1.rulerId, state.regions.ai2.rulerId], regionIds: ['ai1', 'ai2'], variables: { promiseIds: [r1.promiseId, r2.promiseId] } };
+    },
+    gebrochenes_versprechen: (state) => {
+      state.imperialCandidacy = { declaredYear: state.year, rivalCandidateIds: [], giftsGivenThisCandidacy: {} };
+      const res = createElectionPromise(state, 'ai1', 'no_war_target', { targetRegionId: 'ai2' });
+      breakElectionPromise(state, res.promiseId, 'Test-Setup');
+      return { actorIds: [state.regions.ai1.rulerId], regionIds: ['ai1'], variables: { promiseId: res.promiseId } };
+    },
+    deciding_vote: (state) => {
+      state.imperialCandidacy = { declaredYear: state.year, rivalCandidateIds: [], giftsGivenThisCandidacy: {} };
+      return { actorIds: [state.regions.ai1.rulerId], regionIds: ['ai1'], variables: { aiId: 'ai1' } };
+    },
   };
 
   let seedCounter = 900;

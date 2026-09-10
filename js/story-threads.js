@@ -38,6 +38,13 @@ const CHAIN_THREAD_TYPE = {
   church_conflict: "RELIGIOUS_CONFLICT",
   dynastic_marriage: "DYNASTIC_ALLIANCE",
   imperial_ambition: "IMPERIAL_AMBITION",
+  // §Phase-12: dieselbe Geschichte wie imperial_ambition -- der Weg zur
+  // Kaiserkrone ist EIN Erzählbogen, keine fünf getrennten.
+  unsicherer_kurfuerst: "IMPERIAL_AMBITION",
+  teures_versprechen: "IMPERIAL_AMBITION",
+  rivalisierende_zusagen: "IMPERIAL_AMBITION",
+  gebrochenes_versprechen: "IMPERIAL_AMBITION",
+  deciding_vote: "IMPERIAL_AMBITION",
 };
 
 // ---------- Signal-Erkennung je Thread-Typ (§Punkt 9/10, kein RNG) ----------

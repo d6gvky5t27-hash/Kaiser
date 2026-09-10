@@ -7007,6 +7007,13 @@ const CHAIN_THREAD_TYPE = {
   church_conflict: "RELIGIOUS_CONFLICT",
   dynastic_marriage: "DYNASTIC_ALLIANCE",
   imperial_ambition: "IMPERIAL_AMBITION",
+  // §Phase-12: dieselbe Geschichte wie imperial_ambition -- der Weg zur
+  // Kaiserkrone ist EIN Erzählbogen, keine fünf getrennten.
+  unsicherer_kurfuerst: "IMPERIAL_AMBITION",
+  teures_versprechen: "IMPERIAL_AMBITION",
+  rivalisierende_zusagen: "IMPERIAL_AMBITION",
+  gebrochenes_versprechen: "IMPERIAL_AMBITION",
+  deciding_vote: "IMPERIAL_AMBITION",
 };
 
 // ---------- Signal-Erkennung je Thread-Typ (§Punkt 9/10, kein RNG) ----------
@@ -7896,6 +7903,11 @@ const CHAIN_PRIORITY_ORDER = [
   // unter bereits eligiblen Ketten trifft weiterhin der Drama Director.
   "adel_hofamt", "adel_krieg", "staedte_handel",
   "bauern_nahrung", "kirche_herrscher", "staende_gegeneinander",
+  // §Phase-12: die fünf Kaiserwahl-Ketten -- "Die entscheidende Stimme"
+  // zuerst (höchste Dringlichkeit, systemCritical), der Rest in etwa der
+  // natürlichen zeitlichen Reihenfolge einer Kandidatur.
+  "deciding_vote", "unsicherer_kurfuerst", "teures_versprechen",
+  "rivalisierende_zusagen", "gebrochenes_versprechen",
 ];
 
 // §Phase-6-Punkt 41: aktive Ketten fortschreiben bleibt unverändert von der
@@ -9162,6 +9174,327 @@ const CHAIN_STAENDE_GEGENEINANDER = {
   },
 };
 
+// ============================================================
+// CHAIN 17-21 — IMPERIAL POLITICS (§Phase-12 "Kaiserwahl 2.0"): fünf
+// Ketten, die ausschließlich aus dem bereits bestehenden Kaiserwahl-
+// Zustand entstehen (state.imperialCandidacy/state.electionPromises/
+// state.pendingElection, js/imperial-politics.js) — dasselbe Prinzip wie
+// bei den Landstände-Ketten: hier wird nur entschieden, WANN daraus eine
+// konkrete Entscheidung am Hof wird, und WAS die gewählte Option bewirkt,
+// ausschließlich über bereits bestehende Stellschrauben (giftElector(),
+// createElectionPromise(), fulfillElectionPromise(), breakElectionPromise(),
+// computeElectorStance()/computeElectorScoreBreakdown(), Taler, Beziehung,
+// Legitimität). KEIN zweites Wahlversprechen-System, KEINE erfundenen
+// Kurfürsten-Reaktionen.
+// ============================================================
+
+// ---------- CHAIN 17 — UNSICHERER KURFÜRST ----------
+
+function canStartUnsicherKurfuerstChain(state) {
+  const candidacyOk = !!state.imperialCandidacy;
+  const checks = [{ label: "Eine Kaiserwahl-Kandidatur läuft", passed: candidacyOk }];
+  if (!candidacyOk) return chainEligibilityChecks(checks, {});
+  let targetAiId = null;
+  for (const aiId of getElectorIds(state)) {
+    if (computeElectorStance(state, aiId, state.rulerId) === "UNENTSCHLOSSEN") { targetAiId = aiId; break; }
+  }
+  checks.push({ label: "Mindestens ein Kurfürst ist erkennbar unentschlossen", passed: !!targetAiId });
+  if (!targetAiId) return chainEligibilityChecks(checks, {});
+  return chainEligibilityChecks(checks, { actorIds: [state.regions[targetAiId].rulerId], regionIds: [targetAiId], variables: { aiId: targetAiId }, urgency: "normal" });
+}
+
+const CHAIN_UNSICHER_KURFUERST = {
+  id: "unsicherer_kurfuerst", name: "Unsicherer Kurfürst", category: "politik",
+  initialStage: "opening", cooldownYears: 8, startChance: 0.35,
+  checkEligibility: canStartUnsicherKurfuerstChain,
+  advance(state, chain) {
+    if (chain.stage !== "opening") return;
+    chain.stage = "resolution";
+    const aiId = chain.variables.aiId;
+    const region = state.regions[aiId];
+    const ruler = state.characters[region.rulerId];
+    const rulerName = ruler ? `${ruler.name} ${ruler.surname || ""}`.trim() : region.name;
+    const text = `${rulerName} lässt durchblicken, bei der kommenden Kaiserwahl noch unentschlossen zu sein.`;
+    queueChainDecision(state, chain, "Ein unentschlossener Kurfürst", text, [
+      {
+        label: "Ein diplomatisches Geschenk senden.", outcome: "gift",
+        effect: (s, c) => {
+          const res = giftElector(s, aiId);
+          if (res.ok) resolveEventChain(s, c, "GIFT_SENT", `${region.name} nimmt das Geschenk wohlwollend an.`);
+          else failEventChain(s, c, "NO_FUNDS", "Die Staatskasse reicht für ein Geschenk nicht aus.");
+        },
+      },
+      {
+        label: "Eine feste Zusage machen (Wahlversprechen).", outcome: "promise",
+        effect: (s, c) => {
+          const res = createElectionPromise(s, aiId, "pay_tribute", { amount: Math.max(50, Math.round(s.treasury * 0.08)), durationYears: 6 });
+          if (res.ok) resolveEventChain(s, c, "PROMISE_MADE", `${rulerName} erhält eine feste Zusage.`);
+          else failEventChain(s, c, "PROMISE_FAILED", "Eine Zusage kommt derzeit nicht zustande.");
+        },
+      },
+      {
+        label: "Der Sache ihren Lauf lassen.", outcome: "wait",
+        effect: (s, c) => { resolveEventChain(s, c, "WAITED", `${rulerName} bleibt vorerst unentschlossen.`); },
+      },
+    ]);
+  },
+};
+
+// ---------- CHAIN 18 — EIN TEURES VERSPRECHEN ----------
+
+function canStartTeuresVersprechenChain(state) {
+  const checks = [{ label: "Es existieren Wahlversprechen", passed: !!state.electionPromises }];
+  if (!state.electionPromises) return chainEligibilityChecks(checks, {});
+  let target = null;
+  for (const id in state.electionPromises.byId) {
+    const p = state.electionPromises.byId[id];
+    if (p.status !== "PROMISED" || p.type !== "pay_tribute") continue;
+    const yearsLeft = p.deadlineYear - state.year;
+    if (yearsLeft >= 0 && yearsLeft <= 2) { target = p; break; }
+  }
+  checks.push({ label: "Eine zugesagte Zahlung wird bald fällig (Frist ≤ 2 Jahre)", passed: !!target });
+  if (!target) return chainEligibilityChecks(checks, {});
+  return chainEligibilityChecks(checks, { actorIds: [target.electorRulerId], regionIds: [target.electorRegionId], variables: { promiseId: target.id }, urgency: "normal" });
+}
+
+const CHAIN_TEURES_VERSPRECHEN = {
+  id: "teures_versprechen", name: "Ein teures Versprechen", category: "politik",
+  initialStage: "opening", cooldownYears: 6, startChance: 0.4,
+  checkEligibility: canStartTeuresVersprechenChain,
+  advance(state, chain) {
+    if (chain.stage !== "opening") return;
+    chain.stage = "resolution";
+    const promise = state.electionPromises.byId[chain.variables.promiseId];
+    if (!promise || promise.status !== "PROMISED") { expireEventChain(state, chain, "ALREADY_RESOLVED", "Die Angelegenheit hat sich bereits erledigt."); return; }
+    const region = state.regions[promise.electorRegionId];
+    const canAfford = state.treasury >= promise.conditions.amount;
+    const text = `Die zugesagte Zahlung von ${promise.conditions.amount} Talern an ${region.name} wird bald fällig`
+      + (canAfford ? "." : " — die Staatskasse ist derzeit knapp.");
+    queueChainDecision(state, chain, "Ein teures Versprechen", text, [
+      {
+        label: `Sofort zahlen (${promise.conditions.amount} Taler).`, outcome: "pay_now",
+        effect: (s, c) => {
+          const res = fulfillElectionPromise(s, promise.id);
+          if (res.ok) resolveEventChain(s, c, "PAID_EARLY", `${region.name} erhält die zugesagte Zahlung.`);
+          else failEventChain(s, c, "NO_FUNDS", "Die Staatskasse reicht dafür nicht aus.");
+        },
+      },
+      {
+        label: "Um Aufschub bitten (-6 Beziehung, +3 Jahre Frist).", outcome: "ask_extension",
+        effect: (s, c) => {
+          promise.deadlineYear += 3;
+          const dip = s.diplomacy[promise.electorRegionId];
+          if (dip) dip.relation = clamp(dip.relation - 6, -100, 100);
+          resolveEventChain(s, c, "EXTENSION_GRANTED", `${region.name} gewährt widerwillig Aufschub.`);
+        },
+      },
+      {
+        label: "Das Versprechen bewusst brechen.", outcome: "break",
+        effect: (s, c) => {
+          breakElectionPromise(s, promise.id, "Die Zahlung wurde bewusst verweigert");
+          failEventChain(s, c, "BROKEN", `Das Versprechen an ${region.name} wird bewusst gebrochen.`);
+        },
+      },
+    ]);
+  },
+};
+
+// ---------- CHAIN 19 — RIVALISIERENDE ZUSAGEN ----------
+
+function canStartRivalisierendeZusagenChain(state) {
+  const checks = [{ label: "Mindestens zwei gleichzeitig aktive Wahlversprechen", passed: false }];
+  if (!state.electionPromises) return chainEligibilityChecks(checks, {});
+  const active = Object.values(state.electionPromises.byId).filter(p => p.status === "PROMISED");
+  checks[0] = { label: `Mindestens zwei gleichzeitig aktive Wahlversprechen (aktuell ${active.length})`, passed: active.length >= 2 };
+  if (active.length < 2) return chainEligibilityChecks(checks, {});
+  return chainEligibilityChecks(checks, {
+    actorIds: active.map(p => p.electorRulerId), regionIds: active.map(p => p.electorRegionId),
+    variables: { promiseIds: active.map(p => p.id) }, urgency: "low",
+  });
+}
+
+const CHAIN_RIVALISIERENDE_ZUSAGEN = {
+  id: "rivalisierende_zusagen", name: "Rivalisierende Zusagen", category: "politik",
+  initialStage: "opening", cooldownYears: 10, startChance: 0.3,
+  checkEligibility: canStartRivalisierendeZusagenChain,
+  advance(state, chain) {
+    if (chain.stage !== "opening") return;
+    chain.stage = "resolution";
+    const promises = chain.variables.promiseIds.map(id => state.electionPromises.byId[id]).filter(p => p && p.status === "PROMISED");
+    if (promises.length < 2) { expireEventChain(state, chain, "ALREADY_RESOLVED", "Die Lage hat sich inzwischen von selbst geklärt."); return; }
+    const names = promises.map(p => state.regions[p.electorRegionId].name);
+    const text = `Am Hof wird gemunkelt: die vielen gleichzeitigen Zusagen an ${names.join(", ")} beginnen sich gegenseitig zu erschweren.`;
+    queueChainDecision(state, chain, "Rivalisierende Zusagen", text, [
+      {
+        label: "Zu allen Zusagen stehen.", outcome: "hold_all",
+        effect: (s, c) => { s.legitimacy = clamp(s.legitimacy + 3, 0, 100); resolveEventChain(s, c, "HELD_ALL", "Der Herrscher hält an allen Zusagen fest — ein Zeichen von Verlässlichkeit."); },
+      },
+      {
+        label: "Die am wenigsten aussichtsreiche Zusage aufgeben.", outcome: "drop_weakest",
+        effect: (s, c) => {
+          let weakest = promises[0], weakestScore = Infinity;
+          for (const p of promises) {
+            const score = computeElectorScoreBreakdown(s, p.electorRegionId, s.rulerId).total;
+            if (score < weakestScore) { weakestScore = score; weakest = p; }
+          }
+          breakElectionPromise(s, weakest.id, "Zugunsten anderer Zusagen aufgegeben");
+          resolveEventChain(s, c, "DROPPED_WEAKEST", `Die Zusage an ${s.regions[weakest.electorRegionId].name} wird aufgegeben.`);
+        },
+      },
+      {
+        label: "Die Lage vorerst nicht weiter beachten.", outcome: "ignore",
+        effect: (s, c) => { resolveEventChain(s, c, "IGNORED", "Der Herrscher lässt die Angelegenheit vorerst auf sich beruhen."); },
+      },
+    ]);
+  },
+};
+
+// ---------- CHAIN 20 — EIN GEBROCHENES VERSPRECHEN (reaktiv) ----------
+
+function canStartGebrochenesVersprechenChain(state) {
+  const checks = [{ label: "Ein kürzlich gebrochenes, noch unbehandeltes Wahlversprechen", passed: false }];
+  if (!state.electionPromises) return chainEligibilityChecks(checks, {});
+  let target = null;
+  for (const id in state.electionPromises.byId) {
+    const p = state.electionPromises.byId[id];
+    if (p.status !== "BROKEN" || p.grievanceHandled) continue;
+    target = p; break;
+  }
+  checks[0] = { label: "Ein kürzlich gebrochenes, noch unbehandeltes Wahlversprechen", passed: !!target };
+  if (!target) return chainEligibilityChecks(checks, {});
+  return chainEligibilityChecks(checks, { actorIds: [target.electorRulerId], regionIds: [target.electorRegionId], variables: { promiseId: target.id }, urgency: "normal" });
+}
+
+const CHAIN_GEBROCHENES_VERSPRECHEN = {
+  id: "gebrochenes_versprechen", name: "Ein gebrochenes Versprechen", category: "politik",
+  initialStage: "opening", cooldownYears: 8, startChance: 0.4,
+  checkEligibility: canStartGebrochenesVersprechenChain,
+  advance(state, chain) {
+    if (chain.stage !== "opening") return;
+    chain.stage = "resolution";
+    const promise = state.electionPromises.byId[chain.variables.promiseId];
+    if (!promise) { expireEventChain(state, chain, "ALREADY_RESOLVED", "Die Angelegenheit ist bereits verklungen."); return; }
+    // §Punkt (analog markEstateDemandRaised): genau einmal markiert, exakt im
+    // Moment, in dem die Entscheidung tatsächlich angeboten wird — nicht in
+    // checkEligibility(), das mehrfach pro Jahr ausgewertet wird.
+    promise.grievanceHandled = true;
+    const region = state.regions[promise.electorRegionId];
+    const text = `${region.name} spricht offen über das gebrochene Versprechen — der Ruf des Herrschers steht auf dem Spiel.`;
+    queueChainDecision(state, chain, "Ein gebrochenes Versprechen", text, [
+      {
+        label: "Öffentlich Reue zeigen und eine Entschädigung anbieten (-200 Taler).", outcome: "compensate",
+        effect: (s, c) => {
+          s.treasury -= 200;
+          const dip = s.diplomacy[promise.electorRegionId];
+          if (dip) dip.relation = clamp(dip.relation + 10, -100, 100);
+          const memory = recordWorldEvent(s, { type: "DEMAND_ACCEPTED", actorIds: [s.rulerId], targetIds: [promise.electorRulerId], emotionalWeight: 20, metadata: { promiseId: promise.id }, description: `${region.name} erhält eine Entschädigung für das gebrochene Versprechen.` });
+          if (s.characters[promise.electorRulerId]) refreshRelationship(s, promise.electorRulerId, s.rulerId);
+          c.originatingMemoryIds.push(memory.id);
+          resolveEventChain(s, c, "COMPENSATED", `${region.name} nimmt die Entschädigung an.`);
+        },
+      },
+      {
+        label: "Die Verantwortung von sich weisen.", outcome: "deny",
+        effect: (s, c) => {
+          s.legitimacy = Math.max(0, s.legitimacy - 5);
+          const memory = recordWorldEvent(s, { type: "DEMAND_REFUSED", actorIds: [s.rulerId], targetIds: [promise.electorRulerId], emotionalWeight: -15, metadata: { promiseId: promise.id }, description: `Der Herrscher weist jede Verantwortung für das gebrochene Versprechen von sich.` });
+          if (s.characters[promise.electorRulerId]) refreshRelationship(s, promise.electorRulerId, s.rulerId);
+          c.originatingMemoryIds.push(memory.id);
+          failEventChain(s, c, "DENIED", `${region.name} nimmt die Ausflüchte nicht ab.`);
+        },
+      },
+      {
+        label: "Schweigen.", outcome: "silence",
+        effect: (s, c) => { resolveEventChain(s, c, "SILENT", "Der Vorfall wird am Hof totgeschwiegen."); },
+      },
+    ]);
+  },
+};
+
+// ---------- CHAIN 21 — DIE ENTSCHEIDENDE STIMME ----------
+
+// Reine Vorschau des Wahlausgangs, OHNE ihn auszulösen — nutzt exakt dieselbe
+// Score-Grundlage wie resolveImperialElection() (js/imperial-politics.js),
+// hier nur lesend über die bereits vorhandene Debug-Funktion
+// explainImperialElection() wiederverwendet statt einer zweiten Tally-Logik.
+// §15/16: dem Spieler wird bewusst KEINE exakte Stimmenzahl gezeigt (s.
+// advance() unten) — nur, DASS eine Kette überhaupt startet, verrät bereits
+// die Grundspannung, nicht die genauen Zahlen dahinter.
+function computeImperialElectionTallyPreview(state) {
+  const details = explainImperialElection(state);
+  const voteCounts = {};
+  const winnerFor = {};
+  for (const elector of details) {
+    let bestId = state.rulerId, bestScore = -Infinity;
+    for (const s of elector.scores) {
+      if (s.breakdown.total > bestScore || (s.breakdown.total === bestScore && s.isPlayer)) { bestScore = s.breakdown.total; bestId = s.candidateId; }
+    }
+    voteCounts[bestId] = (voteCounts[bestId] || 0) + 1;
+    winnerFor[elector.aiId] = bestId;
+  }
+  return { details, voteCounts, winnerFor };
+}
+
+function canStartDecidingVoteChain(state) {
+  const pendingOk = !!state.pendingElection;
+  const checks = [{ label: "Eine Kaiserwahl steht unmittelbar bevor", passed: pendingOk }];
+  if (!pendingOk) return chainEligibilityChecks(checks, {});
+  const preview = computeImperialElectionTallyPreview(state);
+  const playerVotes = preview.voteCounts[state.rulerId] || 0;
+  const margin = Math.abs(playerVotes - CONFIG.election.votesNeededForMajority);
+  checks.push({ label: "Das Ergebnis steht auf der Kippe", passed: margin <= 1 });
+  if (margin > 1) return chainEligibilityChecks(checks, {});
+  let swingAiId = null, smallestGap = Infinity;
+  for (const elector of preview.details) {
+    if (preview.winnerFor[elector.aiId] === state.rulerId) continue;
+    const playerScore = elector.scores.find(s => s.isPlayer).breakdown.total;
+    const winnerScore = elector.scores.find(s => s.candidateId === preview.winnerFor[elector.aiId]).breakdown.total;
+    const gap = winnerScore - playerScore;
+    if (gap < smallestGap) { smallestGap = gap; swingAiId = elector.aiId; }
+  }
+  checks.push({ label: "Ein einzelner, noch erreichbarer Kurfürst lässt sich ausmachen", passed: !!swingAiId });
+  if (!swingAiId) return chainEligibilityChecks(checks, {});
+  return chainEligibilityChecks(checks, { actorIds: [state.regions[swingAiId].rulerId], regionIds: [swingAiId], variables: { aiId: swingAiId }, urgency: "high" });
+}
+
+const CHAIN_DECIDING_VOTE = {
+  id: "deciding_vote", name: "Die entscheidende Stimme", category: "politik", systemCritical: true,
+  initialStage: "tension", cooldownYears: 6, startChance: 0.5,
+  checkEligibility: canStartDecidingVoteChain,
+  advance(state, chain) {
+    if (chain.stage !== "tension") return;
+    chain.stage = "resolution";
+    const aiId = chain.variables.aiId;
+    const region = state.regions[aiId];
+    const ruler = state.characters[region.rulerId];
+    const rulerName = ruler ? `${ruler.name} ${ruler.surname || ""}`.trim() : region.name;
+    const text = `Die Kaiserwahl steht auf der Kippe. Alle Blicke richten sich auf ${rulerName}: die Stimme aus ${region.name} könnte den Ausschlag geben.`;
+    queueChainDecision(state, chain, "Die entscheidende Stimme", text, [
+      {
+        label: `Ein letztes, großzügiges Geschenk an ${region.name} senden.`, outcome: "final_gift",
+        effect: (s, c) => {
+          const res = giftElector(s, aiId);
+          if (res.ok) resolveEventChain(s, c, "GIFT_SENT", `${region.name} erhält ein letztes, großzügiges Geschenk vor der Wahl.`);
+          else failEventChain(s, c, "NO_FUNDS", "Die Staatskasse reicht für ein letztes Geschenk nicht mehr aus.");
+        },
+      },
+      {
+        label: `${rulerName} eine feste Zusage machen.`, outcome: "final_promise",
+        effect: (s, c) => {
+          if (!s.imperialCandidacy) { failEventChain(s, c, "NO_CANDIDACY", "Die Kandidatur ist inzwischen beendet."); return; }
+          const res = createElectionPromise(s, aiId, "pay_tribute", { amount: Math.max(50, Math.round(s.treasury * 0.1)), durationYears: 5 });
+          if (res.ok) resolveEventChain(s, c, "PROMISE_MADE", `${rulerName} erhält in letzter Minute eine feste Zusage.`);
+          else failEventChain(s, c, "PROMISE_FAILED", "Die Zusage kommt nicht mehr zustande.");
+        },
+      },
+      {
+        label: "Dem eigenen Ansehen vertrauen und nichts weiter unternehmen.", outcome: "trust_fate",
+        effect: (s, c) => { resolveEventChain(s, c, "TRUSTED_FATE", "Der Herrscher verlässt sich auf das bisher Erreichte."); },
+      },
+    ]);
+  },
+};
+
 // ---------- Registrierung ----------
 const CHAIN_TEMPLATES = {
   passed_over_heir: CHAIN_PASSED_OVER_HEIR,
@@ -9180,6 +9513,11 @@ const CHAIN_TEMPLATES = {
   bauern_nahrung: CHAIN_BAUERN_NAHRUNG,
   kirche_herrscher: CHAIN_KIRCHE_HERRSCHER,
   staende_gegeneinander: CHAIN_STAENDE_GEGENEINANDER,
+  unsicherer_kurfuerst: CHAIN_UNSICHER_KURFUERST,
+  teures_versprechen: CHAIN_TEURES_VERSPRECHEN,
+  rivalisierende_zusagen: CHAIN_RIVALISIERENDE_ZUSAGEN,
+  gebrochenes_versprechen: CHAIN_GEBROCHENES_VERSPRECHEN,
+  deciding_vote: CHAIN_DECIDING_VOTE,
 };
 
 // ============================================================
