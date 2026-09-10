@@ -206,12 +206,13 @@ console.log('--- Debug-Erklärung ---');
   check('nicht erfüllte Kette wird korrekt als "nicht eligible" markiert', explanation.eligible === false);
 })();
 
-// ---------- Ergänzend: alle 10 Templates + jede Option durchspielen ----------
-// Reines Passivspiel erreicht nur 4 der 10 Ketten (siehe
+// ---------- Ergänzend: alle Templates + jede Option durchspielen ----------
+// Reines Passivspiel erreicht nur einen Teil der Ketten (siehe
 // phase5_event_chain_metrics_test.js) — dieser synthetische Smoke-Test
-// erzwingt für ALLE 10 Templates jede einzelne Entscheidungsoption, damit
-// kein Code-Pfad ungetestet bleibt, nur weil ihn passives Spiel nie erreicht.
-console.log('--- Smoke-Test: alle 10 Templates x alle Optionen ---');
+// erzwingt für ALLE Templates (10 aus Phase 5 + 6 Landstände-Ketten aus
+// Phase 11) jede einzelne Entscheidungsoption, damit kein Code-Pfad
+// ungetestet bleibt, nur weil ihn passives Spiel nie erreicht.
+console.log('--- Smoke-Test: alle Templates x alle Optionen ---');
 (function() {
   function freshRuler(seed) {
     const state = newGame({ seed });
@@ -266,6 +267,22 @@ console.log('--- Smoke-Test: alle 10 Templates x alle Optionen ---');
       return { actorIds: [id], targetIds: [] };
     },
     imperial_ambition: (state) => { state.titleIndex = TITLES.findIndex(t => t.id === 'kurfuerst'); state.prestige = 300; return { variables: {} }; },
+    // §Phase-11: die sechs Landstände-Ketten — bypassen hier absichtlich
+    // checkEligibility() (wie alle Einträge oben) und bauen nur einen
+    // minimalen, gültigen payload; kirche_herrscher braucht zwingend eine
+    // echte actorIds[0] (advance() liest state.characters[leaderId].name
+    // ohne Null-Guard, siehe canStartKircheHerrscherChain()'s hasLeader-Gate).
+    adel_hofamt: (state) => ({ actorIds: [], regionIds: [], variables: { estateId: 'adel' } }),
+    adel_krieg: (state) => ({ actorIds: [], regionIds: [], variables: { estateId: 'adel' } }),
+    staedte_handel: (state) => ({ actorIds: [], regionIds: [], variables: { estateId: 'buergertum' } }),
+    bauern_nahrung: (state) => ({ actorIds: [], regionIds: ['player'], variables: { estateId: 'bauernschaft' } }),
+    kirche_herrscher: (state) => {
+      const id = makeRelative(state, []);
+      state.characters[id].advisorRole = 'geistlicher';
+      state.advisors.geistlicher = id;
+      return { actorIds: [id], regionIds: [], variables: { estateId: 'geistlichkeit' } };
+    },
+    staende_gegeneinander: (state) => ({ actorIds: [], regionIds: ['player'], variables: { estateIds: ['adel', 'buergertum'] } }),
   };
 
   let seedCounter = 900;

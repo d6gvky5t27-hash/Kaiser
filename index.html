@@ -7233,6 +7233,12 @@ const CHAIN_PRIORITY_ORDER = [
   "passed_over_heir", "corrupt_treasurer", "grieved_advisor", "famine_crisis",
   "rising_rival", "border_conflict", "trade_conflict", "dynastic_marriage",
   "church_conflict", "imperial_ambition",
+  // §Phase-11: die sechs Landstände-Ketten — dienen (wie alle Einträge hier)
+  // nur als stabiler Tie-Break bei Score-Gleichstand, siehe
+  // startNewEventChainIfEligible(); die tatsächliche Priorisierung
+  // unter bereits eligiblen Ketten trifft weiterhin der Drama Director.
+  "adel_hofamt", "adel_krieg", "staedte_handel",
+  "bauern_nahrung", "kirche_herrscher", "staende_gegeneinander",
 ];
 
 // §Phase-6-Punkt 41: aktive Ketten fortschreiben bleibt unverändert von der
@@ -8072,6 +8078,425 @@ const CHAIN_IMPERIAL_AMBITION = {
   },
 };
 
+// ============================================================
+// CHAIN 11-16 — LANDSTÄNDE (§Phase-11 "Living Realm"): die sechs
+// namentlich vorgegebenen Stände-Eventketten. Nutzen ausschließlich das
+// bereits bestehende Kettengerüst (checkEligibility/advance,
+// queueChainDecision -> state.pendingEvent, resolveEventChain/
+// failEventChain) — KEIN zweites Eventsystem. Die Berechnungsgrundlage
+// (Einfluss/Zufriedenheit/Interessen/Forderungsfähigkeit/Wortführer) liefert
+// ausschließlich js/estates.js; hier wird nur entschieden, WANN daraus eine
+// konkrete Entscheidung am Hof wird, und WAS die gewählte Option bewirkt
+// (wieder ausschließlich über bereits bestehende Stellschrauben: Taler,
+// Steuersatz, Zufriedenheit, Prestige, Legitimität, religiousInfluence,
+// Beziehung, sowie das sparsame, optionale state.estates[*].privileges-Array).
+// markEstateDemandRaised() wird jeweils GENAU EINMAL aufgerufen, exakt im
+// Moment des queueChainDecision()-Aufrufs (nicht in checkEligibility(), das
+// mehrfach pro Jahr für alle Kandidaten ausgewertet wird, ohne dass die
+// gewählte Kette tatsächlich startet) — das ist der einzige Ort, an dem
+// eine Forderung tatsächlich "gestellt" wurde.
+// ============================================================
+
+function estateActorIds(state, estateId) {
+  const leaderId = state.estates[estateId].leaderId;
+  return leaderId ? [leaderId] : [];
+}
+
+// ---------- CHAIN 11 — ADEL FORDERT EIN HOFAMT ----------
+
+function canStartAdelHofamtChain(state) {
+  const elig = checkEstateDemandEligibility(state, "adel");
+  const interests = discoverEstateInterests(state, "adel");
+  const relevant = interests.some(i => i.topic === "steuerlast" || i.topic === "hofamt");
+  const checks = elig.checks.concat([{ label: "Adel verlangt spürbar mehr Mitsprache (Steuerlast oder fehlende Vertretung)", passed: relevant }]);
+  if (!elig.eligible || !relevant) return chainEligibilityChecks(checks, {});
+  return chainEligibilityChecks(checks, { actorIds: estateActorIds(state, "adel"), regionIds: [], variables: { estateId: "adel" }, urgency: "normal" });
+}
+
+const CHAIN_ADEL_HOFAMT = {
+  id: "adel_hofamt", name: "Adel fordert ein Hofamt", category: "staende",
+  initialStage: "demand", cooldownYears: 12, startChance: 0.35,
+  checkEligibility: canStartAdelHofamtChain,
+  advance(state, chain) {
+    if (chain.stage !== "demand") return;
+    chain.stage = "resolution";
+    markEstateDemandRaised(state, "adel");
+    const leaderId = chain.actorIds[0] || null;
+    const leader = leaderId ? state.characters[leaderId] : null;
+    const text = leader
+      ? `${leader.name} ${leader.surname || ""} spricht im Namen des Adels: der Hof brauche mehr Stimmen aus den eigenen Reihen.`.replace(/\s+/g, " ")
+      : "Vertreter des Adels erscheinen unangemeldet bei Hofe: man verlangt spürbaren Einfluss auf die Politik des Reiches.";
+    queueChainDecision(state, chain, "Der Adel fordert Mitsprache", text, [
+      {
+        label: "Ein dauerhaftes Mitspracherecht zugestehen.", outcome: "privilege",
+        effect: (s, c) => {
+          s.estates.adel.privileges.push("mitsprache");
+          s.prestige += 5;
+          const memory = recordWorldEvent(s, {
+            type: "ESTATE_PRIVILEGE_GRANTED", actorIds: [s.rulerId], targetIds: leaderId ? [leaderId] : [],
+            emotionalWeight: 25, metadata: { estateId: "adel", privilege: "mitsprache" },
+            description: "Dem Adel wird ein dauerhaftes Mitspracherecht bei Hofe zugestanden.",
+          });
+          if (leaderId) refreshRelationship(s, leaderId, s.rulerId);
+          c.originatingMemoryIds.push(memory.id);
+          resolveEventChain(s, c, "PRIVILEGE_GRANTED", "Der Adel erhält ein dauerhaftes Mitspracherecht.");
+        },
+      },
+      {
+        label: "Eine großzügige Geste anbieten (-150 Taler).", outcome: "gesture",
+        effect: (s, c) => {
+          s.treasury -= 150;
+          s.regions.player.population.adel.satisfaction = clamp(s.regions.player.population.adel.satisfaction + 10, 0, 100);
+          recordWorldEvent(s, { type: "ESTATE_DEMAND_GRANTED", actorIds: [s.rulerId], targetIds: leaderId ? [leaderId] : [], emotionalWeight: 15, metadata: { estateId: "adel" }, description: "Der Adel wird mit einer großzügigen Geste vorerst besänftigt." });
+          if (leaderId) refreshRelationship(s, leaderId, s.rulerId);
+          resolveEventChain(s, c, "COMPROMISE", "Eine großzügige Geste beruhigt den Adel vorerst.");
+        },
+      },
+      {
+        label: "Die Forderung zurückweisen.", outcome: "refuse",
+        effect: (s, c) => {
+          s.regions.player.population.adel.satisfaction = clamp(s.regions.player.population.adel.satisfaction - 15, 0, 100);
+          s.legitimacy = Math.max(0, s.legitimacy - 4);
+          const memory = recordWorldEvent(s, { type: "ESTATE_DEMAND_REFUSED", actorIds: [s.rulerId], targetIds: leaderId ? [leaderId] : [], emotionalWeight: -30, metadata: { estateId: "adel" }, description: "Die Forderung des Adels wird schroff zurückgewiesen." });
+          if (leaderId) refreshRelationship(s, leaderId, s.rulerId);
+          c.originatingMemoryIds.push(memory.id);
+          failEventChain(s, c, "REFUSED", "Der Adel fühlt sich zurückgewiesen.");
+        },
+      },
+    ]);
+  },
+};
+
+// ---------- CHAIN 12 — DER ADEL UND DER KRIEG ----------
+
+function canStartAdelKriegChain(state) {
+  const elig = checkEstateDemandEligibility(state, "adel");
+  const interests = discoverEstateInterests(state, "adel");
+  const relevant = interests.some(i => i.topic === "kriegsbeteiligung");
+  const checks = elig.checks.concat([{ label: "Krieg ohne Beteiligung des Lehnsadels (kein Ritter/keine schwere Kavallerie im Dienst)", passed: relevant }]);
+  if (!elig.eligible || !relevant) return chainEligibilityChecks(checks, {});
+  return chainEligibilityChecks(checks, { actorIds: estateActorIds(state, "adel"), regionIds: [], variables: { estateId: "adel" }, urgency: "normal" });
+}
+
+const CHAIN_ADEL_KRIEG = {
+  id: "adel_krieg", name: "Der Adel und der Krieg", category: "staende",
+  initialStage: "grievance", cooldownYears: 12, startChance: 0.35,
+  checkEligibility: canStartAdelKriegChain,
+  advance(state, chain) {
+    if (chain.stage !== "grievance") return;
+    chain.stage = "resolution";
+    markEstateDemandRaised(state, "adel");
+    const leaderId = chain.actorIds[0] || null;
+    const leader = leaderId ? state.characters[leaderId] : null;
+    const text = leader
+      ? `${leader.name} ${leader.surname || ""} beschwert sich: der Krieg werde geführt, ohne den Adel und sein Lehnsaufgebot überhaupt zu rufen.`.replace(/\s+/g, " ")
+      : "Der Adel murrt: man führe Krieg, ohne das Lehnsaufgebot des Adels überhaupt in Anspruch zu nehmen — eine Kränkung des ritterlichen Standes.";
+    queueChainDecision(state, chain, "Ehre und Lehnspflicht", text, [
+      {
+        label: "Das Lehnsaufgebot ausdrücklich als Ehrensache bestätigen.", outcome: "call_up",
+        effect: (s, c) => {
+          s.estates.adel.privileges.push("lehnsehre_bestaetigt");
+          s.regions.player.population.adel.satisfaction = clamp(s.regions.player.population.adel.satisfaction + 12, 0, 100);
+          const memory = recordWorldEvent(s, { type: "ESTATE_DEMAND_GRANTED", actorIds: [s.rulerId], targetIds: leaderId ? [leaderId] : [], emotionalWeight: 25, metadata: { estateId: "adel" }, description: "Der Herrscher bestätigt die Ehre und Kriegspflicht des Lehnsadels." });
+          if (leaderId) refreshRelationship(s, leaderId, s.rulerId);
+          c.originatingMemoryIds.push(memory.id);
+          resolveEventChain(s, c, "GRANTED", "Der Adel fühlt sich in seiner Ehre bestätigt.");
+        },
+      },
+      {
+        label: "Eine Entschädigung anbieten (-200 Taler).", outcome: "compensate",
+        effect: (s, c) => {
+          s.treasury -= 200;
+          s.regions.player.population.adel.satisfaction = clamp(s.regions.player.population.adel.satisfaction + 6, 0, 100);
+          recordWorldEvent(s, { type: "ESTATE_DEMAND_GRANTED", actorIds: [s.rulerId], targetIds: leaderId ? [leaderId] : [], emotionalWeight: 12, metadata: { estateId: "adel" }, description: "Der Adel erhält eine Entschädigung für seine übergangene Kriegspflicht." });
+          if (leaderId) refreshRelationship(s, leaderId, s.rulerId);
+          resolveEventChain(s, c, "COMPROMISE", "Eine Entschädigung beruhigt den Adel vorerst.");
+        },
+      },
+      {
+        label: "Die Beschwerde übergehen.", outcome: "ignore",
+        effect: (s, c) => {
+          s.regions.player.population.adel.satisfaction = clamp(s.regions.player.population.adel.satisfaction - 12, 0, 100);
+          const memory = recordWorldEvent(s, { type: "ESTATE_DEMAND_REFUSED", actorIds: [s.rulerId], targetIds: leaderId ? [leaderId] : [], emotionalWeight: -25, metadata: { estateId: "adel" }, description: "Die Beschwerde des Adels wird übergangen." });
+          if (leaderId) refreshRelationship(s, leaderId, s.rulerId);
+          c.originatingMemoryIds.push(memory.id);
+          failEventChain(s, c, "IGNORED", "Der Adel fühlt sich missachtet.");
+        },
+      },
+    ]);
+  },
+};
+
+// ---------- CHAIN 13 — STÄDTE UND HANDEL ----------
+
+function canStartStaedteHandelChain(state) {
+  const elig = checkEstateDemandEligibility(state, "buergertum");
+  const interests = discoverEstateInterests(state, "buergertum");
+  const relevant = interests.length > 0;
+  const checks = elig.checks.concat([{ label: "Bürgertum hat ein konkretes wirtschaftliches Anliegen (Zölle/wirtschaftlicher Einfluss)", passed: relevant }]);
+  if (!elig.eligible || !relevant) return chainEligibilityChecks(checks, {});
+  return chainEligibilityChecks(checks, { actorIds: estateActorIds(state, "buergertum"), regionIds: [], variables: { estateId: "buergertum" }, urgency: "normal" });
+}
+
+const CHAIN_STAEDTE_HANDEL = {
+  id: "staedte_handel", name: "Städte und Handel", category: "staende",
+  initialStage: "complaint", cooldownYears: 10, startChance: 0.35,
+  checkEligibility: canStartStaedteHandelChain,
+  advance(state, chain) {
+    if (chain.stage !== "complaint") return;
+    chain.stage = "resolution";
+    markEstateDemandRaised(state, "buergertum");
+    const leaderId = chain.actorIds[0] || null;
+    const leader = leaderId ? state.characters[leaderId] : null;
+    const text = leader
+      ? `${leader.name} ${leader.surname || ""} spricht für die Städte: hohe Zölle und mangelnder Einfluss auf die Wirtschaftspolitik schadeten dem Handel.`.replace(/\s+/g, " ")
+      : "Eine Abordnung der Städte fordert Gehör: hohe Zölle und fehlender Einfluss auf die Wirtschaftspolitik schadeten dem Handel.";
+    queueChainDecision(state, chain, "Die Städte fordern Mitsprache im Handel", text, [
+      {
+        label: "Handelsfreiheiten dauerhaft zusichern.", outcome: "privilege",
+        effect: (s, c) => {
+          s.estates.buergertum.privileges.push("handelsfreiheit");
+          s.regions.player.taxRate = Math.max(0.05, s.regions.player.taxRate - 0.04);
+          s.regions.player.population.haendler.satisfaction = clamp(s.regions.player.population.haendler.satisfaction + 15, 0, 100);
+          const memory = recordWorldEvent(s, { type: "ESTATE_PRIVILEGE_GRANTED", actorIds: [s.rulerId], targetIds: leaderId ? [leaderId] : [], emotionalWeight: 25, metadata: { estateId: "buergertum", privilege: "handelsfreiheit" }, description: "Den Städten werden dauerhafte Handelsfreiheiten zugesichert." });
+          if (leaderId) refreshRelationship(s, leaderId, s.rulerId);
+          c.originatingMemoryIds.push(memory.id);
+          resolveEventChain(s, c, "PRIVILEGE_GRANTED", "Die Städte erhalten dauerhafte Handelsfreiheiten.");
+        },
+      },
+      {
+        label: "Zölle spürbar senken.", outcome: "lower_tax",
+        effect: (s, c) => {
+          s.regions.player.taxRate = Math.max(0.05, s.regions.player.taxRate - 0.06);
+          s.regions.player.population.haendler.satisfaction = clamp(s.regions.player.population.haendler.satisfaction + 10, 0, 100);
+          recordWorldEvent(s, { type: "ESTATE_DEMAND_GRANTED", actorIds: [s.rulerId], targetIds: leaderId ? [leaderId] : [], emotionalWeight: 15, metadata: { estateId: "buergertum" }, description: "Die Zölle werden auf Wunsch der Städte gesenkt." });
+          if (leaderId) refreshRelationship(s, leaderId, s.rulerId);
+          resolveEventChain(s, c, "TAX_LOWERED", "Die Zollsenkung beruhigt die Städte.");
+        },
+      },
+      {
+        label: "Die Forderung abweisen.", outcome: "dismiss",
+        effect: (s, c) => {
+          s.regions.player.population.haendler.satisfaction = clamp(s.regions.player.population.haendler.satisfaction - 15, 0, 100);
+          const memory = recordWorldEvent(s, { type: "ESTATE_DEMAND_REFUSED", actorIds: [s.rulerId], targetIds: leaderId ? [leaderId] : [], emotionalWeight: -25, metadata: { estateId: "buergertum" }, description: "Die Forderung der Städte wird abgewiesen." });
+          if (leaderId) refreshRelationship(s, leaderId, s.rulerId);
+          c.originatingMemoryIds.push(memory.id);
+          failEventChain(s, c, "DISMISSED", "Die Städte fühlen sich übergangen.");
+        },
+      },
+    ]);
+  },
+};
+
+// ---------- CHAIN 14 — DIE BAUERN UND DIE NAHRUNG ----------
+// Bewusst OHNE Wortführer (§: kein erfundener NPC) — die Bauernschaft hat
+// im Character Core keinen plausiblen Kandidatenpool (siehe
+// candidateEstateLeaders() in js/estates.js), das ist historisch korrekt
+// und kein Fehler. actorIds bleibt leer, regionIds trägt die Beteiligung.
+
+function canStartBauernNahrungChain(state) {
+  const elig = checkEstateDemandEligibility(state, "bauernschaft");
+  const interests = discoverEstateInterests(state, "bauernschaft");
+  const relevant = interests.length > 0;
+  const checks = elig.checks.concat([{ label: "Bauernschaft leidet spürbar an Nahrungsmangel oder Abgabenlast", passed: relevant }]);
+  if (!elig.eligible || !relevant) return chainEligibilityChecks(checks, {});
+  return chainEligibilityChecks(checks, { actorIds: [], regionIds: ["player"], variables: { estateId: "bauernschaft" }, urgency: "high" });
+}
+
+const CHAIN_BAUERN_NAHRUNG = {
+  id: "bauern_nahrung", name: "Die Bauern und die Nahrung", category: "staende",
+  initialStage: "unrest", cooldownYears: 8, startChance: 0.4,
+  checkEligibility: canStartBauernNahrungChain,
+  advance(state, chain) {
+    if (chain.stage !== "unrest") return;
+    chain.stage = "resolution";
+    markEstateDemandRaised(state, "bauernschaft");
+    queueChainDecision(state, chain, "Unruhe auf dem Land",
+      "Auf den Dörfern wächst der Unmut. Ohne einen förmlichen Wortführer erreicht die Klage den Hof nur über Verwalter und Pfarrer — doch sie ist unüberhörbar: Nahrung und Abgaben belasten die Bauernschaft über Gebühr.",
+      [
+        {
+          label: "Kornreserven öffnen und Abgaben erleichtern.", outcome: "relief",
+          effect: (s, c) => {
+            const r = s.regions.player;
+            r.warehouse.getreide = Math.max(0, (r.warehouse.getreide || 0) - 50);
+            for (const pid of ESTATE_DEFINITIONS.bauernschaft.popGroups) r.population[pid].satisfaction = clamp(r.population[pid].satisfaction + 12, 0, 100);
+            s.estates.bauernschaft.privileges.push("abgabenerleichterung");
+            const memory = recordWorldEvent(s, { type: "ESTATE_PRIVILEGE_GRANTED", actorIds: [s.rulerId], targetIds: [], emotionalWeight: 20, metadata: { estateId: "bauernschaft", privilege: "abgabenerleichterung" }, description: "Der Bauernschaft wird eine dauerhafte Abgabenerleichterung gewährt." });
+            c.originatingMemoryIds.push(memory.id);
+            resolveEventChain(s, c, "PRIVILEGE_GRANTED", "Kornreserven und Abgabenerleichterung beruhigen das Land.");
+          },
+        },
+        {
+          label: "Getreide aus dem Ausland kaufen (-500 Taler).", outcome: "buy_grain",
+          effect: (s, c) => {
+            s.treasury -= 500;
+            const r = s.regions.player;
+            r.warehouse.getreide = (r.warehouse.getreide || 0) + 70;
+            for (const pid of ESTATE_DEFINITIONS.bauernschaft.popGroups) r.population[pid].satisfaction = clamp(r.population[pid].satisfaction + 8, 0, 100);
+            recordWorldEvent(s, { type: "ESTATE_DEMAND_GRANTED", actorIds: [s.rulerId], targetIds: [], emotionalWeight: 12, metadata: { estateId: "bauernschaft" }, description: "Eingeführtes Getreide lindert die Not auf dem Land." });
+            resolveEventChain(s, c, "GRANTED", "Eingeführtes Getreide lindert die Not.");
+          },
+        },
+        {
+          label: "Die Klagen ignorieren.", outcome: "ignore",
+          effect: (s, c) => {
+            const r = s.regions.player;
+            for (const pid of ESTATE_DEFINITIONS.bauernschaft.popGroups) r.population[pid].satisfaction = clamp(r.population[pid].satisfaction - 12, 0, 100);
+            const memory = recordWorldEvent(s, { type: "ESTATE_DEMAND_REFUSED", actorIds: [s.rulerId], targetIds: [], emotionalWeight: -20, metadata: { estateId: "bauernschaft" }, description: "Die Klagen der Bauernschaft bleiben ungehört." });
+            c.originatingMemoryIds.push(memory.id);
+            failEventChain(s, c, "IGNORED", "Die Not auf dem Land bleibt ungelindert.");
+          },
+        },
+      ]);
+  },
+};
+
+// ---------- CHAIN 15 — DIE KIRCHE UND DER HERRSCHER ----------
+// Bewusst NUR auslösbar mit amtierendem Geistlicher-Berater als Wortführer
+// (Abgrenzung zur bestehenden church_conflict-Kette, die allein an
+// state.religiousInfluence hängt und ohne Berater auskommt) — diese Kette
+// ist die persönliche, hofnahe Variante: eine Audienz mit einem konkreten
+// Gesicht statt einer anonymen Klage des Klerus.
+
+function canStartKircheHerrscherChain(state) {
+  const elig = checkEstateDemandEligibility(state, "geistlichkeit");
+  const hasLeader = !!state.estates.geistlichkeit.leaderId;
+  const checks = elig.checks.concat([{ label: "Die Geistlichkeit hat einen amtierenden Wortführer bei Hofe (Geistlicher-Berater)", passed: hasLeader }]);
+  if (!elig.eligible || !hasLeader) return chainEligibilityChecks(checks, {});
+  return chainEligibilityChecks(checks, { actorIds: estateActorIds(state, "geistlichkeit"), regionIds: [], variables: { estateId: "geistlichkeit" }, urgency: "normal" });
+}
+
+const CHAIN_KIRCHE_HERRSCHER = {
+  id: "kirche_herrscher", name: "Die Kirche und der Herrscher", category: "staende",
+  initialStage: "audience", cooldownYears: 12, startChance: 0.3,
+  checkEligibility: canStartKircheHerrscherChain,
+  advance(state, chain) {
+    if (chain.stage !== "audience") return;
+    chain.stage = "resolution";
+    markEstateDemandRaised(state, "geistlichkeit");
+    const leaderId = chain.actorIds[0];
+    const leader = state.characters[leaderId];
+    queueChainDecision(state, chain, "Eine Audienz des Klerus",
+      `${leader.name} ${leader.surname || ""} bittet um eine persönliche Audienz: der Herrscher möge sein Verhältnis zur Kirche erneuern und bekräftigen.`.replace(/\s+/g, " "),
+      [
+        {
+          label: "Der Kirche eine Steuerbefreiung zusichern.", outcome: "privilege",
+          effect: (s, c) => {
+            s.estates.geistlichkeit.privileges.push("steuerbefreiung");
+            s.religiousInfluence = clamp((s.religiousInfluence || 55) + 12, 0, 100);
+            const memory = recordWorldEvent(s, { type: "ESTATE_PRIVILEGE_GRANTED", actorIds: [s.rulerId], targetIds: [leaderId], emotionalWeight: 25, metadata: { estateId: "geistlichkeit", privilege: "steuerbefreiung" }, description: `${leader.name} erwirkt eine dauerhafte Steuerbefreiung für die Kirche.`.replace(/\s+/g, " ") });
+            refreshRelationship(s, leaderId, s.rulerId);
+            c.originatingMemoryIds.push(memory.id);
+            resolveEventChain(s, c, "PRIVILEGE_GRANTED", "Die Kirche erhält eine dauerhafte Steuerbefreiung.");
+          },
+        },
+        {
+          label: "Ein persönliches Zeichen der Frömmigkeit setzen (-150 Taler, +Ansehen).", outcome: "piety",
+          effect: (s, c) => {
+            s.treasury -= 150;
+            s.prestige += 6;
+            s.religiousInfluence = clamp((s.religiousInfluence || 55) + 8, 0, 100);
+            recordWorldEvent(s, { type: "ESTATE_DEMAND_GRANTED", actorIds: [s.rulerId], targetIds: [leaderId], emotionalWeight: 18, metadata: { estateId: "geistlichkeit" }, description: `${leader.name} nimmt ein persönliches Zeichen der Frömmigkeit des Herrschers wohlwollend auf.`.replace(/\s+/g, " ") });
+            refreshRelationship(s, leaderId, s.rulerId);
+            resolveEventChain(s, c, "GRANTED", "Ein Zeichen der Frömmigkeit stärkt das Verhältnis zur Kirche.");
+          },
+        },
+        {
+          label: "Die Audienz knapp abweisen.", outcome: "refuse",
+          effect: (s, c) => {
+            s.religiousInfluence = clamp((s.religiousInfluence || 55) - 15, 0, 100);
+            s.legitimacy = Math.max(0, s.legitimacy - 5);
+            const memory = recordWorldEvent(s, { type: "ESTATE_DEMAND_REFUSED", actorIds: [s.rulerId], targetIds: [leaderId], emotionalWeight: -30, metadata: { estateId: "geistlichkeit" }, description: `${leader.name} verlässt die knapp abgewiesene Audienz verstimmt.`.replace(/\s+/g, " ") });
+            refreshRelationship(s, leaderId, s.rulerId);
+            c.originatingMemoryIds.push(memory.id);
+            failEventChain(s, c, "REFUSED", "Die Kirche fühlt sich zurückgewiesen.");
+          },
+        },
+      ]);
+  },
+};
+
+// ---------- CHAIN 16 — DIE STÄNDE STEHEN GEGENEINANDER ----------
+// Die zentrale Cross-System-Kette (§Phase-11-Bericht: "Cross-System
+// Decisions" als Haupterfolgsmetrik): zwei gleichzeitig forderungsfähige
+// Stände (Adel + ein zweiter, echter, unabhängig unzufriedener Stand) —
+// jede Option begünstigt unweigerlich den einen auf Kosten des anderen,
+// ein echter Zielkonflikt statt einer isolierten Einzelforderung.
+
+function canStartStaendeGegeneinanderChain(state) {
+  const adelElig = checkEstateDemandEligibility(state, "adel");
+  let rivalId = null, rivalSat = 101;
+  for (const id of ["buergertum", "bauernschaft"]) {
+    const sat = computeEstateSatisfaction(state, id);
+    if (sat < CONFIG.estates.demand.maxSatisfactionToDemand && sat < rivalSat) { rivalSat = sat; rivalId = id; }
+  }
+  const checks = adelElig.checks.concat([
+    { label: "Adel ist derzeit forderungsfähig", passed: adelElig.eligible },
+    { label: "Gleichzeitig ist ein weiterer Stand (Bürgertum/Bauernschaft) spürbar unzufrieden", passed: !!rivalId },
+  ]);
+  if (!adelElig.eligible || !rivalId) return chainEligibilityChecks(checks, {});
+  return chainEligibilityChecks(checks, {
+    actorIds: estateActorIds(state, "adel").concat(estateActorIds(state, rivalId)),
+    regionIds: ["player"], variables: { estateIds: ["adel", rivalId] }, urgency: "high",
+  });
+}
+
+const CHAIN_STAENDE_GEGENEINANDER = {
+  id: "staende_gegeneinander", name: "Die Stände stehen gegeneinander", category: "staende",
+  initialStage: "conflict", cooldownYears: 15, startChance: 0.3,
+  checkEligibility: canStartStaendeGegeneinanderChain,
+  advance(state, chain) {
+    if (chain.stage !== "conflict") return;
+    chain.stage = "resolution";
+    const estateA = chain.variables.estateIds[0], estateB = chain.variables.estateIds[1];
+    markEstateDemandRaised(state, estateA);
+    markEstateDemandRaised(state, estateB);
+    const nameB = ESTATE_DEFINITIONS[estateB].name;
+    queueChainDecision(state, chain, `Adel und ${nameB} im Widerstreit`,
+      `Der Adel verlangt Erleichterungen zu seinen Gunsten — doch jedes Zugeständnis an ihn träfe unmittelbar den ohnehin bedrängten Stand der ${nameB}. Der Herrscher muss sich entscheiden, wen er stärkt.`,
+      [
+        {
+          label: "Den Adel bevorzugen.", outcome: "favor_adel",
+          effect: (s, c) => {
+            s.regions.player.population.adel.satisfaction = clamp(s.regions.player.population.adel.satisfaction + 15, 0, 100);
+            for (const pid of ESTATE_DEFINITIONS[estateB].popGroups) s.regions.player.population[pid].satisfaction = clamp(s.regions.player.population[pid].satisfaction - 10, 0, 100);
+            const adelLeader = s.estates.adel.leaderId, rivalLeader = s.estates[estateB].leaderId;
+            recordWorldEvent(s, { type: "ESTATE_DEMAND_GRANTED", actorIds: [s.rulerId], targetIds: adelLeader ? [adelLeader] : [], emotionalWeight: 20, metadata: { estateId: "adel" }, description: `Der Herrscher stellt sich offen auf die Seite des Adels — auf Kosten der ${nameB}.` });
+            const memory = recordWorldEvent(s, { type: "ESTATE_DEMAND_REFUSED", actorIds: [s.rulerId], targetIds: rivalLeader ? [rivalLeader] : [], emotionalWeight: -25, metadata: { estateId: estateB }, description: `Die ${nameB} sehen sich zugunsten des Adels zurückgesetzt.` });
+            if (adelLeader) refreshRelationship(s, adelLeader, s.rulerId);
+            if (rivalLeader) refreshRelationship(s, rivalLeader, s.rulerId);
+            c.originatingMemoryIds.push(memory.id);
+            resolveEventChain(s, c, "GRANTED", `Der Adel wird bevorzugt, die ${nameB} sind verstimmt.`);
+          },
+        },
+        {
+          label: `Die ${nameB} bevorzugen.`, outcome: "favor_other",
+          effect: (s, c) => {
+            for (const pid of ESTATE_DEFINITIONS[estateB].popGroups) s.regions.player.population[pid].satisfaction = clamp(s.regions.player.population[pid].satisfaction + 15, 0, 100);
+            s.regions.player.population.adel.satisfaction = clamp(s.regions.player.population.adel.satisfaction - 10, 0, 100);
+            const adelLeader = s.estates.adel.leaderId, rivalLeader = s.estates[estateB].leaderId;
+            recordWorldEvent(s, { type: "ESTATE_DEMAND_GRANTED", actorIds: [s.rulerId], targetIds: rivalLeader ? [rivalLeader] : [], emotionalWeight: 20, metadata: { estateId: estateB }, description: `Der Herrscher stellt sich auf die Seite der ${nameB} — auf Kosten des Adels.` });
+            const memory = recordWorldEvent(s, { type: "ESTATE_DEMAND_REFUSED", actorIds: [s.rulerId], targetIds: adelLeader ? [adelLeader] : [], emotionalWeight: -25, metadata: { estateId: "adel" }, description: `Der Adel sieht sich zugunsten der ${nameB} zurückgesetzt.` });
+            if (adelLeader) refreshRelationship(s, adelLeader, s.rulerId);
+            if (rivalLeader) refreshRelationship(s, rivalLeader, s.rulerId);
+            c.originatingMemoryIds.push(memory.id);
+            resolveEventChain(s, c, "GRANTED", `Die ${nameB} werden bevorzugt, der Adel ist verstimmt.`);
+          },
+        },
+        {
+          label: "Einen kostspieligen Ausgleich suchen (-400 Taler).", outcome: "balance",
+          effect: (s, c) => {
+            s.treasury -= 400;
+            s.regions.player.population.adel.satisfaction = clamp(s.regions.player.population.adel.satisfaction + 5, 0, 100);
+            for (const pid of ESTATE_DEFINITIONS[estateB].popGroups) s.regions.player.population[pid].satisfaction = clamp(s.regions.player.population[pid].satisfaction + 5, 0, 100);
+            recordWorldEvent(s, { type: "ESTATE_DEMAND_GRANTED", actorIds: [s.rulerId], targetIds: [], emotionalWeight: 10, metadata: { estateId: "adel" }, description: "Ein kostspieliger Ausgleich mildert den Streit zwischen den Ständen." });
+            resolveEventChain(s, c, "COMPROMISE", "Ein teurer, aber ausgewogener Kompromiss beruhigt beide Seiten leidlich.");
+          },
+        },
+      ]);
+  },
+};
+
 // ---------- Registrierung ----------
 const CHAIN_TEMPLATES = {
   passed_over_heir: CHAIN_PASSED_OVER_HEIR,
@@ -8084,6 +8509,12 @@ const CHAIN_TEMPLATES = {
   church_conflict: CHAIN_CHURCH_CONFLICT,
   rising_rival: CHAIN_RISING_RIVAL,
   imperial_ambition: CHAIN_IMPERIAL_AMBITION,
+  adel_hofamt: CHAIN_ADEL_HOFAMT,
+  adel_krieg: CHAIN_ADEL_KRIEG,
+  staedte_handel: CHAIN_STAEDTE_HANDEL,
+  bauern_nahrung: CHAIN_BAUERN_NAHRUNG,
+  kirche_herrscher: CHAIN_KIRCHE_HERRSCHER,
+  staende_gegeneinander: CHAIN_STAENDE_GEGENEINANDER,
 };
 
 // ============================================================
