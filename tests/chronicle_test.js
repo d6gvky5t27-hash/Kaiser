@@ -228,6 +228,17 @@ console.log('--- Herrscherbiografie ---');
   check('formatRulerBiography() liefert lesbaren Text mit Regierungsjahren', text.includes('Regierte') && text.includes(String(bio.reignStart)));
 })();
 
+console.log('--- Phase 11: eigene STÄNDE-Kategorie ---');
+(function() {
+  const state = newGame({ seed: 72 });
+  recordWorldEvent(state, { type: 'ESTATE_DEMAND_GRANTED', actorIds: [state.rulerId], targetIds: [], importance: 60, description: 'Testforderung des Adels gewährt.' });
+  recordWorldEvent(state, { type: 'ESTATE_PRIVILEGE_GRANTED', actorIds: [state.rulerId], targetIds: [], description: 'Testprivileg gewährt.' });
+  check('chronicleCategoryForMemoryType() gibt STÄNDE für Stände-Memory-Typen zurück', chronicleCategoryForMemoryType('ESTATE_DEMAND_GRANTED') === 'STÄNDE');
+  check('chronicleCategoryForMemoryType() gibt STÄNDE auch für ESTATE_PRIVILEGE_GRANTED zurück', chronicleCategoryForMemoryType('ESTATE_PRIVILEGE_GRANTED') === 'STÄNDE');
+  const entries = computeDynastyChronicle(state);
+  check('eine bedeutsame Stände-Forderung erscheint mit Kategorie STÄNDE in der Dynasty Chronicle', entries.some(e => e.category === 'STÄNDE' && e.text.includes('Testforderung')));
+})();
+
 console.log('');
 if (failures > 0) { console.log(failures + ' Test(s) fehlgeschlagen.'); process.exit(1); }
 console.log('Alle Chronicle-2.0-Tests bestanden.');

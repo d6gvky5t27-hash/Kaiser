@@ -36,6 +36,11 @@ function chronicleCategoryForMemoryType(type) {
   if (cfg.tags.includes("dynasty")) return "DYNASTIE";
   if (cfg.tags.includes("war")) return "KRIEG";
   if (cfg.tags.includes("famine") || cfg.tags.includes("disaster")) return "KRISE";
+  // §Phase-11: eigene Kategorie VOR der allgemeinen "politics"-Prüfung, damit
+  // Stände-Ereignisse (ESTATE_DEMAND_GRANTED/REFUSED/ESTATE_PRIVILEGE_GRANTED,
+  // alle mit dem Tag "estates") in der Chronik als eigenständige politische
+  // Erzählebene sichtbar werden statt in der generischen POLITIK-Kategorie unterzugehen.
+  if (cfg.tags.includes("estates")) return "STÄNDE";
   if (cfg.tags.includes("politics")) return "POLITIK";
   if (cfg.tags.includes("diplomacy")) return "DIPLOMATIE";
   if (cfg.tags.includes("office") || cfg.tags.includes("hof")) return "HOF";

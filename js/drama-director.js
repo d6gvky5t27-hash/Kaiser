@@ -85,6 +85,13 @@ function computeDramaTensionBreakdown(state) {
     (state.year - t.history[t.history.length - 1].year) <= w.recentResolutionYears);
   add("Kürzlich gelöste Krise", recentResolution ? w.recentResolutionBonus : 0);
 
+  // §Phase-11: ein unzufriedener Stand ist eine reale, bereits berechnete
+  // politische Spannungsquelle (js/estates.js) — der Director erfindet hier
+  // nichts, er liest nur computeEstateSatisfaction() aus, genau wie oben
+  // bereits Hunger/Krieg/schlechte Beziehungen gelesen werden.
+  const unrestEstateCount = ESTATE_IDS.filter(id => computeEstateSatisfaction(state, id) < w.estateUnrestThreshold).length;
+  add(`Unzufriedene Stände (${unrestEstateCount})`, Math.min(unrestEstateCount * w.estateUnrestPerEstate, w.estateUnrestCap));
+
   return { components, total: clamp(Math.round(total), 0, 100) };
 }
 

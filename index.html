@@ -2375,6 +2375,11 @@ const CONFIG = {
       highLegitimacyBonus: -7, highLegitimacyThreshold: 80,
       highLoyaltyBonus: -5, highLoyaltyThreshold: 70,
       recentResolutionBonus: -4, recentResolutionYears: 3,
+      // §Phase-11: ein unzufriedener Stand ist eine reale politische
+      // Spannungsquelle, genau wie Hunger/Krieg/schlechte Beziehungen oben —
+      // pro Stand unterhalb der Schwelle EIN Punktwert, gedeckelt (analog
+      // activeRivalryPerRival/-Cap), keine Sonderlogik pro Stand.
+      estateUnrestPerEstate: 5, estateUnrestCap: 15, estateUnrestThreshold: 35,
     },
   },
   // ---------- Phase 7: Narrative Calibration & Chronicle 2.0 (§Punkt 19/20/36) ----------
@@ -6990,6 +6995,13 @@ function computeDramaTensionBreakdown(state) {
     (state.year - t.history[t.history.length - 1].year) <= w.recentResolutionYears);
   add("Kürzlich gelöste Krise", recentResolution ? w.recentResolutionBonus : 0);
 
+  // §Phase-11: ein unzufriedener Stand ist eine reale, bereits berechnete
+  // politische Spannungsquelle (js/estates.js) — der Director erfindet hier
+  // nichts, er liest nur computeEstateSatisfaction() aus, genau wie oben
+  // bereits Hunger/Krieg/schlechte Beziehungen gelesen werden.
+  const unrestEstateCount = ESTATE_IDS.filter(id => computeEstateSatisfaction(state, id) < w.estateUnrestThreshold).length;
+  add(`Unzufriedene Stände (${unrestEstateCount})`, Math.min(unrestEstateCount * w.estateUnrestPerEstate, w.estateUnrestCap));
+
   return { components, total: clamp(Math.round(total), 0, 100) };
 }
 
@@ -8555,6 +8567,11 @@ function chronicleCategoryForMemoryType(type) {
   if (cfg.tags.includes("dynasty")) return "DYNASTIE";
   if (cfg.tags.includes("war")) return "KRIEG";
   if (cfg.tags.includes("famine") || cfg.tags.includes("disaster")) return "KRISE";
+  // §Phase-11: eigene Kategorie VOR der allgemeinen "politics"-Prüfung, damit
+  // Stände-Ereignisse (ESTATE_DEMAND_GRANTED/REFUSED/ESTATE_PRIVILEGE_GRANTED,
+  // alle mit dem Tag "estates") in der Chronik als eigenständige politische
+  // Erzählebene sichtbar werden statt in der generischen POLITIK-Kategorie unterzugehen.
+  if (cfg.tags.includes("estates")) return "STÄNDE";
   if (cfg.tags.includes("politics")) return "POLITIK";
   if (cfg.tags.includes("diplomacy")) return "DIPLOMATIE";
   if (cfg.tags.includes("office") || cfg.tags.includes("hof")) return "HOF";

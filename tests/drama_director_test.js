@@ -169,6 +169,38 @@ console.log('--- §117: Erkennbar dramatischer Zustand ---');
   }
 })();
 
+// ---------- §Phase-11: unzufriedene Stände fließen in die globale Tension ein ----------
+console.log('--- Phase 11: Stände-Unruhe als Tension-Komponente ---');
+(function() {
+  const state = newGame({ seed: 61 });
+  const before = computeDramaTensionBreakdown(state).total;
+  for (const pid of ESTATE_DEFINITIONS.bauernschaft.popGroups) state.regions.player.population[pid].satisfaction = 10;
+  for (const pid of ESTATE_DEFINITIONS.buergertum.popGroups) state.regions.player.population[pid].satisfaction = 10;
+  const breakdown = computeDramaTensionBreakdown(state);
+  const unrestComponent = breakdown.components.find(c => c.label.includes('Unzufriedene Stände'));
+  check('unzufriedene Stände erzeugen eine benannte Tension-Komponente', !!unrestComponent && unrestComponent.value > 0);
+  check('globale Tension steigt spürbar gegenüber dem zufriedenen Ausgangszustand', breakdown.total > before);
+})();
+
+// ---------- §Phase-11: die sechs Stände-Ketten sind fürs Director-Scoring erreichbar ----------
+console.log('--- Phase 11: Stände-Ketten im Director-Scoring ---');
+(function() {
+  const state = newGame({ seed: 62 });
+  state.regions.player.taxRate = 0.5; // Adel-Steuerlast-Interesse auslösen
+  updateStoryThreads(state);
+  updateDramaDirector(state);
+  const explanation = explainDramaState(state);
+  check('explainDramaState() bleibt fehlerfrei, obwohl 16 statt 10 Chain-Templates existieren', Array.isArray(explanation.tensionBreakdown));
+  // explainEligibleChainScores() darf nicht crashen, auch wenn keine der 6
+  // neuen Ketten in CHAIN_THREAD_TYPE eingetragen ist (thread bleibt null) —
+  // computeChainDirectorScore() muss diesen Fall bereits robust behandeln.
+  let threw = false;
+  let scores = [];
+  try { scores = explainEligibleChainScores(state); } catch (e) { threw = true; console.log('    Exception: ' + e.message); }
+  check('explainEligibleChainScores() wirft keinen Fehler mit neuen, thread-losen Ketten', !threw);
+  check('jeder Score hat total/breakdown/threadId', scores.every(s => typeof s.total === 'number' && Array.isArray(s.breakdown) && ('threadId' in s)));
+})();
+
 console.log('');
 if (failures > 0) { console.log(failures + ' Test(s) fehlgeschlagen.'); process.exit(1); }
 console.log('Alle Drama-Director-Tests bestanden.');

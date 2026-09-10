@@ -525,6 +525,11 @@ const CONFIG = {
       highLegitimacyBonus: -7, highLegitimacyThreshold: 80,
       highLoyaltyBonus: -5, highLoyaltyThreshold: 70,
       recentResolutionBonus: -4, recentResolutionYears: 3,
+      // §Phase-11: ein unzufriedener Stand ist eine reale politische
+      // Spannungsquelle, genau wie Hunger/Krieg/schlechte Beziehungen oben —
+      // pro Stand unterhalb der Schwelle EIN Punktwert, gedeckelt (analog
+      // activeRivalryPerRival/-Cap), keine Sonderlogik pro Stand.
+      estateUnrestPerEstate: 5, estateUnrestCap: 15, estateUnrestThreshold: 35,
     },
   },
   // ---------- Phase 7: Narrative Calibration & Chronicle 2.0 (§Punkt 19/20/36) ----------
