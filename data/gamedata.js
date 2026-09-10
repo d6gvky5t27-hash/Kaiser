@@ -262,6 +262,27 @@ const CONFIG = {
     highInfluenceSatBonus: 3,
     highInfluenceThreshold: 75,
   },
+  // ---------- Phase 11: Landstände (§6/§107 — Schwellen konfigurierbar,
+  // zentral, keine verstreuten Magic Numbers). Jede Komponente ist in
+  // computeEstateInfluenceBreakdown() (js/estates.js) 1:1 nachvollziehbar,
+  // nach demselben "additive Breakdown"-Muster wie CONFIG.drama.tensionWeights
+  // und computeThreadImportanceBreakdown() (js/story-threads.js).
+  estates: {
+    influenceWeights: {
+      base: { adel: 20, geistlichkeit: 12, buergertum: 10, bauernschaft: 6 }, // grobe historische Rangfolge der Stände am Hof
+      populationShareFactor: 40, // * Bevölkerungsanteil des Standes (0..1)
+      wealthShareFactor: 25,     // * Anteil des Standes an der steuerlich gewichteten Wirtschaftskraft (0..1, POP_GROUPS[].weight)
+      leaderBonusMax: 10,        // Ausschöpfung bei stärkstmöglichem Leitwert (17) eines Wortführers
+      militaryDependencyBonus: 15, // nur Adel: Lehnsritter/-kavallerie derzeit im Dienst (echte, bestehende minAdelSatisfaction-Abhängigkeit, siehe TROOP_TYPES)
+      religiousInfluenceFactor: 20, // nur Geistlichkeit: Anteil von state.religiousInfluence (0..100), skaliert auf max. diesen Wert
+      recentActivityBonus: 8,    // eine gerade laufende Stände-Eventkette zu diesem Stand
+    },
+    demand: {
+      cooldownYears: 10,          // wie CHAIN_TEMPLATES-cooldownYears in ähnlicher Größenordnung (§Punkt: keine Forderungsflut)
+      minInfluenceToDemand: 30,   // ein einflussloser Stand kann (noch) nicht wirksam fordern
+      maxSatisfactionToDemand: 55, // ein bereits zufriedener Stand hat aktuell keinen Anlass
+    },
+  },
   rebellion: {
     satisfactionThreshold: 25,
     legitimacyThreshold: 35,
@@ -1281,6 +1302,21 @@ const POP_GROUPS = {
   }
 };
 
+// ---------- Phase 11: Landstände (§6 — baut auf POP_GROUPS auf, ersetzt es
+// NICHT: state.regions[*].population bleibt die einzige Bevölkerungsquelle,
+// ein Stand ist nur eine politische Zusammenfassung mehrerer POP_GROUPS,
+// siehe computeEstateSatisfaction()/computeEstatePopulationShare() in
+// js/estates.js). "soldaten" ist bewusst keinem Stand zugeordnet (Militär
+// hat bereits ein eigenes, etabliertes System, siehe TROOP_TYPES/
+// armyStrength() — keine Doppelrolle).
+const ESTATE_DEFINITIONS = {
+  adel:         { name: "Adel",          popGroups: ["adel"] },
+  geistlichkeit:{ name: "Geistlichkeit", popGroups: ["geistliche"] },
+  buergertum:   { name: "Bürgertum",     popGroups: ["buerger", "haendler", "handwerker"] },
+  bauernschaft: { name: "Bauernschaft",  popGroups: ["bauern", "landarbeiter", "tageloehner", "arme"] },
+};
+const ESTATE_IDS = Object.keys(ESTATE_DEFINITIONS);
+
 // ---------- Militär (§33/§34) — geprägt von Vasallenheeren & Söldnern, keine
 // stehende Armee: Vasallentruppen erfordern Lehenstreue (Adelszufriedenheit),
 // Söldner sind jederzeit gegen Gold verfügbar, aber unzuverlässig (Fahnenflucht
@@ -1878,6 +1914,20 @@ const MEMORY_TYPES = {
   // gleiche Argument wie DYNASTY_ENDED in Phase 7.
   FOREIGN_RULER_DIED:        { importance: 55, decayRate: 0.02, direction: "none", tags: ["diplomacy", "death"] },
   FOREIGN_RULER_SUCCEEDED:   { importance: 45, decayRate: 0.02, direction: "none", tags: ["diplomacy", "succession"] },
+  // --- neu in Phase 11 (§Estate System): DEMAND_ACCEPTED/DEMAND_REFUSED
+  // (Phase 5) bleiben bewusst unverändert für persönliche Hofkonflikte —
+  // diese drei sind bewusst GETRENNT, nicht wiederverwendet, damit
+  // Stände-Metriken (Forderungshäufigkeit/-ausgang je Stand, siehe
+  // PHASE11-Bericht) sauber per getMemoriesByType() gefiltert werden können,
+  // ohne persönliche Berater-/Erben-Konflikte mitzuzählen. Keine weitere
+  // Memory-Typ-Explosion darüber hinaus (§Punkt 32-Analogon).
+  ESTATE_DEMAND_GRANTED:     { importance: 50, decayRate: 0.03, direction: "target_to_actor", tags: ["politics", "estates", "gratitude"] },
+  ESTATE_DEMAND_REFUSED:     { importance: 50, decayRate: 0.025, direction: "target_to_actor", tags: ["politics", "estates", "grievance"] },
+  // Ein gewährtes Privileg ist ein dauerhafter, struktureller Fakt (nicht
+  // nur eine Beziehungsfolge) — direction "none" (betrifft den ganzen
+  // Stand, keine Einzelbeziehung), decayRate 0 (verblasst nicht, wie
+  // TITLE_GAINED/MARRIAGE).
+  ESTATE_PRIVILEGE_GRANTED:  { importance: 60, decayRate: 0, direction: "none", tags: ["politics", "estates"] },
 };
 
 // Event-System: TRIGGER/BEDINGUNGEN/TEXT/ENTSCHEIDUNGEN/KONSEQUENZEN (§38)

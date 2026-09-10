@@ -113,6 +113,10 @@ function applyRulerAndDynastyEffects(state) {
   // laufen NACH updateDynasty(), damit eine in diesem Jahr eingetretene
   // Erbfolge bereits mit dem neuen Herrscher berücksichtigt wird.
   updateCharacterCore(state);
+  // §Phase-11: Landstände-Wortführer NACH updateCharacterCore() neu prüfen
+  // (js/estates.js) — ein in diesem Jahr verstorbener/entlassener
+  // Amtsträger ist an dieser Stelle bereits berücksichtigt.
+  updateEstates(state);
   const ruler = state.characters[state.rulerId];
   const prestigeGain = 1 + (ruler ? traitEffectSum(ruler, "prestigeGain") : 0);
   state.prestige += prestigeGain;

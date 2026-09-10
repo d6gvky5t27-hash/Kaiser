@@ -10,7 +10,7 @@ const ROOT = path.join(__dirname, "..");
 const gamedata = fs.readFileSync(path.join(ROOT, "data/gamedata.js"), "utf8");
 const mapGeometry = fs.readFileSync(path.join(ROOT, "js/map-geometry.js"), "utf8");
 const simModules = [
-  "core", "economy", "population-dynasty", "memory", "characters", "story-threads",
+  "core", "economy", "population-dynasty", "memory", "characters", "estates", "story-threads",
   "drama-director", "event-chains", "chronicle", "politics", "diplomacy", "military",
   "debug", "war-map", "advance-year",
 ];

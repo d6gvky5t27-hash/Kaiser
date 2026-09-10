@@ -308,6 +308,7 @@ function newGame(options) {
 
   addChronicle(state, `Im Jahre 1500 übernahm ${ruler.name} ${dynastyName} die Herrschaft über ${state.regions.player.name}.`);
   initTerritories(state); // Kriegskarte (§Original-Vertiefung): Gebietsbesitz/Garnisonen initialisieren
+  initEstates(state); // §Phase-11 Landstände, siehe js/estates.js — nach initTerritories, da unbeteiligt/unabhängig
   return state;
 }
 
@@ -327,7 +328,7 @@ function logLedger(state, label, amount) {
 
 // ---------- Landwirtschaft (§18/§19) ----------
 
-const SAVE_VERSION = 7;
+const SAVE_VERSION = 8;
 
 function serializeSave(state) {
   return JSON.stringify({
@@ -462,6 +463,22 @@ function migrateSaveV6ToV7(parsed) {
   return parsed;
 }
 
+// §Phase-11: Landstände erweitern den State um `state.estates`. Alte Saves
+// bekommen einen frischen initEstates()-Aufbau — dieselbe
+// "keine rückwirkend erfundene Historie"-Regel wie bei jeder vorherigen
+// Migration (state.eventChains/state.storyThreads etc.): der Wortführer
+// wird aus dem AKTUELLEN Weltzustand (bereits vorhandene state.characters)
+// ganz normal deterministisch neu gewählt (selectEstateLeader()), keine
+// erfundene Amtszeit rückwirkend behauptet. `lastDemandYear: 0` bedeutet für
+// jeden Stand "noch nie gefordert" — exakt der reguläre Ausgangszustand
+// einer neuen Partie, keine Sonderbehandlung für Altspielstände nötig.
+function migrateSaveV7ToV8(parsed) {
+  const s = parsed.state;
+  if (!s.estates) initEstates(s);
+  parsed.saveVersion = 8;
+  return parsed;
+}
+
 function deserializeSave(json) {
   let parsed = JSON.parse(json);
   if (parsed.saveVersion === 2) parsed = migrateSaveV2ToV3(parsed);
@@ -469,6 +486,7 @@ function deserializeSave(json) {
   if (parsed.saveVersion === 4) parsed = migrateSaveV4ToV5(parsed);
   if (parsed.saveVersion === 5) parsed = migrateSaveV5ToV6(parsed);
   if (parsed.saveVersion === 6) parsed = migrateSaveV6ToV7(parsed);
+  if (parsed.saveVersion === 7) parsed = migrateSaveV7ToV8(parsed);
   if (parsed.saveVersion !== SAVE_VERSION) {
     throw new Error("Inkompatible Spielstand-Version: " + parsed.saveVersion);
   }
