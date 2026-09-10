@@ -1993,7 +1993,6 @@ const MEMORY_TYPES = {
   // verwendet weiterhin TITLE_GAINED (kein neuer Typ nötig); nur für eine
   // verlorene Wahl gibt es bislang keinerlei Memory-Äquivalent.
   IMPERIAL_CANDIDACY_DECLARED: { importance: 55, decayRate: 0.02, direction: "none", tags: ["politics", "election"] },
-  ELECTOR_PLEDGED_SUPPORT:     { importance: 35, decayRate: 0.05, direction: "target_to_actor", tags: ["politics", "election", "gratitude"] },
   ELECTION_PROMISE_MADE:       { importance: 40, decayRate: 0.03, direction: "target_to_actor", tags: ["politics", "election"] },
   ELECTION_PROMISE_FULFILLED:  { importance: 45, decayRate: 0.02, direction: "target_to_actor", tags: ["politics", "election", "gratitude"] },
   IMPERIAL_ELECTION_LOST:      { importance: 75, decayRate: 0,    direction: "none", tags: ["politics", "election"] },

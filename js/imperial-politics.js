@@ -142,6 +142,12 @@ function createElectionPromise(state, aiId, type, conditions) {
   if (type === "maintain_alliance" && !state.diplomacy[aiId].treaties.allianz) {
     return { ok: false, reason: "Es besteht noch kein Bündnis, das aufrechterhalten werden könnte." };
   }
+  if (type === "maintain_treaty") {
+    const targetDip = state.diplomacy[conditions.targetRegionId];
+    if (!targetDip || !targetDip.treaties[conditions.treatyType]) {
+      return { ok: false, reason: "Es besteht noch kein Vertrag, der aufrechterhalten werden könnte." };
+    }
+  }
   const cfg = CONFIG.election.promise;
   if (!state.electionPromises) state.electionPromises = { byId: {}, nextId: 1 };
   const id = "promise" + state.electionPromises.nextId++;
