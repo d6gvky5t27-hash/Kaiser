@@ -1,0 +1,187 @@
+{
+  "manifest": {
+    "generatedAt": "2026-09-10T21:17:14.897Z",
+    "seedBase": 500000,
+    "seeds": [
+      500000,
+      507919,
+      515838,
+      523757,
+      531676,
+      539595,
+      547514,
+      555433,
+      563352,
+      571271,
+      579190,
+      587109,
+      595028,
+      602947,
+      610866,
+      618785,
+      626704,
+      634623,
+      642542,
+      650461
+    ],
+    "years": 100,
+    "agentPolicyVersion": "phase11-v1"
+  },
+  "overall": {
+    "campaigns": 240,
+    "avgTotalEstateMemories": 5.95,
+    "chronicleWorthyShare": 1,
+    "avgDistinctTemplateIds": 4.83,
+    "avgFinalLeaders": 1.18,
+    "campaignsWithAnyLeaderShare": 0.95,
+    "crossSystemDecisionShare": 0.813,
+    "totalEstateChainResolutions": 1329,
+    "totalCrossSystemDecisions": 1080,
+    "campaignsWithStaendeGegeneinander": 108,
+    "totalStaendeGegeneinander": 242,
+    "estateDemandTotals": {
+      "adel": {
+        "GRANTED": 264,
+        "REFUSED": 62,
+        "PRIVILEGE": 27
+      },
+      "geistlichkeit": {
+        "GRANTED": 31,
+        "REFUSED": 0,
+        "PRIVILEGE": 77
+      },
+      "buergertum": {
+        "GRANTED": 22,
+        "REFUSED": 210,
+        "PRIVILEGE": 51
+      },
+      "bauernschaft": {
+        "GRANTED": 189,
+        "REFUSED": 100,
+        "PRIVILEGE": 395
+      }
+    },
+    "finalInfluenceAvg": {
+      "adel": 32.8,
+      "geistlichkeit": 26.7,
+      "buergertum": 29.2,
+      "bauernschaft": 43.5
+    },
+    "finalSatisfactionAvg": {
+      "adel": 25.8,
+      "geistlichkeit": 20.6,
+      "buergertum": 20.7,
+      "bauernschaft": 32.2
+    }
+  },
+  "agentAggregates": {
+    "passive": {
+      "campaigns": 20,
+      "avgTotalEstateMemories": 6.4,
+      "avgFinalLeaders": 0.95,
+      "avgDistinctTemplateIds": 4.6,
+      "crossSystemDecisionShare": 1,
+      "totalEstateChainResolutions": 128,
+      "campaignsWithStaendeGegeneinander": 11
+    },
+    "verwalter": {
+      "campaigns": 20,
+      "avgTotalEstateMemories": 1.75,
+      "avgFinalLeaders": 1.95,
+      "avgDistinctTemplateIds": 5.1,
+      "crossSystemDecisionShare": 1,
+      "totalEstateChainResolutions": 35,
+      "campaignsWithStaendeGegeneinander": 1
+    },
+    "kaufmann": {
+      "campaigns": 20,
+      "avgTotalEstateMemories": 5.3,
+      "avgFinalLeaders": 1.95,
+      "avgDistinctTemplateIds": 3.95,
+      "crossSystemDecisionShare": 1,
+      "totalEstateChainResolutions": 94,
+      "campaignsWithStaendeGegeneinander": 5
+    },
+    "kriegsherr": {
+      "campaigns": 20,
+      "avgTotalEstateMemories": 7.6,
+      "avgFinalLeaders": 0.85,
+      "avgDistinctTemplateIds": 5.05,
+      "crossSystemDecisionShare": 0.346,
+      "totalEstateChainResolutions": 127,
+      "campaignsWithStaendeGegeneinander": 15
+    },
+    "diplomat": {
+      "campaigns": 20,
+      "avgTotalEstateMemories": 7.3,
+      "avgFinalLeaders": 1.4,
+      "avgDistinctTemplateIds": 5.1,
+      "crossSystemDecisionShare": 1,
+      "totalEstateChainResolutions": 146,
+      "campaignsWithStaendeGegeneinander": 14
+    },
+    "dynast": {
+      "campaigns": 20,
+      "avgTotalEstateMemories": 8.3,
+      "avgFinalLeaders": 1.2,
+      "avgDistinctTemplateIds": 5.5,
+      "crossSystemDecisionShare": 1,
+      "totalEstateChainResolutions": 160,
+      "campaignsWithStaendeGegeneinander": 11
+    },
+    "machtpolitiker": {
+      "campaigns": 20,
+      "avgTotalEstateMemories": 7.2,
+      "avgFinalLeaders": 0.95,
+      "avgDistinctTemplateIds": 4.2,
+      "crossSystemDecisionShare": 1,
+      "totalEstateChainResolutions": 118,
+      "campaignsWithStaendeGegeneinander": 9
+    },
+    "opportunist": {
+      "campaigns": 20,
+      "avgTotalEstateMemories": 7,
+      "avgFinalLeaders": 0.95,
+      "avgDistinctTemplateIds": 4.8,
+      "crossSystemDecisionShare": 0.787,
+      "totalEstateChainResolutions": 136,
+      "campaignsWithStaendeGegeneinander": 5
+    },
+    "hardliner": {
+      "campaigns": 20,
+      "avgTotalEstateMemories": 6.9,
+      "avgFinalLeaders": 0.9,
+      "avgDistinctTemplateIds": 4.95,
+      "crossSystemDecisionShare": 0.374,
+      "totalEstateChainResolutions": 115,
+      "campaignsWithStaendeGegeneinander": 17
+    },
+    "versoehner": {
+      "campaigns": 20,
+      "avgTotalEstateMemories": 4.05,
+      "avgFinalLeaders": 1.05,
+      "avgDistinctTemplateIds": 5,
+      "crossSystemDecisionShare": 1,
+      "totalEstateChainResolutions": 78,
+      "campaignsWithStaendeGegeneinander": 9
+    },
+    "minmaxer": {
+      "campaigns": 20,
+      "avgTotalEstateMemories": 4.8,
+      "avgFinalLeaders": 0.95,
+      "avgDistinctTemplateIds": 5.3,
+      "crossSystemDecisionShare": 0.323,
+      "totalEstateChainResolutions": 96,
+      "campaignsWithStaendeGegeneinander": 0
+    },
+    "anfaenger": {
+      "campaigns": 20,
+      "avgTotalEstateMemories": 4.8,
+      "avgFinalLeaders": 1,
+      "avgDistinctTemplateIds": 4.35,
+      "crossSystemDecisionShare": 1,
+      "totalEstateChainResolutions": 96,
+      "campaignsWithStaendeGegeneinander": 11
+    }
+  }
+}
