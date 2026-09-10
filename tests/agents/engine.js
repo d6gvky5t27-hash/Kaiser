@@ -18,23 +18,38 @@
 // any tie-breaking choice it needs to make. Same agent + same seed always
 // produces an identical decision log and identical final state.
 
-// phase10-v1 (was phase9-v1): added considerBuildPalast() to
-// verwalter/diplomat/machtpolitiker/opportunist/minmaxer. Phase 10A's
-// title-progression audit found checkTitleProgress() gates "König" behind
-// a built palast — analogous to the Phase 9 kathedrale/Kaiserwahl gate —
-// which no agent built, artificially zeroing the König/Kaiser
-// reachability measurement. This is the SAME category of fix as Phase
-// 9's kathedrale addition (closing a test-agent competence gap, not a
-// balance change) — see PHASE10_BALANCE_COMPARISON.md §G. Also added
-// considerBuildKathedrale()+handleElection() to verwalter specifically:
-// with the recalibrated TITLES ladder verwalter now regularly reaches
-// Kurfürst+ rank, which per checkElectionTrigger() is the actual (only)
-// path to Kaiser — checkTitleProgress() explicitly excludes "kaiser"
-// (`if (next.id === "kaiser") return null`), so the Kaiser row in TITLES
-// is display-only; the real gate is kurfuerst rank + kathedrale +
-// resolveElection(), unrelated to reqPop/reqWealth/reqPrestige. All
-// other archetype behavior is byte-for-byte unchanged from phase9-v1.
-const AGENT_POLICY_VERSION = "phase10-v1";
+// phase11-v1 (was phase10-v1): Phase 11 "Living Realm" adds a genuinely
+// new player decision (a Landstände demand, surfaced through the same
+// pendingEvent window every other event/chain uses). Without any archetype
+// change, every agent already resolves these safely through the existing
+// generic agent.eventPrefs(ctx) fallback (verified: a full 100-year
+// verwalter campaign ran cleanly end-to-end with zero special-casing). This
+// bump documents the addition of `agent.estateEventPrefs(ctx)`, an OPTIONAL
+// per-archetype override consulted only when the pending decision is one of
+// the 6 estate chains (see pendingEstateIds() below) — added to the 8
+// archetypes the Phase 11 master prompt names explicitly (Verwalter,
+// Kaufmann, Kriegsherr, Diplomat, Dynast, Hardliner, Versöhner, Min-Maxer);
+// every other archetype (passive/machtpolitiker/opportunist/anfaenger)
+// keeps using its regular eventPrefs() for estate decisions too, which is a
+// deliberate choice, not an oversight — a passive/beginner/no-fixed-stance
+// agent has no principled estate-specific position beyond its general one.
+const AGENT_POLICY_VERSION = "phase11-v1";
+
+// Prior version history (phase10-v1, was phase9-v1): added
+// considerBuildPalast() to verwalter/diplomat/machtpolitiker/opportunist/
+// minmaxer. Phase 10A's title-progression audit found checkTitleProgress()
+// gates "König" behind a built palast — analogous to the Phase 9
+// kathedrale/Kaiserwahl gate — which no agent built, artificially zeroing
+// the König/Kaiser reachability measurement. This is the SAME category of
+// fix as Phase 9's kathedrale addition (closing a test-agent competence
+// gap, not a balance change) — see PHASE10_BALANCE_COMPARISON.md §G. Also
+// added considerBuildKathedrale()+handleElection() to verwalter
+// specifically: with the recalibrated TITLES ladder verwalter now
+// regularly reaches Kurfürst+ rank, which per checkElectionTrigger() is
+// the actual (only) path to Kaiser — checkTitleProgress() explicitly
+// excludes "kaiser" (`if (next.id === "kaiser") return null`), so the
+// Kaiser row in TITLES is display-only; the real gate is kurfuerst rank +
+// kathedrale + resolveElection(), unrelated to reqPop/reqWealth/reqPrestige.
 
 // ---------- Deterministic agent-private RNG (never touches state.rng) ----------
 function hashSeedString(str) {
@@ -138,6 +153,22 @@ function pickEventOptionIndex(ev, prefs, agentRng) {
     if (agentRng() < costSens) idx = best;
   }
   return idx;
+}
+
+// ---------- §Phase-11: Landstände-Erkennung fürs Event-Policy-Routing ----------
+// Reuses js/estates.js's own ESTATE_CHAIN_TEMPLATE_IDS (already loaded into
+// this sandbox) instead of duplicating the list of the 6 chain ids here.
+// Returns the estate id(s) involved (0, 1, or 2 for staende_gegeneinander),
+// purely a read — no rnd(), safe to call from an eventPrefs()-style function.
+function pendingEstateIds(ctx) {
+  const ev = ctx.state.pendingEvent;
+  if (!ev || ev.source !== "EVENT_CHAIN" || !ev.chainId) return [];
+  const chain = ctx.state.eventChains.active[ev.chainId];
+  if (!chain || !ESTATE_CHAIN_TEMPLATE_IDS.includes(chain.templateId)) return [];
+  const v = chain.variables || {};
+  if (v.estateIds) return v.estateIds;
+  if (v.estateId) return [v.estateId];
+  return [];
 }
 
 function resolvePendingEventAsPlayer(ctx, prefs) {
@@ -264,7 +295,16 @@ function resolvePendingQueue(ctx, agent) {
     if (state.pendingTerritoryDefense) { resolvePendingTerritoryDefense(ctx); continue; }
     if (state.pendingMarriage) { resolvePendingMarriage(ctx); continue; }
     if (state.pendingBirth) { resolvePendingBirth(ctx, agent.namePool); continue; }
-    if (state.pendingEvent) { resolvePendingEventAsPlayer(ctx, agent.eventPrefs(ctx)); continue; }
+    if (state.pendingEvent) {
+      // §Phase-11: an optional, archetype-specific estate lean takes over
+      // ONLY for the 6 Landstände chains, when the archetype defines one —
+      // every other pendingEvent (and every archetype without
+      // estateEventPrefs) keeps using the regular, already-established
+      // eventPrefs(ctx).
+      const useEstatePrefs = agent.estateEventPrefs && pendingEstateIds(ctx).length > 0;
+      resolvePendingEventAsPlayer(ctx, useEstatePrefs ? agent.estateEventPrefs(ctx) : agent.eventPrefs(ctx));
+      continue;
+    }
     break;
   }
 }

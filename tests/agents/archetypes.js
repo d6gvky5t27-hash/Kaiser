@@ -37,6 +37,15 @@ AGENTS.verwalter = {
   id: "verwalter",
   namePool: NAME_POOL_DEFAULT,
   eventPrefs: () => ({ aggressionBias: -0.6, costSensitivity: 0.3, reasonLabel: "stability-first, avoid costly harsh options", expectedGoal: "protect satisfaction and treasury" }),
+  // §Phase-11: an administrator values stable institutions over short-term
+  // cost — grant estate privileges generously (a permanent, low-drama fix
+  // beats a recurring grievance), and in a cross-estate conflict refuses to
+  // play favorites (the costly balanced compromise, index 0 of
+  // staende_gegeneinander after its reordering, see event-chains.js).
+  estateEventPrefs: function (ctx) {
+    if (pendingEstateIds(ctx).length > 1) return { aggressionBias: -1, costSensitivity: 0.1, reasonLabel: "no favoritism between estates, take the costly balanced path", expectedGoal: "institutional stability" };
+    return { aggressionBias: -0.8, costSensitivity: 0.1, reasonLabel: "grant estate privileges generously, a stable court is worth the cost", expectedGoal: "long-term institutional stability" };
+  },
   decideMonth: function (ctx) {
     manageTreasuryHealth(ctx, { minBuffer: 400, maxDebt: 5000, reason: "conservative treasury management" });
     makeYearlyOnce(ctx, "annual_verwalter", () => {
@@ -59,6 +68,22 @@ AGENTS.kaufmann = {
   id: "kaufmann",
   namePool: NAME_POOL_DEFAULT,
   eventPrefs: () => ({ aggressionBias: -0.2, costSensitivity: 0.7, reasonLabel: "protect trade margins, minimize cost", expectedGoal: "wealth accumulation" }),
+  // §Phase-11: a merchant grants Bürgertum demands generously (trade
+  // privileges are an investment, not a cost) but is cautious/cost-averse
+  // toward every other estate's demands (no direct commercial upside). In
+  // a cross-estate conflict, sides with whichever estate isn't the landed
+  // Adel (favor_other, index 2 after reordering) when Bürgertum is the
+  // rival; otherwise stays neutral and takes the balanced compromise.
+  estateEventPrefs: function (ctx) {
+    const ids = pendingEstateIds(ctx);
+    if (ids.length > 1) {
+      return ids.includes("buergertum")
+        ? { aggressionBias: 1, costSensitivity: 0.3, reasonLabel: "side with common trade interests against noble privilege", expectedGoal: "protect commerce" }
+        : { aggressionBias: -1, costSensitivity: 0.3, reasonLabel: "no direct commercial stake in this conflict, stay neutral", expectedGoal: "avoid unnecessary entanglement" };
+    }
+    if (ids.includes("buergertum")) return { aggressionBias: -0.9, costSensitivity: 0.1, reasonLabel: "trade privileges pay for themselves, grant generously", expectedGoal: "commercial expansion" };
+    return { aggressionBias: -0.1, costSensitivity: 0.6, reasonLabel: "other estates' demands are a cost with no trade upside, stay cautious", expectedGoal: "minimize non-commercial spending" };
+  },
   decideMonth: function (ctx) {
     manageTreasuryHealth(ctx, { minBuffer: 300, maxDebt: 5500, reason: "keep trading capital available" });
     makeYearlyOnce(ctx, "annual_kaufmann", () => {
@@ -78,6 +103,17 @@ AGENTS.kriegsherr = {
   id: "kriegsherr",
   namePool: NAME_POOL_DEFAULT,
   eventPrefs: () => ({ aggressionBias: 0.8, costSensitivity: 0.1, reasonLabel: "assert dominance, accept cost", expectedGoal: "military prestige" }),
+  // §Phase-11: a warlord's army leans on the Adel's knights and heavy
+  // cavalry (TROOP_TYPES.ritter/schwere_kavallerie both require
+  // minAdelSatisfaction) — unusually generous toward the Adel specifically,
+  // harsh toward every other estate's demands, and sides with the Adel
+  // without hesitation in any cross-estate conflict (favor_adel, index 1).
+  estateEventPrefs: function (ctx) {
+    const ids = pendingEstateIds(ctx);
+    if (ids.length > 1) return { aggressionBias: 0, costSensitivity: 0, reasonLabel: "the army needs the Adel's cavalry, side with them without hesitation", expectedGoal: "military dependency" };
+    if (ids.includes("adel")) return { aggressionBias: -0.7, costSensitivity: 0.1, reasonLabel: "keep the knights loyal -- the army depends on them", expectedGoal: "military readiness" };
+    return { aggressionBias: 1.0, costSensitivity: 0, reasonLabel: "no patience for demands from estates that don't fight", expectedGoal: "assert dominance" };
+  },
   decideMonth: function (ctx) {
     manageTreasuryHealth(ctx, { minBuffer: 150, maxDebt: 8000, reason: "war chest, tolerate debt for army" });
     makeYearlyOnce(ctx, "annual_kriegsherr", () => {
@@ -99,6 +135,15 @@ AGENTS.diplomat = {
   id: "diplomat",
   namePool: NAME_POOL_DEFAULT,
   eventPrefs: () => ({ aggressionBias: -0.8, costSensitivity: 0.3, reasonLabel: "seek peaceful resolution", expectedGoal: "relationship preservation" }),
+  // §Phase-11: generous toward any single estate's demand (same
+  // relationship-first instinct as with foreign powers), and in a
+  // cross-estate conflict specifically refuses to pick a side — brokering
+  // the balanced compromise (index 0 after reordering) is a diplomat's
+  // specialty, not a fallback.
+  estateEventPrefs: function (ctx) {
+    if (pendingEstateIds(ctx).length > 1) return { aggressionBias: -1, costSensitivity: 0.2, reasonLabel: "broker a compromise rather than pick a side between estates", expectedGoal: "internal peace" };
+    return { aggressionBias: -0.9, costSensitivity: 0.2, reasonLabel: "generosity preserves goodwill with every estate, just as with foreign powers", expectedGoal: "relationship preservation" };
+  },
   decideMonth: function (ctx) {
     manageTreasuryHealth(ctx, { minBuffer: 300, maxDebt: 5000, reason: "diplomatic gifts require liquidity" });
     makeYearlyOnce(ctx, "annual_diplomat", () => {
@@ -120,6 +165,15 @@ AGENTS.dynast = {
   id: "dynast",
   namePool: ["Heinrich", "Adelheid", "Sigismund", "Kunigunde", "Otto", "Gertrud", "Albrecht", "Irmgard"],
   eventPrefs: () => ({ aggressionBias: -0.4, costSensitivity: 0.4, reasonLabel: "preserve family harmony and succession", expectedGoal: "dynastic stability" }),
+  // §Phase-11: a dynast wants every estate content around the throne (an
+  // alienated estate is a future threat to the succession) — moderately
+  // generous toward single demands, and in a cross-estate conflict always
+  // takes the costly balanced path rather than making a permanent enemy of
+  // either side.
+  estateEventPrefs: function (ctx) {
+    if (pendingEstateIds(ctx).length > 1) return { aggressionBias: -1, costSensitivity: 0.2, reasonLabel: "no estate should become a lasting enemy of the throne", expectedGoal: "dynastic security" };
+    return { aggressionBias: -0.5, costSensitivity: 0.3, reasonLabel: "an estate content today doesn't threaten the succession tomorrow", expectedGoal: "dynastic stability" };
+  },
   decideMonth: function (ctx) {
     manageTreasuryHealth(ctx, { minBuffer: 350, maxDebt: 5000, reason: "court stability requires solvency" });
     makeYearlyOnce(ctx, "annual_dynast", () => {
@@ -200,6 +254,14 @@ AGENTS.hardliner = {
   id: "hardliner",
   namePool: NAME_POOL_DEFAULT,
   eventPrefs: () => ({ aggressionBias: 1.0, costSensitivity: 0.0, reasonLabel: "HARDLINE policy: always the harshest option", expectedGoal: "maximum immediate leverage" }),
+  // §Phase-11: stays true to the general hardline stance (refuse every
+  // single-estate demand) -- the one deliberate exception is siding with
+  // the Adel in a direct cross-estate conflict, since even a hardliner
+  // needs the nobility's swords (see kriegsherr's identical reasoning).
+  estateEventPrefs: function (ctx) {
+    if (pendingEstateIds(ctx).length > 1) return { aggressionBias: 0, costSensitivity: 0, reasonLabel: "even a hardliner needs the nobility's swords", expectedGoal: "maintain coercive capacity" };
+    return { aggressionBias: 1.0, costSensitivity: 0.0, reasonLabel: "HARDLINE policy: refuse every estate demand", expectedGoal: "maximum immediate leverage" };
+  },
   decideMonth: function (ctx) {
     manageTreasuryHealth(ctx, { minBuffer: 150, maxDebt: 7000, reason: "hardline treasury tolerance" });
     makeYearlyOnce(ctx, "annual_hardliner", () => {
@@ -226,6 +288,14 @@ AGENTS.versoehner = {
   id: "versoehner",
   namePool: NAME_POOL_DEFAULT,
   eventPrefs: () => ({ aggressionBias: -1.0, costSensitivity: 0.5, reasonLabel: "CONCILIATORY policy: always the most generous option", expectedGoal: "stability and goodwill" }),
+  // §Phase-11: stays true to the general conciliatory stance for single
+  // demands, and in a cross-estate conflict takes the same costly balanced
+  // path a diplomat/dynast would -- picking a side is the one thing a
+  // conciliator by definition refuses to do.
+  estateEventPrefs: function (ctx) {
+    if (pendingEstateIds(ctx).length > 1) return { aggressionBias: -1, costSensitivity: 0.3, reasonLabel: "CONCILIATORY policy: never picks a side between estates", expectedGoal: "goodwill with every estate" };
+    return { aggressionBias: -1.0, costSensitivity: 0.4, reasonLabel: "CONCILIATORY policy: always the most generous option", expectedGoal: "stability and goodwill" };
+  },
   decideMonth: function (ctx) {
     manageTreasuryHealth(ctx, { minBuffer: 350, maxDebt: 4500, reason: "conciliatory, low-risk finances" });
     makeYearlyOnce(ctx, "annual_versoehner", () => {
@@ -266,6 +336,23 @@ AGENTS.minmaxer = {
     const phase = minmaxPhaseFor(yearsIn);
     const bias = phase.name === "economic_extraction" || phase.name === "advisor_stacking" ? -0.5 : 0.5;
     return { aggressionBias: bias, costSensitivity: 0.8, reasonLabel: "min-max exploit test: " + phase.name };
+  },
+  // §Phase-11: estate demands aren't one of the 5 named exploit hypotheses
+  // (§MINMAX_PHASES), so the min-maxer doesn't invent a 6th one on the fly
+  // -- it treats a granted privilege as cheap during its low-spend phases
+  // (economic_extraction/advisor_stacking, same phases its general
+  // eventPrefs already treats as low-cost-tolerance) and refuses during its
+  // high-spend military/bribery phases to protect the war chest. A
+  // cross-estate conflict always gets the safe, hypothesis-neutral balanced
+  // compromise -- not part of what this run is testing.
+  estateEventPrefs: function (ctx) {
+    if (pendingEstateIds(ctx).length > 1) return { aggressionBias: -1, costSensitivity: 0.2, reasonLabel: "not part of the current exploit hypothesis, take the safe middle path", expectedGoal: "avoid confounding the active test" };
+    const yearsIn = ctx.state.year - 1500;
+    const phase = minmaxPhaseFor(yearsIn);
+    const lowSpendPhase = phase.name === "economic_extraction" || phase.name === "advisor_stacking";
+    return lowSpendPhase
+      ? { aggressionBias: -0.8, costSensitivity: 0.1, reasonLabel: "min-max: a permanent privilege is cheap during " + phase.name, expectedGoal: "cheap structural gains" }
+      : { aggressionBias: 1.0, costSensitivity: 0.9, reasonLabel: "min-max: protect the war chest during " + phase.name, expectedGoal: "preserve resources for the active exploit test" };
   },
   decideMonth: function (ctx) {
     const yearsIn = ctx.state.year - 1500;

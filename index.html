@@ -8495,6 +8495,24 @@ const CHAIN_STAENDE_GEGENEINANDER = {
     queueChainDecision(state, chain, `Adel und ${nameB} im Widerstreit`,
       `Der Adel verlangt Erleichterungen zu seinen Gunsten — doch jedes Zugeständnis an ihn träfe unmittelbar den ohnehin bedrängten Stand der ${nameB}. Der Herrscher muss sich entscheiden, wen er stärkt.`,
       [
+        // §Konvention (siehe resolvePendingEventWithPolicy oben): Option 0
+        // großzügig/entgegenkommend, letzte Option am härtesten/einseitigsten.
+        // Bei einem echten Nullsummenkonflikt gibt es keine natürliche
+        // "härteste" Seite -- der teure, beide Seiten mäßig zufriedenstellende
+        // Ausgleich ist die einzige Option, die beiden gegenüber großzügig
+        // ist, und steht deshalb an Position 0 statt einseitig Adel zu
+        // bevorzugen; die beiden einseitigen Optionen (gleich einseitig,
+        // nur zugunsten unterschiedlicher Stände) folgen danach.
+        {
+          label: "Einen kostspieligen Ausgleich suchen (-400 Taler).", outcome: "balance",
+          effect: (s, c) => {
+            s.treasury -= 400;
+            s.regions.player.population.adel.satisfaction = clamp(s.regions.player.population.adel.satisfaction + 5, 0, 100);
+            for (const pid of ESTATE_DEFINITIONS[estateB].popGroups) s.regions.player.population[pid].satisfaction = clamp(s.regions.player.population[pid].satisfaction + 5, 0, 100);
+            recordWorldEvent(s, { type: "ESTATE_DEMAND_GRANTED", actorIds: [s.rulerId], targetIds: [], emotionalWeight: 10, metadata: { estateId: "adel" }, description: "Ein kostspieliger Ausgleich mildert den Streit zwischen den Ständen." });
+            resolveEventChain(s, c, "COMPROMISE", "Ein teurer, aber ausgewogener Kompromiss beruhigt beide Seiten leidlich.");
+          },
+        },
         {
           label: "Den Adel bevorzugen.", outcome: "favor_adel",
           effect: (s, c) => {
@@ -8521,16 +8539,6 @@ const CHAIN_STAENDE_GEGENEINANDER = {
             if (rivalLeader) refreshRelationship(s, rivalLeader, s.rulerId);
             c.originatingMemoryIds.push(memory.id);
             resolveEventChain(s, c, "GRANTED", `Die ${nameB} werden bevorzugt, der Adel ist verstimmt.`);
-          },
-        },
-        {
-          label: "Einen kostspieligen Ausgleich suchen (-400 Taler).", outcome: "balance",
-          effect: (s, c) => {
-            s.treasury -= 400;
-            s.regions.player.population.adel.satisfaction = clamp(s.regions.player.population.adel.satisfaction + 5, 0, 100);
-            for (const pid of ESTATE_DEFINITIONS[estateB].popGroups) s.regions.player.population[pid].satisfaction = clamp(s.regions.player.population[pid].satisfaction + 5, 0, 100);
-            recordWorldEvent(s, { type: "ESTATE_DEMAND_GRANTED", actorIds: [s.rulerId], targetIds: [], emotionalWeight: 10, metadata: { estateId: "adel" }, description: "Ein kostspieliger Ausgleich mildert den Streit zwischen den Ständen." });
-            resolveEventChain(s, c, "COMPROMISE", "Ein teurer, aber ausgewogener Kompromiss beruhigt beide Seiten leidlich.");
           },
         },
       ]);
