@@ -943,6 +943,47 @@ console.log('--- Phase 11: getStoryContextViewModel() ohne Story-Thread ---');
   check('threadTitle ist der echte Kettenname, nicht "undefined"', ctx.threadTitle === 'Die Bauern und die Nahrung');
 })();
 
+// ---------- Phase 12: Kaiserkrone-ViewModel ----------
+console.log('--- Phase 12: getImperialPoliticsViewModel() ---');
+(function() {
+  const state = newGame({ seed: 2200 });
+  const vm0 = getImperialPoliticsViewModel(state);
+  check('frisches Spiel (kein Kurfürst): Panel nicht sichtbar', vm0.visible === false);
+})();
+(function() {
+  const state = newGame({ seed: 2201 });
+  state.titleIndex = TITLES.findIndex(t => t.id === 'kurfuerst');
+  const vm = getImperialPoliticsViewModel(state);
+  check('ab Kurfürst-Rang: Panel sichtbar', vm.visible === true);
+  check('ohne Kathedrale: Eignungs-Checkliste zeigt einen fehlgeschlagenen Punkt', vm.eligibility.checks.some(c => !c.passed));
+  check('noch keine Kandidatur aktiv', vm.candidacyActive === false);
+})();
+(function() {
+  const state = newGame({ seed: 2202 });
+  state.titleIndex = TITLES.findIndex(t => t.id === 'kurfuerst');
+  state.regions.player.buildings.push({ type: 'kathedrale', level: 1, plotIndex: -1 });
+  declareImperialCandidacy(state);
+  const vm = getImperialPoliticsViewModel(state);
+  check('nach Kandidatur: candidacyActive true', vm.candidacyActive === true);
+  check('genau 7 Electors gelistet', vm.electors.length === 7);
+  check('jeder Elector hat eine qualitative Haltung (leaning), keinen rohen Score', vm.electors.every(e => typeof e.leaning === 'string' && !('score' in e) && !('total' in e)));
+  check('regionOptions enthält alle 7 Regionen für die Zielauswahl bei Versprechen', vm.regionOptions.length === 7);
+
+  const res = createElectionPromise(state, 'ai1', 'pay_tribute', { amount: 123 });
+  const vm2 = getImperialPoliticsViewModel(state);
+  check('ein erstelltes Versprechen erscheint im ViewModel', vm2.promises.some(p => p.id === res.promiseId && p.conditionText.includes('123')));
+  check('ein offenes pay_tribute-Versprechen ist sofort einlösbar (canFulfillNow)', vm2.promises.find(p => p.id === res.promiseId).canFulfillNow === true);
+})();
+(function() {
+  const state = newGame({ seed: 2203 });
+  const before = __rngCalls;
+  state.titleIndex = TITLES.findIndex(t => t.id === 'kurfuerst');
+  state.regions.player.buildings.push({ type: 'kathedrale', level: 1, plotIndex: -1 });
+  declareImperialCandidacy(state);
+  getImperialPoliticsViewModel(state);
+  check('kein einziger rnd()-Aufruf durch getImperialPoliticsViewModel() (declareImperialCandidacy() selbst ebenfalls rnd-frei)', __rngCalls === before);
+})();
+
 console.log('');
 if (failures > 0) { console.log(failures + ' Test(s) fehlgeschlagen.'); process.exit(1); }
 console.log('Alle UI-ViewModel-Tests bestanden.');

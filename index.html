@@ -757,6 +757,21 @@
   .diploActionsGroup .groupLabel { font-size: var(--fs-micro); color: var(--umber); text-transform: uppercase; letter-spacing: 0.5px; margin: var(--sp-2) 0 3px 0; }
   .diploActionsGroup button { margin: 2px 4px 2px 0; }
 
+  /* §Phase-12 "Imperial Politics": Kaiserkrone-Unteransicht. */
+  #kaiserkronePanel .checklist { list-style: none; padding: 0; margin: var(--sp-2) 0; }
+  #kaiserkronePanel .checklist li { padding: 2px 0; }
+  #kaiserkronePanel .checklist li.passed { color: var(--umber); }
+  #kaiserkronePanel .checklist li.failed { color: var(--ink); font-weight: 600; }
+  .electorRow { border: 1px solid var(--umber); border-radius: var(--r-sm); padding: var(--sp-2); margin-bottom: var(--sp-2); background: rgba(242,230,201,0.35); }
+  .electorRow .electorHead { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+  .electorRow .electorHead b { flex: 1; min-width: 120px; }
+  .promiseForm { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 6px; }
+  .promiseForm select, .promiseForm input { font-family: inherit; font-size: var(--fs-micro); padding: 3px; }
+  .promiseForm input[type="number"] { width: 65px; }
+  .promiseLedger { list-style: none; padding: 0; margin: var(--sp-2) 0; }
+  .promiseLedger li { padding: 4px 0; border-bottom: 1px dotted var(--umber); font-size: var(--fs-body); }
+  .promiseLedger .promiseStatus { font-weight: 600; }
+
   /* ============================================================
      §Phase-11 "Living Realm": Landstände -- dieselbe Karten-/Detail-
      Zweiteilung wie DIPLOMATIE (.diploPowerRow/.diploDetailHead), nur als
@@ -1566,6 +1581,10 @@
   </div>
 
   <div id="diplomatiePage" style="display:none;">
+    <div class="panel" id="kaiserkronePanel" style="display:none; margin-bottom:var(--sp-3);">
+      <h2 class="title">👑 KAISERKRONE</h2>
+      <div id="kaiserkroneBody"></div>
+    </div>
     <div class="panel">
       <h2 class="title">DIPLOMATIE</h2>
       <div class="diploFilterBar" id="diploFilterBar"></div>
@@ -3625,6 +3644,7 @@ const STRINGS = {
     dynasty_tree_title: "STAMMBAUM", dynasty_succession_title: "THRONFOLGE",
     tab_wirtschaft_label: "WIRTSCHAFT", tab_diplomatie_label: "DIPLOMATIE",
     tab_karte_label: "GEBÄUDE", tab_militaer_label: "MILITÄR",
+    tab_staende_label: "LANDSTÄNDE",
     btn_advance: "▶ MONAT VERGEHEN LASSEN",
     btn_save: "💾 SPEICHERN",
     btn_load: "📂 LADEN",
@@ -3687,6 +3707,7 @@ const STRINGS = {
     dynasty_tree_title: "FAMILY TREE", dynasty_succession_title: "SUCCESSION",
     tab_wirtschaft_label: "ECONOMY", tab_diplomatie_label: "DIPLOMACY",
     tab_karte_label: "BUILDINGS", tab_militaer_label: "MILITARY",
+    tab_staende_label: "ESTATES",
     btn_advance: "▶ ADVANCE MONTH",
     btn_save: "💾 SAVE",
     btn_load: "📂 LOAD",
@@ -13669,6 +13690,59 @@ function getElectorInfoViewModel(state, aiId) {
   return { isElector: true, stance, leaning: ELECTOR_STANCE_LABELS[stance] };
 }
 
+// ---------- §Phase-12: Kaiserkrone-Unteransicht (Diplomatie-Tab) -- volle
+// Kandidatur-/Geschenk-/Wahlversprechen-Übersicht. Weiterhin nur die
+// qualitative Haltung je Kurfürst (s.o.), niemals der rohe Score. ----------
+const ELECTION_PROMISE_TYPE_LABELS = {
+  no_war_target: "Kein Krieg gegen Zielgebiet", maintain_alliance: "Bündnis aufrechterhalten",
+  maintain_treaty: "Nichtangriffspakt mit Zielgebiet aufrechterhalten", pay_tribute: "Zahlung zusichern",
+};
+const ELECTION_PROMISE_STATUS_LABELS = { PROMISED: "offen", FULFILLED: "eingelöst", BROKEN: "gebrochen" };
+function describeElectionPromiseCondition(p) {
+  if (p.type === "pay_tribute") return `${p.conditions.amount} Taler bis ${p.deadlineYear}`;
+  if (p.type === "no_war_target" || p.type === "maintain_treaty") return `betrifft ${p.conditions.targetRegionId}, bis ${p.deadlineYear}`;
+  return `bis ${p.deadlineYear}`;
+}
+function getImperialPoliticsViewModel(state) {
+  const eligibility = checkImperialCandidacyEligibility(state);
+  const candidacy = state.imperialCandidacy;
+  const electorIds = getElectorIds(state);
+  const electors = electorIds.map(aiId => {
+    const region = state.regions[aiId];
+    const ruler = region.rulerId ? state.characters[region.rulerId] : null;
+    const info = getElectorInfoViewModel(state, aiId);
+    return {
+      aiId, regionName: region.name,
+      rulerName: ruler ? `${ruler.name} ${ruler.surname || ""}`.trim() : region.name,
+      stance: info.stance, leaning: info.leaning,
+      giftCount: candidacy ? (candidacy.giftsGivenThisCandidacy[aiId] || 0) : 0,
+    };
+  });
+  const promises = state.electionPromises ? Object.values(state.electionPromises.byId)
+    .slice().sort((a, b) => b.createdYear - a.createdYear || a.id.localeCompare(b.id))
+    .map(p => ({
+      id: p.id, regionName: state.regions[p.electorRegionId].name,
+      typeLabel: ELECTION_PROMISE_TYPE_LABELS[p.type] || p.type,
+      statusLabel: ELECTION_PROMISE_STATUS_LABELS[p.status] || p.status,
+      status: p.status,
+      conditionText: describeElectionPromiseCondition(p),
+      canFulfillNow: p.status === "PROMISED" && p.type === "pay_tribute",
+    })) : [];
+  const kurfuerstRank = TITLES.findIndex(t => t.id === "kurfuerst");
+  return {
+    visible: state.titleIndex >= kurfuerstRank || !!candidacy || !!state.pendingElection,
+    eligibility,
+    candidacyActive: !!candidacy,
+    candidacyDeclaredYear: candidacy ? candidacy.declaredYear : null,
+    candidacyAgeYears: candidacy ? state.year - candidacy.declaredYear : null,
+    pendingElection: !!state.pendingElection,
+    electionCooldown: state.electionCooldown || 0,
+    electors,
+    promises,
+    regionOptions: electorIds.map(aiId => ({ aiId, name: state.regions[aiId].name })),
+  };
+}
+
 // ---------- §7: "Warum stehen wir so zueinander?" -- die diplomatische
 // Beziehung ist (anders als Character-Core-Beziehungen) ein reiner
 // Drift-Akkumulator ohne gespeicherte Einzelkomponenten (js/diplomacy.js
@@ -17333,7 +17407,129 @@ function diploPowerImportance(aiId) {
   return totalPop + region.land * 0.01;
 }
 
+// ============================================================
+// §Phase-12 "Imperial Politics": Kaiserkrone-Unteransicht im Diplomatie-Tab.
+// Ersetzt/ergänzt das minimale electionBanner-Provisorium aus der
+// Kernmodul-Verdrahtung um Kandidatur-Erklärung, Geschenke, Wahlversprechen
+// und die Versprechen-Ablage -- alles über die bereits bestehende
+// js/imperial-politics.js-API, keine neue Spiellogik hier.
+// §15/16: den Electoren wird bewusst nur die qualitative Haltung gezeigt
+// (getImperialPoliticsViewModel() -> ELECTOR_STANCE_LABELS), niemals der
+// rohe Score -- der bleibt dem DEBUG-Panel vorbehalten.
+// ============================================================
+const IMPERIAL_STANCE_TIER = {
+  SICHER_FUER: 'tier-pos', GENEIGT: 'tier-pos',
+  UNENTSCHLOSSEN: 'tier-neutral',
+  GENEIGT_GEGEN: 'tier-neg', SICHER_GEGEN: 'tier-neg',
+};
+
+function renderKaiserkronePanel() {
+  const panel = document.getElementById('kaiserkronePanel');
+  const vm = getImperialPoliticsViewModel(state);
+  if (!vm.visible) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+
+  let html = '';
+
+  if (state.pendingElection) {
+    html += `<p><b>Die Kaiserwahl steht unmittelbar bevor.</b> Die Kurfürsten werden bald über den neuen Kaiser entscheiden.</p>
+      <button onclick="doResolveElection()">Wahl jetzt abhalten</button>`;
+  } else if (vm.candidacyActive) {
+    html += `<p>Kandidatur erklärt im Jahr ${vm.candidacyDeclaredYear} (vor ${vm.candidacyAgeYears} ${vm.candidacyAgeYears === 1 ? 'Jahr' : 'Jahren'}).
+      Die Kurfürsten werden die Wahl ansetzen, sobald die Zeit reif ist.</p>`;
+  } else if (vm.electionCooldown > 0) {
+    html += `<p>Nach der letzten verlorenen Wahl werben die Kurfürsten noch ${vm.electionCooldown} ${vm.electionCooldown === 1 ? 'Jahr' : 'Jahre'} lang keine neue Kandidatur.</p>`;
+  } else if (vm.eligibility.eligible) {
+    html += `<p>Ihr erfüllt alle Voraussetzungen, um offiziell um die Kaiserkrone zu kandidieren.</p>
+      <button onclick="doDeclareImperialCandidacy()">Kandidatur erklären</button>`;
+  } else {
+    html += `<p>Voraussetzungen für eine Kandidatur um die Kaiserkrone:</p>
+      <ul class="checklist">${vm.eligibility.checks.map(c => `<li class="${c.passed ? 'passed' : 'failed'}">${c.passed ? '✓' : '✗'} ${c.label}</li>`).join('')}</ul>`;
+  }
+
+  if (vm.candidacyActive) {
+    html += `<div class="diploSection"><h4>Die Kurfürsten</h4>`;
+    html += vm.electors.map(e => {
+      const tier = IMPERIAL_STANCE_TIER[e.stance] || 'tier-neutral';
+      return `<div class="electorRow">
+        <div class="electorHead">
+          <b>${e.rulerName} (${e.regionName})</b>
+          <span class="relTierTag ${tier}">${e.leaning}</span>
+          <button class="btn-ghost" onclick="doGiftElector('${e.aiId}')" data-tip="Diplomatisches Geschenk (${CONFIG.election.giftCost} Taler)">Geschenk senden</button>
+        </div>
+        <div class="promiseForm">
+          <select id="promiseType_${e.aiId}" onchange="updatePromiseFormVisibility('${e.aiId}')">
+            ${Object.entries(ELECTION_PROMISE_TYPE_LABELS).map(([type, label]) => `<option value="${type}">${label}</option>`).join('')}
+          </select>
+          <span id="promiseTargetWrap_${e.aiId}">
+            <select id="promiseTarget_${e.aiId}">${vm.regionOptions.filter(r => r.aiId !== e.aiId).map(r => `<option value="${r.aiId}">${r.name}</option>`).join('')}</select>
+          </span>
+          <span id="promiseAmountWrap_${e.aiId}">
+            <input type="number" id="promiseAmount_${e.aiId}" value="100" min="10" step="10">
+            <span>Taler</span>
+          </span>
+          <button class="btn-ghost" onclick="doCreateElectionPromise('${e.aiId}')">Zusagen</button>
+        </div>
+      </div>`;
+    }).join('');
+    html += `</div>`;
+  }
+
+  if (vm.promises.length) {
+    html += `<div class="diploSection"><h4>Wahlversprechen</h4><ul class="promiseLedger">`;
+    html += vm.promises.map(p => {
+      const statusCls = p.status === 'FULFILLED' ? 'goodgood' : (p.status === 'BROKEN' ? 'goodbad' : '');
+      return `<li><b>${p.regionName}</b>: ${p.typeLabel} (${p.conditionText}) —
+        <span class="promiseStatus ${statusCls}">${p.statusLabel}</span>
+        ${p.canFulfillNow ? `<button class="btn-ghost" onclick="doFulfillElectionPromise('${p.id}')">Jetzt einlösen</button>` : ''}
+      </li>`;
+    }).join('');
+    html += `</ul></div>`;
+  }
+
+  document.getElementById('kaiserkroneBody').innerHTML = html;
+  for (const e of vm.electors) updatePromiseFormVisibility(e.aiId);
+}
+
+// Zeigt/versteckt Ziel-Region-/Betrags-Eingabe je nach gewähltem
+// Versprechenstyp -- rein visuell, keine Spiellogik.
+function updatePromiseFormVisibility(aiId) {
+  const typeEl = document.getElementById('promiseType_' + aiId);
+  if (!typeEl) return;
+  const type = typeEl.value;
+  const targetWrap = document.getElementById('promiseTargetWrap_' + aiId);
+  const amountWrap = document.getElementById('promiseAmountWrap_' + aiId);
+  if (targetWrap) targetWrap.style.display = (type === 'no_war_target' || type === 'maintain_treaty') ? '' : 'none';
+  if (amountWrap) amountWrap.style.display = (type === 'pay_tribute') ? '' : 'none';
+}
+
+function doCreateElectionPromise(aiId) {
+  const type = document.getElementById('promiseType_' + aiId).value;
+  const conditions = {};
+  if (type === 'pay_tribute') {
+    conditions.amount = Math.max(10, Math.round(Number(document.getElementById('promiseAmount_' + aiId).value) || 0));
+  } else if (type === 'no_war_target') {
+    conditions.targetRegionId = document.getElementById('promiseTarget_' + aiId).value;
+  } else if (type === 'maintain_treaty') {
+    conditions.targetRegionId = document.getElementById('promiseTarget_' + aiId).value;
+    conditions.treatyType = 'nichtangriff';
+  }
+  const result = createElectionPromise(state, aiId, type, conditions);
+  if (!result.ok) { alert(result.reason); return; }
+  playBeep(520, 0.12);
+  render();
+}
+
+function doFulfillElectionPromise(promiseId) {
+  const result = fulfillElectionPromise(state, promiseId);
+  if (!result.ok) { alert(result.reason); return; }
+  playBeep(660, 0.15);
+  render();
+}
+
 function renderDiplomacyPage() {
+  renderKaiserkronePanel();
+
   const overview = getDiplomacyOverviewViewModel(state);
   if (!overview.find(p => p.aiId === selectedDiploPower)) selectedDiploPower = overview.length ? overview[0].aiId : null;
 

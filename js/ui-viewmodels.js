@@ -1147,6 +1147,59 @@ function getElectorInfoViewModel(state, aiId) {
   return { isElector: true, stance, leaning: ELECTOR_STANCE_LABELS[stance] };
 }
 
+// ---------- §Phase-12: Kaiserkrone-Unteransicht (Diplomatie-Tab) -- volle
+// Kandidatur-/Geschenk-/Wahlversprechen-Übersicht. Weiterhin nur die
+// qualitative Haltung je Kurfürst (s.o.), niemals der rohe Score. ----------
+const ELECTION_PROMISE_TYPE_LABELS = {
+  no_war_target: "Kein Krieg gegen Zielgebiet", maintain_alliance: "Bündnis aufrechterhalten",
+  maintain_treaty: "Nichtangriffspakt mit Zielgebiet aufrechterhalten", pay_tribute: "Zahlung zusichern",
+};
+const ELECTION_PROMISE_STATUS_LABELS = { PROMISED: "offen", FULFILLED: "eingelöst", BROKEN: "gebrochen" };
+function describeElectionPromiseCondition(p) {
+  if (p.type === "pay_tribute") return `${p.conditions.amount} Taler bis ${p.deadlineYear}`;
+  if (p.type === "no_war_target" || p.type === "maintain_treaty") return `betrifft ${p.conditions.targetRegionId}, bis ${p.deadlineYear}`;
+  return `bis ${p.deadlineYear}`;
+}
+function getImperialPoliticsViewModel(state) {
+  const eligibility = checkImperialCandidacyEligibility(state);
+  const candidacy = state.imperialCandidacy;
+  const electorIds = getElectorIds(state);
+  const electors = electorIds.map(aiId => {
+    const region = state.regions[aiId];
+    const ruler = region.rulerId ? state.characters[region.rulerId] : null;
+    const info = getElectorInfoViewModel(state, aiId);
+    return {
+      aiId, regionName: region.name,
+      rulerName: ruler ? `${ruler.name} ${ruler.surname || ""}`.trim() : region.name,
+      stance: info.stance, leaning: info.leaning,
+      giftCount: candidacy ? (candidacy.giftsGivenThisCandidacy[aiId] || 0) : 0,
+    };
+  });
+  const promises = state.electionPromises ? Object.values(state.electionPromises.byId)
+    .slice().sort((a, b) => b.createdYear - a.createdYear || a.id.localeCompare(b.id))
+    .map(p => ({
+      id: p.id, regionName: state.regions[p.electorRegionId].name,
+      typeLabel: ELECTION_PROMISE_TYPE_LABELS[p.type] || p.type,
+      statusLabel: ELECTION_PROMISE_STATUS_LABELS[p.status] || p.status,
+      status: p.status,
+      conditionText: describeElectionPromiseCondition(p),
+      canFulfillNow: p.status === "PROMISED" && p.type === "pay_tribute",
+    })) : [];
+  const kurfuerstRank = TITLES.findIndex(t => t.id === "kurfuerst");
+  return {
+    visible: state.titleIndex >= kurfuerstRank || !!candidacy || !!state.pendingElection,
+    eligibility,
+    candidacyActive: !!candidacy,
+    candidacyDeclaredYear: candidacy ? candidacy.declaredYear : null,
+    candidacyAgeYears: candidacy ? state.year - candidacy.declaredYear : null,
+    pendingElection: !!state.pendingElection,
+    electionCooldown: state.electionCooldown || 0,
+    electors,
+    promises,
+    regionOptions: electorIds.map(aiId => ({ aiId, name: state.regions[aiId].name })),
+  };
+}
+
 // ---------- §7: "Warum stehen wir so zueinander?" -- die diplomatische
 // Beziehung ist (anders als Character-Core-Beziehungen) ein reiner
 // Drift-Akkumulator ohne gespeicherte Einzelkomponenten (js/diplomacy.js
