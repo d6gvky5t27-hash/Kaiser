@@ -62,6 +62,25 @@ console.log('--- Einfluss-Breakdown ---');
   check('Adel-Einfluss steigt, wenn der Spieler von Lehnsrittern abhängt (echte, bestehende Abhängigkeit)', infl2 > infl1);
 })();
 
+// ---------- §Phase-12: Adel-Einfluss reagiert auf eine echte Kaiserwahl-Kandidatur/-Würde ----------
+console.log('--- Phase 12: Adel-Einfluss und Kaiserwahl ---');
+(function() {
+  const base = newGame({ seed: 5 });
+  const inflBase = computeEstateInfluence(base, 'adel');
+
+  const candidate = newGame({ seed: 5 });
+  candidate.titleIndex = TITLES.findIndex(t => t.id === 'kurfuerst');
+  candidate.regions.player.buildings.push({ type: 'kathedrale', level: 1, plotIndex: -1 });
+  declareImperialCandidacy(candidate);
+  const inflCandidate = computeEstateInfluence(candidate, 'adel');
+  check('eine laufende Kaiserwahl-Kandidatur erhöht den Adel-Einfluss', inflCandidate > inflBase);
+
+  const kaiser = newGame({ seed: 5 });
+  kaiser.titleIndex = TITLES.findIndex(t => t.id === 'kaiser');
+  const inflKaiser = computeEstateInfluence(kaiser, 'adel');
+  check('die Kaiserwürde selbst erhöht den Adel-Einfluss noch stärker als eine bloße Kandidatur', inflKaiser > inflCandidate);
+})();
+
 // ---------- Wortführer: nur aus Character Core, stabil, an das passende Hofamt gekoppelt ----------
 console.log('--- Wortführer ---');
 (function() {

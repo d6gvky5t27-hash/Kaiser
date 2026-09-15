@@ -206,6 +206,36 @@ console.log('--- Debug-Erklärung ---');
   check('nicht erfüllte Kette wird korrekt als "nicht eligible" markiert', explanation.eligible === false);
 })();
 
+// ---------- §Phase-12: imperial_ambition löst jetzt eine ECHTE Kandidatur aus ----------
+console.log('--- Phase 12: imperial_ambition -> echte Kandidatur ---');
+(function() {
+  // Voll bereit (inkl. Kathedrale, die checkImperialCandidacyEligibility()
+  // zusätzlich zur bloßen Ketten-Eignung verlangt): "Offen um Unterstützung
+  // werben" soll eine ECHTE Kandidatur auslösen, nicht nur Prestige geben.
+  const state = newGame({ seed: 29 });
+  state.titleIndex = TITLES.findIndex(t => t.id === 'kurfuerst');
+  state.prestige = 300;
+  state.regions.player.buildings.push({ type: 'kathedrale', level: 1, plotIndex: -1 });
+  const chain = startEventChain(state, 'imperial_ambition', { variables: {} });
+  CHAIN_TEMPLATES.imperial_ambition.advance(state, chain);
+  state.pendingEvent.options[0].apply(state.regions.player, state);
+  check('"Offen um Unterstützung werben" löst bei voller Eignung eine echte Kandidatur aus', !!state.imperialCandidacy);
+  check('die Kette löst sich mit CANDIDACY_DECLARED auf', chain.resolution === 'CANDIDACY_DECLARED');
+})();
+(function() {
+  // Ketten-Eignung (Titel+Prestige) reicht, aber die Kathedrale fehlt --
+  // declareImperialCandidacy() lehnt ab, die Kette darf dabei nicht crashen
+  // und bleibt beim bisherigen, rein symbolischen Werben.
+  const state = newGame({ seed: 30 });
+  state.titleIndex = TITLES.findIndex(t => t.id === 'kurfuerst');
+  state.prestige = 300;
+  const chain = startEventChain(state, 'imperial_ambition', { variables: {} });
+  CHAIN_TEMPLATES.imperial_ambition.advance(state, chain);
+  state.pendingEvent.options[0].apply(state.regions.player, state);
+  check('ohne Kathedrale bleibt es beim symbolischen Werben (keine Kandidatur)', !state.imperialCandidacy);
+  check('die Kette löst sich dennoch regulär auf (CAMPAIGNING)', chain.resolution === 'CAMPAIGNING');
+})();
+
 // ---------- §Phase-12: Eligibility-Logik der fünf Kaiserwahl-Ketten ----------
 console.log('--- Phase 12: Kaiserwahl-Ketten Eligibility ---');
 function setupImperialCandidacy(seed) {

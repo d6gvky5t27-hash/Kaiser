@@ -158,6 +158,31 @@ console.log('--- Thread-Zusammenfassung ---');
   check('Zusammenfassung enthält das Ergebnis', summary.includes('RECONCILED'));
 })();
 
+// ---------- §Phase-12: IMPERIAL_AMBITION-Signalstärke folgt echtem Fortschritt ----------
+console.log('--- Phase 12: IMPERIAL_AMBITION-Signal ---');
+(function() {
+  const state = newGame({ seed: 47 });
+  check('unterhalb der Eignungsschwelle: kein Signal', detectImperialAmbitionSignals(state).length === 0);
+})();
+(function() {
+  const state = newGame({ seed: 48 });
+  state.titleIndex = TITLES.findIndex(t => t.id === 'kurfuerst');
+  state.prestige = 200;
+  const baseline = detectImperialAmbitionSignals(state)[0].strength;
+  state.regions.player.buildings.push({ type: 'kathedrale', level: 1, plotIndex: -1 });
+  declareImperialCandidacy(state);
+  const withCandidacy = detectImperialAmbitionSignals(state)[0].strength;
+  check('eine erklärte Kandidatur ist ein stärkeres Signal als bloße Eignung', withCandidacy > baseline);
+  state.pendingElection = true;
+  const withPendingElection = detectImperialAmbitionSignals(state)[0].strength;
+  check('eine anstehende Wahl ist der stärkste Ausschlag', withPendingElection > withCandidacy);
+})();
+(function() {
+  const state = newGame({ seed: 49 });
+  state.titleIndex = TITLES.findIndex(t => t.id === 'kaiser');
+  check('bereits Kaiser: kein offenes Ambitions-Signal mehr', detectImperialAmbitionSignals(state).length === 0);
+})();
+
 console.log('');
 if (failures > 0) { console.log(failures + ' Test(s) fehlgeschlagen.'); process.exit(1); }
 console.log('Alle Story-Thread-Tests bestanden.');

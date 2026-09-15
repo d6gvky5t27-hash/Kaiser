@@ -135,10 +135,27 @@ function detectReligiousConflictSignals(state) {
   return [{ actorIds: [], regionIds: ["player"], memoryIds: [], strength: 40 }];
 }
 
+// §Phase-12: die Stärke folgt jetzt dem tatsächlichen Kaiserwahl-Fortschritt
+// (js/imperial-politics.js) statt eines flachen Konstantwerts ab Eignung --
+// eine erklärte Kandidatur ist ein weit stärkeres Signal als bloße
+// theoretische Eignung, eine anstehende Wahl der eigentliche Höhepunkt.
 function detectImperialAmbitionSignals(state) {
   const kurfuerstRank = TITLES.findIndex(t => t.id === "kurfuerst");
+  const kaiserRank = TITLES.findIndex(t => t.id === "kaiser");
+  if (state.titleIndex >= kaiserRank) return []; // Ziel bereits erreicht -- keine offene Ambition mehr
   if (state.titleIndex < kurfuerstRank && state.prestige < 150) return [];
-  return [{ actorIds: [], regionIds: [], memoryIds: [], strength: 40 }];
+  let strength = 40;
+  if (state.imperialCandidacy) {
+    strength = 65;
+    const giftCount = Object.values(state.imperialCandidacy.giftsGivenThisCandidacy || {}).reduce((s, n) => s + n, 0);
+    strength += Math.min(10, giftCount * 2);
+  }
+  if (state.electionPromises) {
+    const unresolvedBroken = Object.values(state.electionPromises.byId).filter(p => p.status === "BROKEN" && !p.grievanceHandled).length;
+    strength += Math.min(10, unresolvedBroken * 5);
+  }
+  if (state.pendingElection) strength = 90;
+  return [{ actorIds: [], regionIds: [], memoryIds: [], strength: clamp(strength, 0, 100) }];
 }
 
 function detectDynasticAllianceSignals(state) {

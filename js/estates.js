@@ -124,6 +124,13 @@ function computeEstateInfluenceBreakdown(state, estateId) {
   if (estateId === "adel") {
     const dependentTroops = (state.army.ritter || 0) + (state.army.schwere_kavallerie || 0);
     add("Militärische Abhängigkeit vom Lehnsadel", dependentTroops > 0 ? cfg.militaryDependencyBonus : 0);
+    // §Phase-12: eine laufende Kaiserwahl-Kandidatur des eigenen Hauses (oder
+    // gar schon die Kaiserwürde selbst) rückt den Hochadel politisch enger an
+    // den Hof -- reale, bereits bestehende Zustände (js/imperial-politics.js),
+    // kein zweiter Einfluss-Kanal.
+    const kaiserRank = TITLES.findIndex(t => t.id === "kaiser");
+    add("Kaiserliche Kandidatur/Würde des Hauses",
+      state.titleIndex >= kaiserRank ? cfg.imperialTitleBonus : (state.imperialCandidacy ? cfg.imperialCandidacyBonus : 0));
   }
   // Geistlichkeit: koppelt an den bereits bestehenden, einzigen
   // Religionsregler state.religiousInfluence (js/politics.js,

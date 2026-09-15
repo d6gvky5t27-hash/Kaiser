@@ -201,6 +201,49 @@ console.log('--- Phase 11: Stände-Ketten im Director-Scoring ---');
   check('jeder Score hat total/breakdown/threadId', scores.every(s => typeof s.total === 'number' && Array.isArray(s.breakdown) && ('threadId' in s)));
 })();
 
+// ---------- §Phase-12: "Bevorstehende Kaiserwahl" folgt echter Kandidatur ----------
+console.log('--- Phase 12: Bevorstehende Kaiserwahl (Tension) ---');
+(function() {
+  const state = newGame({ seed: 63 });
+  const breakdown = computeDramaTensionBreakdown(state);
+  check('ohne Kandidatur/Wahl: keine "Bevorstehende Kaiserwahl"-Komponente', !breakdown.components.some(c => c.label === 'Bevorstehende Kaiserwahl'));
+})();
+(function() {
+  const state = newGame({ seed: 64 });
+  state.titleIndex = TITLES.findIndex(t => t.id === 'kurfuerst');
+  state.regions.player.buildings.push({ type: 'kathedrale', level: 1, plotIndex: -1 });
+  declareImperialCandidacy(state);
+  const freshBreakdown = computeDramaTensionBreakdown(state);
+  check('frisch erklärte Kandidatur (noch vor candidacyPrepYearsMin): noch keine "bevorstehend"-Komponente', !freshBreakdown.components.some(c => c.label === 'Bevorstehende Kaiserwahl'));
+  state.year += CONFIG.election.candidacyPrepYearsMin;
+  const matureBreakdown = computeDramaTensionBreakdown(state);
+  check('Kandidatur nach candidacyPrepYearsMin Jahren: "bevorstehend"-Komponente erscheint', matureBreakdown.components.some(c => c.label === 'Bevorstehende Kaiserwahl'));
+})();
+(function() {
+  const state = newGame({ seed: 65 });
+  state.pendingElection = true;
+  const breakdown = computeDramaTensionBreakdown(state);
+  check('eine anhängige Wahl zählt immer als "bevorstehend", unabhängig vom Kandidatur-Alter', breakdown.components.some(c => c.label === 'Bevorstehende Kaiserwahl'));
+})();
+
+// ---------- §Phase-12: ungesühnte gebrochene Wahlversprechen erhöhen die Tension ----------
+console.log('--- Phase 12: Gebrochene Wahlversprechen (Tension) ---');
+(function() {
+  const state = newGame({ seed: 66 });
+  state.titleIndex = TITLES.findIndex(t => t.id === 'kurfuerst');
+  state.regions.player.buildings.push({ type: 'kathedrale', level: 1, plotIndex: -1 });
+  declareImperialCandidacy(state);
+  const before = computeDramaTensionBreakdown(state);
+  check('vor jedem Bruch: keine Komponente', !before.components.some(c => c.label === 'Ungesühnte gebrochene Wahlversprechen'));
+  const res = createElectionPromise(state, 'ai1', 'no_war_target', { targetRegionId: 'ai2' });
+  breakElectionPromise(state, res.promiseId, 'Test');
+  const afterBreak = computeDramaTensionBreakdown(state);
+  check('nach einem ungesühnten Bruch: Komponente erscheint', afterBreak.components.some(c => c.label === 'Ungesühnte gebrochene Wahlversprechen'));
+  state.electionPromises.byId[res.promiseId].grievanceHandled = true;
+  const afterHandled = computeDramaTensionBreakdown(state);
+  check('nach Behandlung (grievanceHandled): Komponente verschwindet wieder', !afterHandled.components.some(c => c.label === 'Ungesühnte gebrochene Wahlversprechen'));
+})();
+
 console.log('');
 if (failures > 0) { console.log(failures + ' Test(s) fehlgeschlagen.'); process.exit(1); }
 console.log('Alle Drama-Director-Tests bestanden.');

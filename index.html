@@ -2207,6 +2207,10 @@ const CONFIG = {
       militaryDependencyBonus: 15, // nur Adel: Lehnsritter/-kavallerie derzeit im Dienst (echte, bestehende minAdelSatisfaction-Abhängigkeit, siehe TROOP_TYPES)
       religiousInfluenceFactor: 20, // nur Geistlichkeit: Anteil von state.religiousInfluence (0..100), skaliert auf max. diesen Wert
       recentActivityBonus: 8,    // eine gerade laufende Stände-Eventkette zu diesem Stand
+      // §Phase-12: nur Adel -- eine laufende Kandidatur des eigenen Hauses um
+      // die Kaiserkrone (oder gar die Würde selbst) rückt den Hochadel
+      // politisch enger an den Hof (state.imperialCandidacy/state.titleIndex).
+      imperialCandidacyBonus: 10, imperialTitleBonus: 18,
     },
     demand: {
       cooldownYears: 10,          // wie CHAIN_TEMPLATES-cooldownYears in ähnlicher Größenordnung (§Punkt: keine Forderungsflut)
@@ -2461,6 +2465,11 @@ const CONFIG = {
       // pro Stand unterhalb der Schwelle EIN Punktwert, gedeckelt (analog
       // activeRivalryPerRival/-Cap), keine Sonderlogik pro Stand.
       estateUnrestPerEstate: 5, estateUnrestCap: 15, estateUnrestThreshold: 35,
+      // §Phase-12: ein gebrochenes, noch unverarbeitetes Wahlversprechen
+      // (state.electionPromises, p.grievanceHandled -- s. CHAIN_GEBROCHENES_VERSPRECHEN
+      // in js/event-chains.js) ist eine reale politische Spannungsquelle, genau
+      // wie estateUnrest oben -- kein neues Muster, nur derselbe Aufbau.
+      brokenPromiseTension: 7,
     },
   },
   // ---------- Phase 7: Narrative Calibration & Chronicle 2.0 (§Punkt 19/20/36) ----------
@@ -6264,6 +6273,13 @@ function computeEstateInfluenceBreakdown(state, estateId) {
   if (estateId === "adel") {
     const dependentTroops = (state.army.ritter || 0) + (state.army.schwere_kavallerie || 0);
     add("Militärische Abhängigkeit vom Lehnsadel", dependentTroops > 0 ? cfg.militaryDependencyBonus : 0);
+    // §Phase-12: eine laufende Kaiserwahl-Kandidatur des eigenen Hauses (oder
+    // gar schon die Kaiserwürde selbst) rückt den Hochadel politisch enger an
+    // den Hof -- reale, bereits bestehende Zustände (js/imperial-politics.js),
+    // kein zweiter Einfluss-Kanal.
+    const kaiserRank = TITLES.findIndex(t => t.id === "kaiser");
+    add("Kaiserliche Kandidatur/Würde des Hauses",
+      state.titleIndex >= kaiserRank ? cfg.imperialTitleBonus : (state.imperialCandidacy ? cfg.imperialCandidacyBonus : 0));
   }
   // Geistlichkeit: koppelt an den bereits bestehenden, einzigen
   // Religionsregler state.religiousInfluence (js/politics.js,
@@ -7104,10 +7120,27 @@ function detectReligiousConflictSignals(state) {
   return [{ actorIds: [], regionIds: ["player"], memoryIds: [], strength: 40 }];
 }
 
+// §Phase-12: die Stärke folgt jetzt dem tatsächlichen Kaiserwahl-Fortschritt
+// (js/imperial-politics.js) statt eines flachen Konstantwerts ab Eignung --
+// eine erklärte Kandidatur ist ein weit stärkeres Signal als bloße
+// theoretische Eignung, eine anstehende Wahl der eigentliche Höhepunkt.
 function detectImperialAmbitionSignals(state) {
   const kurfuerstRank = TITLES.findIndex(t => t.id === "kurfuerst");
+  const kaiserRank = TITLES.findIndex(t => t.id === "kaiser");
+  if (state.titleIndex >= kaiserRank) return []; // Ziel bereits erreicht -- keine offene Ambition mehr
   if (state.titleIndex < kurfuerstRank && state.prestige < 150) return [];
-  return [{ actorIds: [], regionIds: [], memoryIds: [], strength: 40 }];
+  let strength = 40;
+  if (state.imperialCandidacy) {
+    strength = 65;
+    const giftCount = Object.values(state.imperialCandidacy.giftsGivenThisCandidacy || {}).reduce((s, n) => s + n, 0);
+    strength += Math.min(10, giftCount * 2);
+  }
+  if (state.electionPromises) {
+    const unresolvedBroken = Object.values(state.electionPromises.byId).filter(p => p.status === "BROKEN" && !p.grievanceHandled).length;
+    strength += Math.min(10, unresolvedBroken * 5);
+  }
+  if (state.pendingElection) strength = 90;
+  return [{ actorIds: [], regionIds: [], memoryIds: [], strength: clamp(strength, 0, 100) }];
 }
 
 function detectDynasticAllianceSignals(state) {
@@ -7630,9 +7663,26 @@ function computeDramaTensionBreakdown(state) {
   const activeChainCount = Object.keys(state.eventChains.active).length;
   add(`Aktive Event Chains (${activeChainCount})`, Math.min(activeChainCount * w.activeChainPerChain, w.activeChainCap));
 
-  const kurfuerstRank = TITLES.findIndex(t => t.id === "kurfuerst");
-  const electionSoon = !!state.pendingElection || (state.titleIndex >= kurfuerstRank && (state.electionCooldown || 0) <= 1);
+  // §Phase-12: "bevorstehend" bedeutet jetzt eine ECHTE, erklärte Kandidatur,
+  // die sich ihrem Wahlfenster nähert (oder die Wahl steht bereits an) --
+  // die alte Titel-/Cooldown-Eignung allein sagte nichts mehr über echte
+  // Nähe aus, seit die Wahl nicht mehr automatisch bei Eignung ausgelöst
+  // wird, sondern eine bewusste declareImperialCandidacy() voraussetzt
+  // (js/imperial-politics.js, §42).
+  let electionSoon = !!state.pendingElection;
+  if (!electionSoon && state.imperialCandidacy) {
+    const yearsSinceDeclared = state.year - state.imperialCandidacy.declaredYear;
+    electionSoon = yearsSinceDeclared >= CONFIG.election.candidacyPrepYearsMin;
+  }
   add("Bevorstehende Kaiserwahl", electionSoon ? w.upcomingElection : 0);
+
+  // §Phase-12: ein gebrochenes, noch unverarbeitetes Wahlversprechen ist
+  // eine reale politische Spannungsquelle, genau wie Estate-Unruhe oben
+  // (js/imperial-politics.js breakElectionPromise(), grievanceHandled wird
+  // erst von CHAIN_GEBROCHENES_VERSPRECHEN gesetzt).
+  const unresolvedBrokenPromises = state.electionPromises
+    ? Object.values(state.electionPromises.byId).filter(p => p.status === "BROKEN" && !p.grievanceHandled).length : 0;
+  add("Ungesühnte gebrochene Wahlversprechen", unresolvedBrokenPromises > 0 ? w.brokenPromiseTension : 0);
 
   const infl = state.religiousInfluence !== undefined ? state.religiousInfluence : 55;
   add("Religiöse Spannungen", infl < CONFIG.religion.lowInfluenceThreshold + 15 ? w.religiousTension : 0);
@@ -8728,8 +8778,19 @@ const CHAIN_IMPERIAL_AMBITION = {
         "Die Berater am Hof deuten unverhohlen an: Rang und Ansehen des Herrschers rechtfertigen inzwischen offene Ambitionen auf die Kaiserkrone.",
         [
           {
+            // §Phase-12: die eigentliche Kandidatur-Erklärung (declareImperialCandidacy())
+            // hat strengere Voraussetzungen als diese Kette selbst (u.a. Kathedrale,
+            // s. checkImperialCandidacyEligibility()) -- ist der Herrscher bereits
+            // vollständig bereit, wird hier die ECHTE Kandidatur ausgelöst statt nur
+            // Prestige zu vergeben; andernfalls bleibt es beim bisherigen, rein
+            // symbolischen Werben (kein Fehlschlag, nur noch keine formelle Kandidatur).
             label: "Offen um Unterstützung werben.", outcome: "openly_campaign",
-            effect: (s, c) => { s.prestige += 10; resolveEventChain(s, c, "CAMPAIGNING", "Der Herrscher wirbt offen um die Kaiserkrone."); },
+            effect: (s, c) => {
+              s.prestige += 10;
+              const res = declareImperialCandidacy(s);
+              if (res.ok) resolveEventChain(s, c, "CANDIDACY_DECLARED", "Der Herrscher erklärt offen seine Kandidatur um die Kaiserkrone.");
+              else resolveEventChain(s, c, "CAMPAIGNING", "Der Herrscher wirbt offen um die Kaiserkrone.");
+            },
           },
           {
             label: "Diskret Unterstützung bei den Kurfürsten suchen.", outcome: "discreet_support",

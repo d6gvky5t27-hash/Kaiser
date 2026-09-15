@@ -958,8 +958,19 @@ const CHAIN_IMPERIAL_AMBITION = {
         "Die Berater am Hof deuten unverhohlen an: Rang und Ansehen des Herrschers rechtfertigen inzwischen offene Ambitionen auf die Kaiserkrone.",
         [
           {
+            // §Phase-12: die eigentliche Kandidatur-Erklärung (declareImperialCandidacy())
+            // hat strengere Voraussetzungen als diese Kette selbst (u.a. Kathedrale,
+            // s. checkImperialCandidacyEligibility()) -- ist der Herrscher bereits
+            // vollständig bereit, wird hier die ECHTE Kandidatur ausgelöst statt nur
+            // Prestige zu vergeben; andernfalls bleibt es beim bisherigen, rein
+            // symbolischen Werben (kein Fehlschlag, nur noch keine formelle Kandidatur).
             label: "Offen um Unterstützung werben.", outcome: "openly_campaign",
-            effect: (s, c) => { s.prestige += 10; resolveEventChain(s, c, "CAMPAIGNING", "Der Herrscher wirbt offen um die Kaiserkrone."); },
+            effect: (s, c) => {
+              s.prestige += 10;
+              const res = declareImperialCandidacy(s);
+              if (res.ok) resolveEventChain(s, c, "CANDIDACY_DECLARED", "Der Herrscher erklärt offen seine Kandidatur um die Kaiserkrone.");
+              else resolveEventChain(s, c, "CAMPAIGNING", "Der Herrscher wirbt offen um die Kaiserkrone.");
+            },
           },
           {
             label: "Diskret Unterstützung bei den Kurfürsten suchen.", outcome: "discreet_support",

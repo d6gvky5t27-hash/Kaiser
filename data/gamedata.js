@@ -329,6 +329,10 @@ const CONFIG = {
       militaryDependencyBonus: 15, // nur Adel: Lehnsritter/-kavallerie derzeit im Dienst (echte, bestehende minAdelSatisfaction-Abhängigkeit, siehe TROOP_TYPES)
       religiousInfluenceFactor: 20, // nur Geistlichkeit: Anteil von state.religiousInfluence (0..100), skaliert auf max. diesen Wert
       recentActivityBonus: 8,    // eine gerade laufende Stände-Eventkette zu diesem Stand
+      // §Phase-12: nur Adel -- eine laufende Kandidatur des eigenen Hauses um
+      // die Kaiserkrone (oder gar die Würde selbst) rückt den Hochadel
+      // politisch enger an den Hof (state.imperialCandidacy/state.titleIndex).
+      imperialCandidacyBonus: 10, imperialTitleBonus: 18,
     },
     demand: {
       cooldownYears: 10,          // wie CHAIN_TEMPLATES-cooldownYears in ähnlicher Größenordnung (§Punkt: keine Forderungsflut)
@@ -583,6 +587,11 @@ const CONFIG = {
       // pro Stand unterhalb der Schwelle EIN Punktwert, gedeckelt (analog
       // activeRivalryPerRival/-Cap), keine Sonderlogik pro Stand.
       estateUnrestPerEstate: 5, estateUnrestCap: 15, estateUnrestThreshold: 35,
+      // §Phase-12: ein gebrochenes, noch unverarbeitetes Wahlversprechen
+      // (state.electionPromises, p.grievanceHandled -- s. CHAIN_GEBROCHENES_VERSPRECHEN
+      // in js/event-chains.js) ist eine reale politische Spannungsquelle, genau
+      // wie estateUnrest oben -- kein neues Muster, nur derselbe Aufbau.
+      brokenPromiseTension: 7,
     },
   },
   // ---------- Phase 7: Narrative Calibration & Chronicle 2.0 (§Punkt 19/20/36) ----------

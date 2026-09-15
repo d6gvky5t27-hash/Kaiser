@@ -68,9 +68,26 @@ function computeDramaTensionBreakdown(state) {
   const activeChainCount = Object.keys(state.eventChains.active).length;
   add(`Aktive Event Chains (${activeChainCount})`, Math.min(activeChainCount * w.activeChainPerChain, w.activeChainCap));
 
-  const kurfuerstRank = TITLES.findIndex(t => t.id === "kurfuerst");
-  const electionSoon = !!state.pendingElection || (state.titleIndex >= kurfuerstRank && (state.electionCooldown || 0) <= 1);
+  // §Phase-12: "bevorstehend" bedeutet jetzt eine ECHTE, erklärte Kandidatur,
+  // die sich ihrem Wahlfenster nähert (oder die Wahl steht bereits an) --
+  // die alte Titel-/Cooldown-Eignung allein sagte nichts mehr über echte
+  // Nähe aus, seit die Wahl nicht mehr automatisch bei Eignung ausgelöst
+  // wird, sondern eine bewusste declareImperialCandidacy() voraussetzt
+  // (js/imperial-politics.js, §42).
+  let electionSoon = !!state.pendingElection;
+  if (!electionSoon && state.imperialCandidacy) {
+    const yearsSinceDeclared = state.year - state.imperialCandidacy.declaredYear;
+    electionSoon = yearsSinceDeclared >= CONFIG.election.candidacyPrepYearsMin;
+  }
   add("Bevorstehende Kaiserwahl", electionSoon ? w.upcomingElection : 0);
+
+  // §Phase-12: ein gebrochenes, noch unverarbeitetes Wahlversprechen ist
+  // eine reale politische Spannungsquelle, genau wie Estate-Unruhe oben
+  // (js/imperial-politics.js breakElectionPromise(), grievanceHandled wird
+  // erst von CHAIN_GEBROCHENES_VERSPRECHEN gesetzt).
+  const unresolvedBrokenPromises = state.electionPromises
+    ? Object.values(state.electionPromises.byId).filter(p => p.status === "BROKEN" && !p.grievanceHandled).length : 0;
+  add("Ungesühnte gebrochene Wahlversprechen", unresolvedBrokenPromises > 0 ? w.brokenPromiseTension : 0);
 
   const infl = state.religiousInfluence !== undefined ? state.religiousInfluence : 55;
   add("Religiöse Spannungen", infl < CONFIG.religion.lowInfluenceThreshold + 15 ? w.religiousTension : 0);
