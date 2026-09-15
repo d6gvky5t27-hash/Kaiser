@@ -87,10 +87,18 @@ function summarizeCampaign(result) {
   const declaredWars = log.filter(d => d.action === "declare_war" && d.ok).length;
   const defendedForced = log.filter(d => (d.action === "defend_surprise_attack" || d.action === "defend_territory") && d.ok).length;
 
-  // ---- Kaiserwahl (§69-70) ----
-  const bribes = log.filter(d => d.action === "bribe_elector" && d.ok).length;
+  // ---- Kaiserwahl (§69-70). §Phase-12-Fund (non-regression validation):
+  // "bribe_elector"/gameOver==="victory" were the Phase-9/10 action name and
+  // win-signal; Phase 12 renamed the action to gift_elector (+ the new
+  // promise_elector) and gameOver==="victory" became ambiguous once
+  // alternative victory conditions could ALSO set it -- both were silently
+  // stale (always 0 resp. sometimes wrong) until this fix. `bribes` now
+  // counts both spending actions (gifts and promises are both "political
+  // capital spent on an elector"); becameKaiser checks the real,
+  // unambiguous titleName instead of the shared gameOver flag. ----
+  const bribes = log.filter(d => (d.action === "gift_elector" || d.action === "promise_elector") && d.ok).length;
   const elections = log.filter(d => d.action === "resolve_election" && d.ok).length;
-  const becameKaiser = result.finalState && result.finalState.gameOver === "victory";
+  const becameKaiser = !!(result.finalState && result.finalState.titleName === "Kaiser");
 
   // ---- Perfect stability streak (§99-100): composite "no visible crisis" definition. ----
   let stabilityStreak = 0, longestStabilityStreak = 0;

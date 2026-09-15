@@ -1,0 +1,203 @@
+{
+  "manifest": {
+    "generatedAt": "2026-09-15T20:27:21.060Z",
+    "seedBase": 500000,
+    "seeds": [
+      500000,
+      507919,
+      515838
+    ],
+    "years": 100,
+    "agentPolicyVersion": "phase12-v1"
+  },
+  "overall": {
+    "campaigns": 36,
+    "candidacyRate": 0.083,
+    "electionHeldRate": 0.083,
+    "totalElectionsHeld": 3,
+    "totalElectionsWon": 3,
+    "totalElectionsLost": 0,
+    "electionWinShare": 1,
+    "avgYearsToFirstResolution": 5.67,
+    "avgGiftsPerCampaign": 0.03,
+    "avgPromiseOffersPerCampaign": 0.03,
+    "totalPromisesCreated": 1,
+    "promiseStatusTotals": {
+      "PROMISED": 1,
+      "FULFILLED": 0,
+      "BROKEN": 0
+    },
+    "promiseTypeTotals": {
+      "no_war_target": 0,
+      "maintain_alliance": 0,
+      "maintain_treaty": 0,
+      "pay_tribute": 1
+    },
+    "totalImperialPoliticsChainResolutions": 0,
+    "gebrochenesVersprechenHandlingTotals": {
+      "COMPENSATED": 0,
+      "DENIED": 0,
+      "SILENT": 0
+    },
+    "avgDistinctTemplateIds": 4.92,
+    "chainOutcomeTotals": {}
+  },
+  "agentAggregates": {
+    "passive": {
+      "campaigns": 3,
+      "candidacyRate": 0,
+      "electionHeldRate": 0,
+      "totalElectionsWon": 0,
+      "totalElectionsLost": 0,
+      "electionWinShare": 0,
+      "avgYearsToFirstResolution": null,
+      "avgGiftsPerCampaign": 0,
+      "avgPromiseOffersPerCampaign": 0,
+      "totalPromisesCreated": 0,
+      "promiseBrokenShare": 0
+    },
+    "verwalter": {
+      "campaigns": 3,
+      "candidacyRate": 1,
+      "electionHeldRate": 1,
+      "totalElectionsWon": 3,
+      "totalElectionsLost": 0,
+      "electionWinShare": 1,
+      "avgYearsToFirstResolution": 5.67,
+      "avgGiftsPerCampaign": 0.33,
+      "avgPromiseOffersPerCampaign": 0.33,
+      "totalPromisesCreated": 1,
+      "promiseBrokenShare": 0
+    },
+    "kaufmann": {
+      "campaigns": 3,
+      "candidacyRate": 0,
+      "electionHeldRate": 0,
+      "totalElectionsWon": 0,
+      "totalElectionsLost": 0,
+      "electionWinShare": 0,
+      "avgYearsToFirstResolution": null,
+      "avgGiftsPerCampaign": 0,
+      "avgPromiseOffersPerCampaign": 0,
+      "totalPromisesCreated": 0,
+      "promiseBrokenShare": 0
+    },
+    "kriegsherr": {
+      "campaigns": 3,
+      "candidacyRate": 0,
+      "electionHeldRate": 0,
+      "totalElectionsWon": 0,
+      "totalElectionsLost": 0,
+      "electionWinShare": 0,
+      "avgYearsToFirstResolution": null,
+      "avgGiftsPerCampaign": 0,
+      "avgPromiseOffersPerCampaign": 0,
+      "totalPromisesCreated": 0,
+      "promiseBrokenShare": 0
+    },
+    "diplomat": {
+      "campaigns": 3,
+      "candidacyRate": 0,
+      "electionHeldRate": 0,
+      "totalElectionsWon": 0,
+      "totalElectionsLost": 0,
+      "electionWinShare": 0,
+      "avgYearsToFirstResolution": null,
+      "avgGiftsPerCampaign": 0,
+      "avgPromiseOffersPerCampaign": 0,
+      "totalPromisesCreated": 0,
+      "promiseBrokenShare": 0
+    },
+    "dynast": {
+      "campaigns": 3,
+      "candidacyRate": 0,
+      "electionHeldRate": 0,
+      "totalElectionsWon": 0,
+      "totalElectionsLost": 0,
+      "electionWinShare": 0,
+      "avgYearsToFirstResolution": null,
+      "avgGiftsPerCampaign": 0,
+      "avgPromiseOffersPerCampaign": 0,
+      "totalPromisesCreated": 0,
+      "promiseBrokenShare": 0
+    },
+    "machtpolitiker": {
+      "campaigns": 3,
+      "candidacyRate": 0,
+      "electionHeldRate": 0,
+      "totalElectionsWon": 0,
+      "totalElectionsLost": 0,
+      "electionWinShare": 0,
+      "avgYearsToFirstResolution": null,
+      "avgGiftsPerCampaign": 0,
+      "avgPromiseOffersPerCampaign": 0,
+      "totalPromisesCreated": 0,
+      "promiseBrokenShare": 0
+    },
+    "opportunist": {
+      "campaigns": 3,
+      "candidacyRate": 0,
+      "electionHeldRate": 0,
+      "totalElectionsWon": 0,
+      "totalElectionsLost": 0,
+      "electionWinShare": 0,
+      "avgYearsToFirstResolution": null,
+      "avgGiftsPerCampaign": 0,
+      "avgPromiseOffersPerCampaign": 0,
+      "totalPromisesCreated": 0,
+      "promiseBrokenShare": 0
+    },
+    "hardliner": {
+      "campaigns": 3,
+      "candidacyRate": 0,
+      "electionHeldRate": 0,
+      "totalElectionsWon": 0,
+      "totalElectionsLost": 0,
+      "electionWinShare": 0,
+      "avgYearsToFirstResolution": null,
+      "avgGiftsPerCampaign": 0,
+      "avgPromiseOffersPerCampaign": 0,
+      "totalPromisesCreated": 0,
+      "promiseBrokenShare": 0
+    },
+    "versoehner": {
+      "campaigns": 3,
+      "candidacyRate": 0,
+      "electionHeldRate": 0,
+      "totalElectionsWon": 0,
+      "totalElectionsLost": 0,
+      "electionWinShare": 0,
+      "avgYearsToFirstResolution": null,
+      "avgGiftsPerCampaign": 0,
+      "avgPromiseOffersPerCampaign": 0,
+      "totalPromisesCreated": 0,
+      "promiseBrokenShare": 0
+    },
+    "minmaxer": {
+      "campaigns": 3,
+      "candidacyRate": 0,
+      "electionHeldRate": 0,
+      "totalElectionsWon": 0,
+      "totalElectionsLost": 0,
+      "electionWinShare": 0,
+      "avgYearsToFirstResolution": null,
+      "avgGiftsPerCampaign": 0,
+      "avgPromiseOffersPerCampaign": 0,
+      "totalPromisesCreated": 0,
+      "promiseBrokenShare": 0
+    },
+    "anfaenger": {
+      "campaigns": 3,
+      "candidacyRate": 0,
+      "electionHeldRate": 0,
+      "totalElectionsWon": 0,
+      "totalElectionsLost": 0,
+      "electionWinShare": 0,
+      "avgYearsToFirstResolution": null,
+      "avgGiftsPerCampaign": 0,
+      "avgPromiseOffersPerCampaign": 0,
+      "totalPromisesCreated": 0,
+      "promiseBrokenShare": 0
+    }
+  }
+}
