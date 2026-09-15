@@ -18,22 +18,23 @@
 // any tie-breaking choice it needs to make. Same agent + same seed always
 // produces an identical decision log and identical final state.
 
-// phase11-v1 (was phase10-v1): Phase 11 "Living Realm" adds a genuinely
-// new player decision (a Landstände demand, surfaced through the same
-// pendingEvent window every other event/chain uses). Without any archetype
-// change, every agent already resolves these safely through the existing
-// generic agent.eventPrefs(ctx) fallback (verified: a full 100-year
-// verwalter campaign ran cleanly end-to-end with zero special-casing). This
-// bump documents the addition of `agent.estateEventPrefs(ctx)`, an OPTIONAL
-// per-archetype override consulted only when the pending decision is one of
-// the 6 estate chains (see pendingEstateIds() below) — added to the 8
-// archetypes the Phase 11 master prompt names explicitly (Verwalter,
-// Kaufmann, Kriegsherr, Diplomat, Dynast, Hardliner, Versöhner, Min-Maxer);
-// every other archetype (passive/machtpolitiker/opportunist/anfaenger)
-// keeps using its regular eventPrefs() for estate decisions too, which is a
-// deliberate choice, not an oversight — a passive/beginner/no-fixed-stance
-// agent has no principled estate-specific position beyond its general one.
-const AGENT_POLICY_VERSION = "phase11-v1";
+// phase12-v1 (was phase11-v1): Phase 12 "Imperial Politics" replaced the old
+// single-abstract-vote Kaiserwahl with a real, multi-candidate election
+// (declareImperialCandidacy/giftElector/createElectionPromise/
+// resolveImperialElection, js/imperial-politics.js) and added five new
+// event chains (unsicherer_kurfuerst/teures_versprechen/
+// rivalisierende_zusagen/gebrochenes_versprechen/deciding_vote). Every
+// agent already resolves these five chains safely through the existing
+// generic eventPrefs(ctx) fallback (the same "no special-casing required"
+// property phase11-v1 verified for estate chains). This bump documents two
+// additions: (1) handleElection()'s new opts.usePromises, letting an
+// archetype also offer pay_tribute election promises alongside gifts
+// (tests/agents/shared-behaviors.js) — enabled only for archetypes for whom
+// binding promises fit their established political character; (2) the
+// optional agent.imperialPoliticsEventPrefs(ctx) override, consulted only
+// for the five Kaiserwahl chains (pendingImperialPoliticsChainId() below),
+// mirroring estateEventPrefs' pattern exactly.
+const AGENT_POLICY_VERSION = "phase12-v1";
 
 // Prior version history (phase10-v1, was phase9-v1): added
 // considerBuildPalast() to verwalter/diplomat/machtpolitiker/opportunist/
@@ -171,6 +172,24 @@ function pendingEstateIds(ctx) {
   return [];
 }
 
+// ---------- §Phase-12: Kaiserwahl-Erkennung fürs Event-Policy-Routing ----------
+// Dasselbe Muster wie pendingEstateIds() oben, nur für die fünf
+// Phase-12-Ketten (js/event-chains.js) -- liefert die templateId, damit ein
+// Archetyp bei Bedarf granular je Kette reagieren kann (z.B. ein Hardliner
+// verweigert bei "gebrochenes_versprechen" jede Wiedergutmachung, ist aber
+// bei "unsicherer_kurfuerst" schlicht desinteressiert).
+const IMPERIAL_POLITICS_CHAIN_TEMPLATE_IDS = [
+  "unsicherer_kurfuerst", "teures_versprechen", "rivalisierende_zusagen",
+  "gebrochenes_versprechen", "deciding_vote",
+];
+function pendingImperialPoliticsChainId(ctx) {
+  const ev = ctx.state.pendingEvent;
+  if (!ev || ev.source !== "EVENT_CHAIN" || !ev.chainId) return null;
+  const chain = ctx.state.eventChains.active[ev.chainId];
+  if (!chain || !IMPERIAL_POLITICS_CHAIN_TEMPLATE_IDS.includes(chain.templateId)) return null;
+  return chain.templateId;
+}
+
 function resolvePendingEventAsPlayer(ctx, prefs) {
   const state = ctx.state;
   const ev = state.pendingEvent;
@@ -302,7 +321,13 @@ function resolvePendingQueue(ctx, agent) {
       // estateEventPrefs) keeps using the regular, already-established
       // eventPrefs(ctx).
       const useEstatePrefs = agent.estateEventPrefs && pendingEstateIds(ctx).length > 0;
-      resolvePendingEventAsPlayer(ctx, useEstatePrefs ? agent.estateEventPrefs(ctx) : agent.eventPrefs(ctx));
+      // §Phase-12: same pattern for the five Kaiserwahl chains, via an
+      // optional agent.imperialPoliticsEventPrefs(ctx).
+      const useImperialPoliticsPrefs = !useEstatePrefs && agent.imperialPoliticsEventPrefs && !!pendingImperialPoliticsChainId(ctx);
+      const prefs = useEstatePrefs ? agent.estateEventPrefs(ctx)
+        : useImperialPoliticsPrefs ? agent.imperialPoliticsEventPrefs(ctx)
+        : agent.eventPrefs(ctx);
+      resolvePendingEventAsPlayer(ctx, prefs);
       continue;
     }
     break;

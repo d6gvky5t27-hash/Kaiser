@@ -334,8 +334,13 @@ function considerBuildPalast(ctx, minBuffer, reason) {
 // ---------- Kaiserwahl (§Phase-12 "Imperial Politics": Kandidatur erklären,
 // unentschlossene/gegnerische Electors während der Vorbereitungszeit
 // beschenken, Wahl abhalten sobald sie ansteht -- ersetzt das alte
-// bestechen+auflösen 1:1 durch die neue mehrkandidatenfähige API.) ----------
-function handleElection(ctx, giftBudgetPerElector, minBuffer, reason) {
+// bestechen+auflösen 1:1 durch die neue mehrkandidatenfähige API.
+// opts.usePromises (optional, default false): zusätzlich zum Geschenk ein
+// pay_tribute-Wahlversprechen anbieten -- ein bewusst archetyp-abhängiges
+// Werkzeug (§Phase-12-Agenten-Update), nicht jeder Archetyp will sich
+// vertraglich binden, s. archetypes.js für die konkrete Zuordnung. ----------
+function handleElection(ctx, giftBudgetPerElector, minBuffer, reason, opts) {
+  opts = opts || {};
   const state = ctx.state;
   if (state.pendingElection) {
     act(ctx, resolveImperialElection, [], { category: "TITLE", action: "resolve_election", reason: "cast the vote", meaningful: true });
@@ -350,9 +355,17 @@ function handleElection(ctx, giftBudgetPerElector, minBuffer, reason) {
   let acted = false;
   for (const aiId of neighborIds(state)) {
     if (computeElectorStance(state, aiId, state.rulerId) === "SICHER_FUER") continue;
-    if (state.treasury - CONFIG.election.giftCost < minBuffer) continue;
-    const res = act(ctx, giftElector, [aiId], { category: "TITLE", action: "gift_elector", reason, meaningful: true });
-    if (res.ok) acted = true;
+    if (state.treasury - CONFIG.election.giftCost >= minBuffer) {
+      const res = act(ctx, giftElector, [aiId], { category: "TITLE", action: "gift_elector", reason, meaningful: true });
+      if (res.ok) acted = true;
+    }
+    if (opts.usePromises && state.electionPromises) {
+      const alreadyPromised = Object.values(state.electionPromises.byId).some(p => p.electorRegionId === aiId && p.status === "PROMISED");
+      if (!alreadyPromised && state.treasury - giftBudgetPerElector >= minBuffer) {
+        const pres = act(ctx, createElectionPromise, [aiId, "pay_tribute", { amount: giftBudgetPerElector }], { category: "TITLE", action: "promise_elector", reason, meaningful: true });
+        if (pres.ok) acted = true;
+      }
+    }
   }
   return acted;
 }

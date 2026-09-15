@@ -46,6 +46,17 @@ AGENTS.verwalter = {
     if (pendingEstateIds(ctx).length > 1) return { aggressionBias: -1, costSensitivity: 0.1, reasonLabel: "no favoritism between estates, take the costly balanced path", expectedGoal: "institutional stability" };
     return { aggressionBias: -0.8, costSensitivity: 0.1, reasonLabel: "grant estate privileges generously, a stable court is worth the cost", expectedGoal: "long-term institutional stability" };
   },
+  // §Phase-12: the same institutional-stability instinct applies to formal
+  // Kaiserwahl commitments — a given word is a standing obligation, so a
+  // broken promise gets compensated without hesitation, and a "rivalisierende
+  // Zusagen" dilemma is resolved by keeping every commitment, not by picking
+  // the cheapest way out.
+  imperialPoliticsEventPrefs: function (ctx) {
+    const templateId = pendingImperialPoliticsChainId(ctx);
+    if (templateId === "gebrochenes_versprechen") return { aggressionBias: -1, costSensitivity: 0.1, reasonLabel: "a broken word is a standing institutional failure, compensate fully", expectedGoal: "restore trust in the crown's commitments" };
+    if (templateId === "rivalisierende_zusagen") return { aggressionBias: -1, costSensitivity: 0.1, reasonLabel: "hold every commitment, consistency is the point", expectedGoal: "institutional reliability" };
+    return { aggressionBias: -0.7, costSensitivity: 0.2, reasonLabel: "the same measured, stability-first instinct as everywhere else", expectedGoal: "orderly path to the crown" };
+  },
   decideMonth: function (ctx) {
     manageTreasuryHealth(ctx, { minBuffer: 400, maxDebt: 5000, reason: "conservative treasury management" });
     makeYearlyOnce(ctx, "annual_verwalter", () => {
@@ -57,7 +68,7 @@ AGENTS.verwalter = {
     tradeSurplusGoods(ctx, 400, "avoid waste, ensure food security");
     considerBuildPalast(ctx, 400, "a well-run realm eventually earns a palace, and König requires one");
     considerBuildKathedrale(ctx, 400, "the crown requires a kathedrale, and a well-run realm can eventually afford one");
-    handleElection(ctx, CONFIG.election.giftCost, 400, "if the crown becomes reachable through sheer good governance, take it");
+    handleElection(ctx, CONFIG.election.giftCost, 400, "if the crown becomes reachable through sheer good governance, take it", { usePromises: true });
     recruitPreferred(ctx, ["pikeniere", "miliz"], 0.15, 400, "minimal defensive garrison only", "deterrence, not conquest", 80);
     warCampaign(ctx, { minBuffer: 400, allowDeclareWar: false, allowPeace: true, peaceAfterYears: 3, reason: "defensive only" });
   },
@@ -144,6 +155,15 @@ AGENTS.diplomat = {
     if (pendingEstateIds(ctx).length > 1) return { aggressionBias: -1, costSensitivity: 0.2, reasonLabel: "broker a compromise rather than pick a side between estates", expectedGoal: "internal peace" };
     return { aggressionBias: -0.9, costSensitivity: 0.2, reasonLabel: "generosity preserves goodwill with every estate, just as with foreign powers", expectedGoal: "relationship preservation" };
   },
+  // §Phase-12: the crown itself is just another relationship to cultivate —
+  // court every undecided elector, always compensate a broken promise
+  // generously, and never abandon a standing commitment when several
+  // collide.
+  imperialPoliticsEventPrefs: function (ctx) {
+    const templateId = pendingImperialPoliticsChainId(ctx);
+    if (templateId === "teures_versprechen") return { aggressionBias: -1, costSensitivity: 0.1, reasonLabel: "pay every debt of honor promptly, relationships come before cost", expectedGoal: "preserve trust with the electors" };
+    return { aggressionBias: -0.95, costSensitivity: 0.15, reasonLabel: "the crown is won through goodwill, not coercion", expectedGoal: "relationship preservation" };
+  },
   decideMonth: function (ctx) {
     manageTreasuryHealth(ctx, { minBuffer: 300, maxDebt: 5000, reason: "diplomatic gifts require liquidity" });
     makeYearlyOnce(ctx, "annual_diplomat", () => {
@@ -154,7 +174,7 @@ AGENTS.diplomat = {
     maintainDiplomacy(ctx, ["gift", "nonaggr", "trade", "alliance", "guarantee"], 60, 300, "build durable alliances");
     considerBuildKathedrale(ctx, 300, "the crown requires a kathedrale first");
     considerBuildPalast(ctx, 300, "König requires a palace");
-    handleElection(ctx, CONFIG.election.giftCost, 300, "diplomatic path to the crown");
+    handleElection(ctx, CONFIG.election.giftCost, 300, "diplomatic path to the crown", { usePromises: true });
     recruitPreferred(ctx, ["pikeniere"], 0.05, 500, "token defense only", "credibility, not aggression", 40);
     warCampaign(ctx, { minBuffer: 500, allowDeclareWar: false, allowPeace: true, peaceAfterYears: 1, reason: "war is a diplomatic failure" });
   },
@@ -174,6 +194,16 @@ AGENTS.dynast = {
     if (pendingEstateIds(ctx).length > 1) return { aggressionBias: -1, costSensitivity: 0.2, reasonLabel: "no estate should become a lasting enemy of the throne", expectedGoal: "dynastic security" };
     return { aggressionBias: -0.5, costSensitivity: 0.3, reasonLabel: "an estate content today doesn't threaten the succession tomorrow", expectedGoal: "dynastic stability" };
   },
+  // §Phase-12: the crown is the ultimate dynastic legacy, worth pursuing the
+  // same way marriage/hostage bonds are — a formal Wahlversprechen is just
+  // another dynastic-style commitment, kept scrupulously (family honor is
+  // the point, not the cheapest exit).
+  imperialPoliticsEventPrefs: function (ctx) {
+    const templateId = pendingImperialPoliticsChainId(ctx);
+    if (templateId === "gebrochenes_versprechen") return { aggressionBias: -1, costSensitivity: 0.1, reasonLabel: "a broken word stains the house's honor for generations, compensate fully", expectedGoal: "protect the family's name" };
+    if (templateId === "rivalisierende_zusagen") return { aggressionBias: -1, costSensitivity: 0.1, reasonLabel: "a dynasty keeps every bond it makes", expectedGoal: "dynastic reliability" };
+    return { aggressionBias: -0.5, costSensitivity: 0.3, reasonLabel: "the same measured, family-first instinct as everywhere else", expectedGoal: "dynastic legacy" };
+  },
   decideMonth: function (ctx) {
     manageTreasuryHealth(ctx, { minBuffer: 350, maxDebt: 5000, reason: "court stability requires solvency" });
     makeYearlyOnce(ctx, "annual_dynast", () => {
@@ -185,6 +215,9 @@ AGENTS.dynast = {
     // §3 of the catalog) is prioritized ahead of alliance-building for its own sake.
     maintainDiplomacy(ctx, ["gift", "marriage", "hostage", "nonaggr"], 50, 350, "bind neighboring houses through marriage and hostages");
     tradeSurplusGoods(ctx, 350, "steady household finances");
+    considerBuildKathedrale(ctx, 350, "the crown is the ultimate dynastic legacy");
+    considerBuildPalast(ctx, 350, "König requires a palace, another dynastic milestone");
+    handleElection(ctx, CONFIG.election.giftCost, 350, "the crown crowns the dynasty's legacy", { usePromises: true });
     recruitPreferred(ctx, ["pikeniere", "miliz"], 0.1, 400, "household guard only", "protect the dynasty, not conquest", 60);
     warCampaign(ctx, { minBuffer: 400, allowDeclareWar: false, allowPeace: true, peaceAfterYears: 2, reason: "war endangers heirs" });
   },
@@ -195,6 +228,19 @@ AGENTS.machtpolitiker = {
   id: "machtpolitiker",
   namePool: NAME_POOL_DEFAULT,
   eventPrefs: () => ({ aggressionBias: 0.3, costSensitivity: 0.2, reasonLabel: "protect prestige and legitimacy", expectedGoal: "title progression" }),
+  // §Phase-12: the Kaiserwahl is this archetype's whole reason for being
+  // (unlike the Landstände, which it deliberately treats with its regular,
+  // non-specialized eventPrefs) — a calculated operator who protects
+  // legitimacy and prestige, not a generous one: pays debts of honor
+  // promptly (image matters), but under conflicting commitments sheds the
+  // weakest one rather than clinging to all of them out of principle.
+  imperialPoliticsEventPrefs: function (ctx) {
+    const templateId = pendingImperialPoliticsChainId(ctx);
+    if (templateId === "teures_versprechen") return { aggressionBias: -0.8, costSensitivity: 0.1, reasonLabel: "a prompt payment protects legitimacy far more than the coin costs", expectedGoal: "unblemished reputation" };
+    if (templateId === "rivalisierende_zusagen") return { aggressionBias: 0.5, costSensitivity: 0.2, reasonLabel: "shed the weakest commitment, calculated over sentimental", expectedGoal: "protect the strongest bonds" };
+    if (templateId === "gebrochenes_versprechen") return { aggressionBias: -0.5, costSensitivity: 0.3, reasonLabel: "a calculated compensation, enough to protect legitimacy, not more", expectedGoal: "damage control" };
+    return { aggressionBias: 0.1, costSensitivity: 0.2, reasonLabel: "every move here is measured against prestige and legitimacy", expectedGoal: "the crown itself" };
+  },
   decideMonth: function (ctx) {
     manageTreasuryHealth(ctx, { minBuffer: 300, maxDebt: 5500, reason: "prestige projects need funds" });
     makeYearlyOnce(ctx, "annual_machtpolitiker", () => {
@@ -206,7 +252,7 @@ AGENTS.machtpolitiker = {
     maintainDiplomacy(ctx, ["gift", "nonaggr", "alliance", "guarantee"], 55, 300, "diplomatic standing supports the crown");
     considerBuildKathedrale(ctx, 300, "prestige building and Kaiserwahl prerequisite");
     considerBuildPalast(ctx, 300, "König requires a palace");
-    handleElection(ctx, CONFIG.election.giftCost, 300, "the crown is the ultimate prestige goal");
+    handleElection(ctx, CONFIG.election.giftCost, 300, "the crown is the ultimate prestige goal", { usePromises: true });
     recruitPreferred(ctx, ["ritter", "pikeniere"], 0.25, 300, "credible but selective military", "power projection", 200);
     warCampaign(ctx, {
       minBuffer: 300, allowDeclareWar: true, opportunistic: false, hostileRelationThreshold: 10,
@@ -245,6 +291,11 @@ AGENTS.opportunist = {
       minBuffer: 250, allowDeclareWar: true, opportunistic: true, strengthMargin: 1.2,
       attackMargin: 0.75, allowPeace: true, peaceAfterYears: 5, reason: "war when the numbers favor it, peace when they don't",
     });
+    // §Phase-12: deliberately no imperialPoliticsEventPrefs and no
+    // usePromises -- "no fixed doctrine" (see eventPrefs above) extends to
+    // never binding itself with a formal promise either; its per-decision
+    // random bias already gives it naturally varied behavior in the five
+    // new chains without a second, contradictory fixed stance.
     handleElection(ctx, CONFIG.election.giftCost, 250, "crown is worth grabbing if affordable");
   },
 };
@@ -354,6 +405,17 @@ AGENTS.minmaxer = {
       ? { aggressionBias: -0.8, costSensitivity: 0.1, reasonLabel: "min-max: a permanent privilege is cheap during " + phase.name, expectedGoal: "cheap structural gains" }
       : { aggressionBias: 1.0, costSensitivity: 0.9, reasonLabel: "min-max: protect the war chest during " + phase.name, expectedGoal: "preserve resources for the active exploit test" };
   },
+  // §Phase-12: mirrors the estateEventPrefs honesty above -- the five new
+  // Kaiserwahl chains aren't a named hypothesis outside kaiserwahl_bribery_rush,
+  // so they get the same safe, hypothesis-neutral middle path; only during
+  // that phase does the min-maxer actively lean into the toolkit it's
+  // testing (gifts AND promises now, not just the old bribery-only path).
+  imperialPoliticsEventPrefs: function (ctx) {
+    const yearsIn = ctx.state.year - 1500;
+    const phase = minmaxPhaseFor(yearsIn);
+    if (phase.name !== "kaiserwahl_bribery_rush") return { aggressionBias: -1, costSensitivity: 0.2, reasonLabel: "not part of the current exploit hypothesis, take the safe middle path", expectedGoal: "avoid confounding the active test" };
+    return { aggressionBias: -0.8, costSensitivity: 0.1, reasonLabel: "min-max: rush every lever toward the crown during kaiserwahl_bribery_rush", expectedGoal: "measure whether promises accelerate a bribery-rush win" };
+  },
   decideMonth: function (ctx) {
     const yearsIn = ctx.state.year - 1500;
     const phase = minmaxPhaseFor(yearsIn);
@@ -370,7 +432,7 @@ AGENTS.minmaxer = {
     considerBuildKathedrale(ctx, 100, "exploit test: build the Kaiserwahl prerequisite early so the bribery-rush phase can actually trigger an election");
     considerBuildPalast(ctx, 100, "exploit test: König also requires a palace");
     if (phase.name === "kaiserwahl_bribery_rush") {
-      handleElection(ctx, CONFIG.election.giftCost, 100, "exploit test: rush the crown via bribery");
+      handleElection(ctx, CONFIG.election.giftCost, 100, "exploit test: rush the crown via gifts and promises", { usePromises: true });
     }
     if (phase.name === "economic_extraction") {
       tradeSurplusGoods(ctx, 100, "exploit test: liquidate everything");
